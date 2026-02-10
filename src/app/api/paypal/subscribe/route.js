@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { createSubscription } from '@/lib/paypal-server';
 import { adminDb } from '@/lib/firebase-admin';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * POST /api/paypal/subscribe
  * Body: { orgId, tier, billingCycle, quantity, subscriberName, subscriberEmail }

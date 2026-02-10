@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { updateSubscriptionQuantity, suspendSubscription, activateSubscription } from '@/lib/paypal-server';
 import { adminDb } from '@/lib/firebase-admin';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/paypal/sync
  * Body: { orgId }

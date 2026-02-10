@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { cancelSubscription } from '@/lib/paypal-server';
 import { adminDb } from '@/lib/firebase-admin';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * POST /api/paypal/cancel
  * Body: { orgId, reason }

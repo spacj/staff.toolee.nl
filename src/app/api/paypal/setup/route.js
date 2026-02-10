@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { setupAllPlans } from '@/lib/paypal-server';
 import { adminDb } from '@/lib/firebase-admin';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/paypal/setup
  * One-time: Creates PayPal product + 4 billing plans, stores IDs in Firestore.
