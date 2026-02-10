@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function CostsPage() {
+function CostsContent() {
   const { orgId, organization, isAdmin, user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -297,5 +297,19 @@ export default function CostsPage() {
         </Modal>
       </div>
     </Layout>
+  );
+}
+
+export default function CostsPage() {
+  return (
+    <Suspense fallback={
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
+        </div>
+      </Layout>
+    }>
+      <CostsContent />
+    </Suspense>
   );
 }
