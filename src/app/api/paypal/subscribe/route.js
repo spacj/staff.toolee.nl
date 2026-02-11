@@ -23,14 +23,23 @@ export async function POST(req) {
     let configDoc = await adminDb.collection('config').doc('paypal').get();
     if (!configDoc.exists || !configDoc.data()?.plans) {
       console.log('[Subscribe] Plans not configured, creating automatically...');
-      const result = await setupAllPlans();
-      await adminDb.collection('config').doc('paypal').set({
-        productId: result.productId,
-        plans: result.plans,
-        planVersion: 2,
-        createdAt: new Date().toISOString(),
-      });
-      configDoc = await adminDb.collection('config').doc('paypal').get();
+      try {
+        const result = await setupAllPlans();
+        await adminDb.collection('config').doc('paypal').set({
+          productId: result.productId,
+          plans: result.plans,
+          planVersion: 2,
+          createdAt: new Date().toISOString(),
+        });
+        // Re-read the updated config
+        configDoc = await adminDb.collection('config').doc('paypal').get();
+      } catch (setupErr) {
+        console.error('[Subscribe] Auto-setup failed:', setupErr);
+        return NextResponse.json({ 
+          error: 'Failed to create PayPal plans automatically: ' + setupErr.message,
+          needsPlanRecreation: true
+        }, { status: 500 });
+      }
     }
     if (!configDoc.exists) {
       return NextResponse.json({ error: 'PayPal plans not configured after setup.' }, { status: 500 });
