@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createSubscription } from '@/lib/paypal-server';
+import { createSubscription, setupAllPlans } from '@/lib/paypal-server';
 import { adminDb } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
@@ -19,26 +19,26 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-// Get plan IDs from Firestore config
-    const configDoc = await adminDb.collection('config').doc('paypal').get();
+    // Auto-ensure PayPal plans are configured (no user prompts)
+    let configDoc = await adminDb.collection('config').doc('paypal').get();
+    if (!configDoc.exists || !configDoc.data()?.plans) {
+      console.log('[Subscribe] Plans not configured, creating automatically...');
+      const result = await setupAllPlans();
+      await adminDb.collection('config').doc('paypal').set({
+        productId: result.productId,
+        plans: result.plans,
+        planVersion: 2,
+        createdAt: new Date().toISOString(),
+      });
+      configDoc = await adminDb.collection('config').doc('paypal').get();
+    }
     if (!configDoc.exists) {
-      return NextResponse.json({ error: 'PayPal plans not configured. Run setup first.' }, { status: 400 });
+      return NextResponse.json({ error: 'PayPal plans not configured after setup.' }, { status: 500 });
     }
-    const { plans, planVersion } = configDoc.data();
+    const plans = configDoc.data().plans;
     
-    // Check if plans support decimal pricing (version 2+)
-    const supportsDecimalPricing = planVersion >= 2;
-    console.log('[Subscribe Debug] Plan version:', planVersion, 'Supports decimal:', supportsDecimalPricing, 'Quantity:', quantity);
-    
-    if (!supportsDecimalPricing && quantity && quantity > 100) {
-      console.log('[Subscribe Debug] Decimal pricing not supported, returning error');
-      return NextResponse.json({ 
-        error: 'PayPal plans need to be recreated to support decimal pricing. Please contact admin.',
-        needsPlanRecreation: true,
-        currentVersion: planVersion || 1,
-        requiredVersion: 2
-      }, { status: 400 });
-    }
+    // Debug logging for troubleshooting
+    console.log('[Subscribe Debug] Creating subscription with quantity:', quantity);
 
     // Determine plan ID
     let planId;
@@ -59,10 +59,7 @@ export async function POST(req) {
       planId: plans.standardMonthly || plans.standardYearly || plans.enterpriseMonthly || plans.enterpriseYearly
     });
 
-    // Check if quantity suggests a pricing mismatch (quantity > 100 suggests cents-based pricing)
-    if (quantity && quantity > 100 && !isEnterprise) {
-      console.warn('Large quantity detected, may need to recreate PayPal plans with €0.01/unit pricing');
-    }
+    
 
     const result = await createSubscription(
       planId,
@@ -74,17 +71,6 @@ export async function POST(req) {
 
 if (!result.ok) {
       console.error('PayPal subscription creation failed:', result.status, result.data);
-      
-      // Specific handling for 422 semantic error (pricing mismatch)
-      if (result.status === 422) {
-        return NextResponse.json({ 
-          error: 'PayPal pricing mismatch. Please recreate PayPal plans with new decimal pricing.',
-          detail: result.data,
-          needsPlanRecreation: true,
-          status: result.status 
-        }, { status: 422 });
-      }
-      
       return NextResponse.json({ 
         error: 'Failed to create subscription', 
         detail: result.data,
