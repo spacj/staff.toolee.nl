@@ -27,8 +27,9 @@ function CostsContent() {
   const [orgData, setOrgData] = useState(null);
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [setupLoading, setSetupLoading] = useState(false);
+const [setupLoading, setSetupLoading] = useState(false);
   const [planConfig, setPlanConfig] = useState(null);
+  const [planConfigLoading, setPlanConfigLoading] = useState(true);
 
   const currentPeriod = new Date().toISOString().slice(0, 7);
   const today = new Date().toISOString().split('T')[0];
@@ -42,8 +43,14 @@ function CostsContent() {
     getShifts({ orgId, startDate: monthStart, endDate: monthEnd }).then(setShifts);
     getPayments({ orgId, limit: 20 }).then(setPayments);
     getOrganization(orgId).then(setOrgData);
-    // Check if PayPal plans are configured
-    fetch('/api/paypal/setup').then(r => r.json()).then(setPlanConfig).catch(() => {});
+// Check if PayPal plans are configured
+    setPlanConfigLoading(true);
+    fetch('/api/paypal/setup').then(r => r.json()).then(data => {
+      setPlanConfig(data);
+      setPlanConfigLoading(false);
+    }).catch(() => {
+      setPlanConfigLoading(false);
+    });
   };
   useEffect(() => { load(); }, [orgId]);
 
@@ -89,11 +96,11 @@ function CostsContent() {
   }, 0);
 
   // ─── Setup PayPal Plans (admin one-time) ────
-  const handleSetupPlans = async () => {
+const handleSetupPlans = async () => {
     if (!confirm('This creates PayPal billing plans. Run once only. Continue?')) return;
     setSetupLoading(true);
     try {
-      const res = await fetch('/api/paypal/setup', { method: 'POST' });
+      const res = await fetch('/api/paypal/setup', { method: 'POST', body: JSON.stringify({}) });
       const data = await res.json();
       if (res.ok) {
         toast.success('PayPal plans created!');
@@ -101,8 +108,34 @@ function CostsContent() {
       } else {
         toast.error(data.error || 'Setup failed');
       }
-    } catch (err) { toast.error(err.message); }
-    setSetupLoading(false);
+      setSetupLoading(false);
+    } catch (err) {
+      toast.error(err.message);
+      setSetupLoading(false);
+    }
+  };
+
+  const handleRecreatePlans = async () => {
+    if (!confirm('This will recreate PayPal billing plans with new decimal pricing. Existing subscriptions will continue working. Continue?')) return;
+    setSetupLoading(true);
+    try {
+      const res = await fetch('/api/paypal/setup', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('PayPal plans updated with decimal pricing!');
+        setPlanConfig(data);
+      } else {
+        toast.error(data.error || 'Setup failed');
+      }
+      setSetupLoading(false);
+    } catch (err) {
+      toast.error(err.message);
+      setSetupLoading(false);
+    }
   };
 
   // ─── Cancel Subscription ────────────────────
@@ -270,8 +303,8 @@ function CostsContent() {
           </div>
         </div>
 
-        {/* ═══ Admin: Setup PayPal Plans ═══ */}
-        {isAdmin && !planConfig?.configured && (
+{/* ═══ Admin: Setup PayPal Plans ═══ */}
+        {isAdmin && !planConfigLoading && !planConfig?.configured && (
           <div className="card p-5 border-amber-200 bg-amber-50/30">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -280,6 +313,22 @@ function CostsContent() {
                 <p className="text-xs text-amber-700 mt-1">Before customers can subscribe, you need to create billing plans on PayPal. This only needs to be done once. Make sure PAYPAL_CLIENT_SECRET and NEXT_PUBLIC_PAYPAL_CLIENT_ID are set in .env.local.</p>
                 <button onClick={handleSetupPlans} disabled={setupLoading} className="btn-primary mt-3 !text-sm">
                   {setupLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating plans...</> : <><Zap className="w-4 h-4" /> Create PayPal Plans</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ Admin: Recreate PayPal Plans (Decimal Pricing) ═══ */}
+        {isAdmin && planConfig?.configured && planConfig?.planVersion < 2 && (
+          <div className="card p-5 border-blue-200 bg-blue-50/30">
+            <div className="flex items-start gap-3">
+              <RefreshCw className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-blue-800">PayPal Plans Need Update</p>
+                <p className="text-xs text-blue-700 mt-1">Your PayPal plans use old pricing (€1/unit). Update to support decimal pricing (€0.50/worker, €2.99/shop). This will recreate all billing plans with the new pricing structure.</p>
+                <button onClick={() => handleRecreatePlans()} disabled={setupLoading} className="btn-primary mt-3 !text-sm bg-blue-600 hover:bg-blue-700">
+                  {setupLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Updating plans...</> : <><RefreshCw className="w-4 h-4" /> Update PayPal Plans</>}
                 </button>
               </div>
             </div>
