@@ -51,37 +51,29 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
       });
       const data = await res.json();
 
-      if (!res.ok) {
-      if (data.needsPlanRecreation) {
-        // Offer direct recreation option
-        if (confirm('PayPal plans need updating. Click OK to recreate plans with decimal pricing now.')) {
-          // Trigger plan recreation
-          try {
-            const setupRes = await fetch('/api/paypal/setup', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ force: true })
-            });
-            if (setupRes.ok) {
-              toast.success('PayPal plans updated! Please refresh the page and try again.');
-              // Don't retry automatically - require page refresh
-              setStatus('idle');
-              return;
+if (!res.ok) {
+        if (data.needsPlanRecreation) {
+          // Offer direct recreation option
+          if (confirm('PayPal plans need updating. Click OK to recreate plans with decimal pricing now.')) {
+            // Trigger plan recreation
+            try {
+              const setupRes = await fetch('/api/paypal/setup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ force: true })
+              });
+              if (setupRes.ok) {
+                toast.success('PayPal plans updated! Please refresh the page and try again.');
+                // Don't retry automatically - require page refresh
+                setStatus('idle');
+                return;
+              }
+            } catch (setupErr) {
+              console.error('Failed to recreate plans:', setupErr);
             }
-          } catch (setupErr) {
-            console.error('Failed to recreate plans:', setupErr);
           }
-        }
-        throw new Error('PayPal plans need to be updated to support decimal pricing. Please refresh the page after updating.');
-      }
-          } catch (setupErr) {
-            console.error('Failed to recreate plans:', setupErr);
-          }
-        }
-        throw new Error('PayPal plans need to be updated to support decimal pricing. Please contact your administrator to recreate PayPal plans.');
-      }
-        throw new Error(data.error || 'Failed to create subscription');
-      }
+          throw new Error('PayPal plans need to be updated to support decimal pricing. Please refresh the page after updating.');
+}
 
       if (data.approvalUrl) {
         // Redirect to PayPal for approval
