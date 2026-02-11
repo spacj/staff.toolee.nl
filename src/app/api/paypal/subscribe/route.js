@@ -28,7 +28,10 @@ export async function POST(req) {
     
     // Check if plans support decimal pricing (version 2+)
     const supportsDecimalPricing = planVersion >= 2;
+    console.log('[Subscribe Debug] Plan version:', planVersion, 'Supports decimal:', supportsDecimalPricing, 'Quantity:', quantity);
+    
     if (!supportsDecimalPricing && quantity && quantity > 100) {
+      console.log('[Subscribe Debug] Decimal pricing not supported, returning error');
       return NextResponse.json({ 
         error: 'PayPal plans need to be recreated to support decimal pricing. Please contact admin.',
         needsPlanRecreation: true,

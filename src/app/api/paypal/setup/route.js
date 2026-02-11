@@ -30,7 +30,9 @@ export async function POST(req) {
       createdAt: new Date().toISOString(),
     });
 
-    return NextResponse.json({ success: true, ...result });
+    const response = { success: true, ...result, planVersion: 2 };
+    console.log('[Setup Debug] Returning response:', response);
+    return NextResponse.json(response);
   } catch (err) {
     console.error('PayPal setup error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -42,7 +44,9 @@ export async function GET() {
   try {
     const configDoc = await adminDb.collection('config').doc('paypal').get();
     if (!configDoc.exists) return NextResponse.json({ configured: false });
-    return NextResponse.json({ configured: true, ...configDoc.data() });
+    const data = { configured: true, ...configDoc.data() };
+    console.log('[GET Config] Returning:', data);
+    return NextResponse.json(data);
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

@@ -44,12 +44,14 @@ function CostsContent() {
     getShifts({ orgId, startDate: monthStart, endDate: monthEnd }).then(setShifts);
     getPayments({ orgId, limit: 20 }).then(setPayments);
     getOrganization(orgId).then(setOrgData);
-// Check if PayPal plans are configured
+    // Check if PayPal plans are configured
     setPlanConfigLoading(true);
     fetch('/api/paypal/setup').then(r => r.json()).then(data => {
+      console.log('[Page Load] Received plan config:', data);
       setPlanConfig(data);
       setPlanConfigLoading(false);
-    }).catch(() => {
+    }).catch((err) => {
+      console.error('[Page Load] Error fetching plan config:', err);
       setPlanConfigLoading(false);
     });
   };
@@ -330,6 +332,25 @@ const handleSetupPlans = async () => {
             <div>planConfigLoading: {planConfigLoading ? 'true' : 'false'}</div>
             <div>planConfig.configured: {planConfig?.configured ? 'true' : 'false'}</div>
             <div>planConfig.planVersion: {planConfig?.planVersion || 'undefined'}</div>
+            <div>justUpdatedPlans: {justUpdatedPlans ? 'true' : 'false'}</div>
+            <div>setupLoading: {setupLoading ? 'true' : 'false'}</div>
+            <div>Full planConfig: {JSON.stringify(planConfig, null, 2)}</div>
+            <button 
+              onClick={() => {
+                setPlanConfigLoading(true);
+                fetch('/api/paypal/setup').then(r => r.json()).then(data => {
+                  console.log('[Manual Refresh] Received plan config:', data);
+                  setPlanConfig(data);
+                  setPlanConfigLoading(false);
+                }).catch((err) => {
+                  console.error('[Manual Refresh] Error:', err);
+                  setPlanConfigLoading(false);
+                });
+              }}
+              className="mt-2 text-xs bg-gray-200 px-2 py-1 rounded"
+            >
+              Refresh Plan Config
+            </button>
           </div>
         )}
 
