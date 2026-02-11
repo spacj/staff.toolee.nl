@@ -52,9 +52,9 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
       const data = await res.json();
 
       if (!res.ok) {
-        if (data.needsPlanRecreation) {
+      if (data.needsPlanRecreation) {
         // Offer direct recreation option
-        if (confirm('PayPal plans need updating. Click OK to recreate plans with decimal pricing now, or Cancel to contact your administrator.')) {
+        if (confirm('PayPal plans need updating. Click OK to recreate plans with decimal pricing now.')) {
           // Trigger plan recreation
           try {
             const setupRes = await fetch('/api/paypal/setup', {
@@ -63,11 +63,17 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
               body: JSON.stringify({ force: true })
             });
             if (setupRes.ok) {
-              toast.success('PayPal plans updated! Trying payment again...');
-              // Retry the subscription after a brief delay
-              setTimeout(() => handleSubscribe(), 2000);
-              return; // Don't throw error, will retry automatically
+              toast.success('PayPal plans updated! Please refresh the page and try again.');
+              // Don't retry automatically - require page refresh
+              setStatus('idle');
+              return;
             }
+          } catch (setupErr) {
+            console.error('Failed to recreate plans:', setupErr);
+          }
+        }
+        throw new Error('PayPal plans need to be updated to support decimal pricing. Please refresh the page after updating.');
+      }
           } catch (setupErr) {
             console.error('Failed to recreate plans:', setupErr);
           }

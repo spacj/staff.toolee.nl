@@ -103,8 +103,12 @@ const handleSetupPlans = async () => {
       const res = await fetch('/api/paypal/setup', { method: 'POST', body: JSON.stringify({}) });
       const data = await res.json();
       if (res.ok) {
-        toast.success('PayPal plans created!');
+        toast.success('PayPal plans created! Please refresh the page.');
         setPlanConfig(data);
+        // Force page reload after successful plan creation
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       } else {
         toast.error(data.error || 'Setup failed');
       }
@@ -126,8 +130,12 @@ const handleSetupPlans = async () => {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success('PayPal plans updated with decimal pricing!');
+        toast.success('PayPal plans updated with decimal pricing! Please refresh the page.');
         setPlanConfig(data);
+        // Force page reload after successful plan update
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       } else {
         toast.error(data.error || 'Setup failed');
       }
