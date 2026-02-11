@@ -10,8 +10,8 @@
  *   When workers or shops change, we PATCH the subscription quantity.
  *   Enterprise plans use fixed pricing.
  */
-const PRICE_PER_WORKER = 0.02;
-const PRICE_PER_SHOP = 0.15;
+const PRICE_PER_WORKER = 0.50; // €0.50 per worker for testing
+const PRICE_PER_SHOP = 2.99;   // €2.99 per shop for testing
 const FREE_WORKER_LIMIT = 5;
 const FREE_SHOP_LIMIT = 1;
 const ENTERPRISE_THRESHOLD = 21;
@@ -91,13 +91,15 @@ export function calculateMonthlyCost(workerCount, shopCount) {
 
 /**
  * Get the PayPal subscription quantity.
- * For Standard: quantity = monthly cost in whole euros (€1/unit pricing).
+ * For Standard: quantity = monthly cost in cents (€0.01/unit pricing).
  * For Enterprise: null (fixed price plan).
  */
 export function getSubscriptionQuantity(workerCount, shopCount) {
   const tier = getTier(workerCount);
   if (tier !== TIERS.STANDARD) return null;
-  return Math.round(workerCount * PRICE_PER_WORKER + shopCount * PRICE_PER_SHOP);
+  // Convert to cents for PayPal quantity (multiply by 100)
+  const totalMonthlyCost = workerCount * PRICE_PER_WORKER + shopCount * PRICE_PER_SHOP;
+  return Math.round(totalMonthlyCost * 100);
 }
 
 export function canAddWorker(currentActiveWorkers, currentShopCount, orgPlan) {

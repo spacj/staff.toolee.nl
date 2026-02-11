@@ -2,12 +2,12 @@
  * PayPal Server-Side API Helpers
  *
  * Uses PayPal Subscriptions API for recurring billing.
- * Strategy: Plans use €1/unit pricing. Quantity = total monthly cost in euros.
+ * Strategy: Plans use €0.01/unit pricing. Quantity = total monthly cost in cents.
  * When workers/shops change → update subscription quantity → PayPal auto-adjusts billing.
  *
  * Plans created:
- *   standard-monthly  → €1/unit/month  (quantity = workerCount×2 + shopCount×15)
- *   standard-yearly   → €10/unit/year  (quantity = same — effectively 2 months free)
+ *   standard-monthly  → €0.01/unit/month  (quantity = total monthly cost × 100)
+ *   standard-yearly   → €0.01/unit/year   (quantity = same — effectively 2 months free)
  *   enterprise-monthly → €99/month fixed
  *   enterprise-yearly  → €990/year fixed (2 months free)
  */
@@ -69,13 +69,13 @@ export async function createPlan(productId, { name, interval, intervalCount, fix
       pricing_scheme: { fixed_price: { value: fixedPrice, currency_code: 'EUR' } },
     });
   } else {
-    // Quantity-based plan (Standard) — €1/unit, quantity = total cost
+    // Quantity-based plan (Standard) — €0.01/unit, quantity = total cost in cents
     billingCycles.push({
       frequency: { interval_unit: interval, interval_count: intervalCount || 1 },
       tenure_type: 'REGULAR',
       sequence: 1,
       total_cycles: 0,
-      pricing_scheme: { fixed_price: { value: unitPrice || '1.00', currency_code: 'EUR' } },
+      pricing_scheme: { fixed_price: { value: unitPrice || '0.01', currency_code: 'EUR' } },
     });
   }
 
@@ -101,13 +101,13 @@ export async function setupAllPlans() {
   // 2. Create plans
   const plans = {};
 
-  // Standard Monthly: €1/unit/month (quantity = total monthly cost)
-  const sm = await createPlan(productId, { name: 'Standard Monthly', interval: 'MONTH', unitPrice: '1.00' });
+  // Standard Monthly: €0.01/unit/month (quantity = total monthly cost × 100)
+  const sm = await createPlan(productId, { name: 'Standard Monthly', interval: 'MONTH', unitPrice: '0.01' });
   if (!sm.ok) throw new Error('Standard Monthly plan failed');
   plans.standardMonthly = sm.data.id;
 
-  // Standard Yearly: €10/unit/year (quantity = monthly cost → effective 2 months free)
-  const sy = await createPlan(productId, { name: 'Standard Yearly', interval: 'YEAR', unitPrice: '10.00' });
+  // Standard Yearly: €1/unit/year (quantity = monthly cost × 100 → effective 2 months free)
+  const sy = await createPlan(productId, { name: 'Standard Yearly', interval: 'YEAR', unitPrice: '1.00' });
   if (!sy.ok) throw new Error('Standard Yearly plan failed');
   plans.standardYearly = sy.data.id;
 

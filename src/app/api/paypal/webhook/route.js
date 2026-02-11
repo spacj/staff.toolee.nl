@@ -71,6 +71,19 @@ export async function POST(req) {
             pendingSubscriptionCycle: null,
             pendingSubscriptionQuantity: null,
           });
+
+          // Update user profiles for all users in the organization
+          const usersSnap = await adminDb.collection('users').where('orgId', '==', org.id).get();
+          const batch = adminDb.firestore.batch();
+          usersSnap.forEach(userDoc => {
+            batch.update(userDoc.ref, {
+              subscriptionStatus: 'active',
+              subscriptionTier: org.pendingSubscriptionTier || org.subscriptionTier || 'standard',
+              subscriptionCycle: org.pendingSubscriptionCycle || org.subscriptionCycle || 'monthly',
+              subscriptionStartTime: resource.start_time,
+            });
+          });
+          await batch.commit();
         }
         break;
       }
@@ -103,6 +116,19 @@ export async function POST(req) {
             paidThrough: period,
             subscriptionStatus: 'active',
           });
+
+          // Update user profiles for all users in the organization
+          const usersSnap = await adminDb.collection('users').where('orgId', '==', org.id).get();
+          const batch = adminDb.firestore.batch();
+          usersSnap.forEach(userDoc => {
+            batch.update(userDoc.ref, {
+              subscriptionStatus: 'active',
+              lastPaymentDate: new Date().toISOString(),
+              subscriptionTier: org.subscriptionTier || 'standard',
+              subscriptionCycle: org.subscriptionCycle || 'monthly',
+            });
+          });
+          await batch.commit();
         }
         break;
       }
@@ -115,6 +141,17 @@ export async function POST(req) {
             subscriptionStatus: 'cancelled',
             subscriptionCancelledAt: new Date().toISOString(),
           });
+
+          // Update user profiles for all users in the organization
+          const usersSnap = await adminDb.collection('users').where('orgId', '==', org.id).get();
+          const batch = adminDb.firestore.batch();
+          usersSnap.forEach(userDoc => {
+            batch.update(userDoc.ref, {
+              subscriptionStatus: 'cancelled',
+              subscriptionCancelledAt: new Date().toISOString(),
+            });
+          });
+          await batch.commit();
         }
         break;
       }
@@ -126,6 +163,16 @@ export async function POST(req) {
           await adminDb.collection('organizations').doc(org.id).update({
             subscriptionStatus: 'suspended',
           });
+
+          // Update user profiles for all users in the organization
+          const usersSnap = await adminDb.collection('users').where('orgId', '==', org.id).get();
+          const batch = adminDb.firestore.batch();
+          usersSnap.forEach(userDoc => {
+            batch.update(userDoc.ref, {
+              subscriptionStatus: 'suspended',
+            });
+          });
+          await batch.commit();
         }
         break;
       }
