@@ -145,7 +145,7 @@ if (!res.ok) {
             )}
           </>
         )}
-        {cost.savings > 0 && (
+{cost.savings > 0 && (
           <div className="flex justify-between text-emerald-600">
             <span>Yearly savings</span>
             <span className="font-semibold">−{formatCurrency(cost.savings)}</span>
@@ -156,6 +156,7 @@ if (!res.ok) {
           <span className="text-lg font-display font-bold text-surface-900">{formatCurrency(cost.total)}</span>
         </div>
       </div>
+      </>
 
       {/* How it works */}
       <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700 space-y-1">
