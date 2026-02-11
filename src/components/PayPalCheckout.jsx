@@ -55,7 +55,6 @@ if (!res.ok) {
         if (data.needsPlanRecreation) {
           // Offer direct recreation option
           if (confirm('PayPal plans need updating. Click OK to recreate plans with decimal pricing now.')) {
-            // Trigger plan recreation
             try {
               const setupRes = await fetch('/api/paypal/setup', {
                 method: 'POST',
@@ -73,7 +72,9 @@ if (!res.ok) {
             }
           }
           throw new Error('PayPal plans need to be updated to support decimal pricing. Please refresh the page after updating.');
-}
+        }
+        throw new Error(data.error || 'Subscription failed');
+      }
 
       if (data.approvalUrl) {
         // Redirect to PayPal for approval
