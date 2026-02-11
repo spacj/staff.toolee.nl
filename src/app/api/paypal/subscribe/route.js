@@ -4,7 +4,6 @@ import { adminDb } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
-
 /**
  * POST /api/paypal/subscribe
  * Body: { orgId, tier, billingCycle, quantity, subscriberName, subscriberEmail }
@@ -19,13 +18,12 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Auto-ensure PayPal plans are configured (no user prompts)
+    // Auto-ensure PayPal plans are configured with decimal pricing
     let configDoc = await adminDb.collection('config').doc('paypal').get();
     const configData = configDoc.data();
     
-    // Always recreate plans to ensure they have the latest pricing (€0.01/unit for decimal support)
     if (!configDoc.exists || !configData?.plans || configData?.planVersion < 2) {
-      console.log('[Subscribe] Plans missing or outdated, recreating automatically...');
+      console.log('[Subscribe] Creating PayPal plans with decimal pricing...');
       try {
         const result = await setupAllPlans();
         await adminDb.collection('config').doc('paypal').set({
@@ -34,7 +32,6 @@ export async function POST(req) {
           planVersion: 2,
           createdAt: new Date().toISOString(),
         });
-        // Re-read the updated config
         configDoc = await adminDb.collection('config').doc('paypal').get();
       } catch (setupErr) {
         console.error('[Subscribe] Auto-setup failed:', setupErr);
@@ -44,34 +41,9 @@ export async function POST(req) {
         }, { status: 500 });
       }
     }
-    if (!configDoc.exists) {
-      return NextResponse.json({ error: 'PayPal plans not configured after setup.' }, { status: 500 });
-    }
-    const plans = configDoc.data().plans;
     
-    // Force recreation if quantity is > 100 (decimal pricing mismatch)
-    if (quantity && quantity > 100 && !isEnterprise) {
-      console.log('[Subscribe] Forcing recreation - decimal quantity detected with old pricing');
-      try {
-        const result = await setupAllPlans();
-        await adminDb.collection('config').doc('paypal').set({
-          productId: result.productId,
-          plans: result.plans,
-          planVersion: 2,
-          createdAt: new Date().toISOString(),
-        });
-        configDoc = await adminDb.collection('config').doc('paypal').get();
-      } catch (setupErr) {
-        console.error('[Subscribe] Forced recreation failed:', setupErr);
-        return NextResponse.json({ 
-          error: 'Failed to update PayPal plans for decimal pricing: ' + setupErr.message,
-          needsPlanRecreation: true
-        }, { status: 500 });
-      }
-    }
-    
-    // Debug logging for troubleshooting
-    console.log('[Subscribe Debug] Creating subscription with quantity:', quantity);
+    const plans = configData?.plans || {};
+    console.log('[Subscribe] Using plans:', plans);
 
     // Determine plan ID
     let planId;
@@ -81,21 +53,11 @@ export async function POST(req) {
     else if (tier === 'enterprise' && billingCycle === 'yearly') planId = plans.enterpriseYearly;
     else return NextResponse.json({ error: 'Invalid tier/cycle combination' }, { status: 400 });
 
-// For standard plans, quantity = total monthly cost in cents
     // For enterprise, quantity is not used (fixed price)
     const isEnterprise = tier === 'enterprise';
     const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
-    // Debug logging
-    console.log('Subscription request:', {
-      tier, billingCycle, quantity, isEnterprise,
-      planId: plans.standardMonthly || plans.standardYearly || plans.enterpriseMonthly || plans.enterpriseYearly
-    });
-
-    
-
-    // Debug logging before PayPal call
-    console.log('[Subscribe Debug] Creating PayPal subscription:', {
+    console.log('[Subscribe Debug] Creating subscription:', {
       planId,
       quantity,
       isEnterprise,
@@ -113,7 +75,7 @@ export async function POST(req) {
       `${origin}/costs?subscription=cancelled`
     );
 
-if (!result.ok) {
+    if (!result.ok) {
       console.error('PayPal subscription creation failed:', result.status, result.data);
       return NextResponse.json({ 
         error: 'Failed to create subscription', 
@@ -138,9 +100,8 @@ if (!result.ok) {
       approvalUrl,
       status: result.data.status,
     });
-} catch (err) {
+  } catch (err) {
     console.error('Subscribe error:', err);
-    console.error('Error stack:', err.stack);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
