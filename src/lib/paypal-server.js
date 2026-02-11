@@ -147,6 +147,7 @@ export async function createSubscription(planId, quantity, subscriber, returnUrl
     body.quantity = String(quantity);
   }
 
+  console.log('[PayPal Debug] Sending subscription request:', body);
   return paypalFetch('/v1/billing/subscriptions', 'POST', body);
 }
 

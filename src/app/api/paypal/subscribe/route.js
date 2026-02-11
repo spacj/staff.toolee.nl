@@ -21,8 +21,11 @@ export async function POST(req) {
 
     // Auto-ensure PayPal plans are configured (no user prompts)
     let configDoc = await adminDb.collection('config').doc('paypal').get();
-    if (!configDoc.exists || !configDoc.data()?.plans) {
-      console.log('[Subscribe] Plans not configured, creating automatically...');
+    const configData = configDoc.data();
+    
+    // Always recreate plans to ensure they have the latest pricing (€0.01/unit for decimal support)
+    if (!configDoc.exists || !configData?.plans || configData?.planVersion < 2) {
+      console.log('[Subscribe] Plans missing or outdated, recreating automatically...');
       try {
         const result = await setupAllPlans();
         await adminDb.collection('config').doc('paypal').set({
@@ -45,6 +48,27 @@ export async function POST(req) {
       return NextResponse.json({ error: 'PayPal plans not configured after setup.' }, { status: 500 });
     }
     const plans = configDoc.data().plans;
+    
+    // Force recreation if quantity is > 100 (decimal pricing mismatch)
+    if (quantity && quantity > 100 && !isEnterprise) {
+      console.log('[Subscribe] Forcing recreation - decimal quantity detected with old pricing');
+      try {
+        const result = await setupAllPlans();
+        await adminDb.collection('config').doc('paypal').set({
+          productId: result.productId,
+          plans: result.plans,
+          planVersion: 2,
+          createdAt: new Date().toISOString(),
+        });
+        configDoc = await adminDb.collection('config').doc('paypal').get();
+      } catch (setupErr) {
+        console.error('[Subscribe] Forced recreation failed:', setupErr);
+        return NextResponse.json({ 
+          error: 'Failed to update PayPal plans for decimal pricing: ' + setupErr.message,
+          needsPlanRecreation: true
+        }, { status: 500 });
+      }
+    }
     
     // Debug logging for troubleshooting
     console.log('[Subscribe Debug] Creating subscription with quantity:', quantity);
@@ -69,6 +93,17 @@ export async function POST(req) {
     });
 
     
+
+    // Debug logging before PayPal call
+    console.log('[Subscribe Debug] Creating PayPal subscription:', {
+      planId,
+      quantity,
+      isEnterprise,
+      tier,
+      billingCycle,
+      subscriberName,
+      subscriberEmail
+    });
 
     const result = await createSubscription(
       planId,
