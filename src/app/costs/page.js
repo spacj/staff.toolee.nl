@@ -303,7 +303,18 @@ const handleSetupPlans = async () => {
           </div>
         </div>
 
-{/* ═══ Admin: Setup PayPal Plans ═══ */}
+{/* ═══ Debug Info (remove in production) ═══ */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="card p-3 border-gray-200 bg-gray-50/30 text-xs">
+            <div><strong>Debug Info:</strong></div>
+            <div>isAdmin: {isAdmin ? 'true' : 'false'}</div>
+            <div>planConfigLoading: {planConfigLoading ? 'true' : 'false'}</div>
+            <div>planConfig.configured: {planConfig?.configured ? 'true' : 'false'}</div>
+            <div>planConfig.planVersion: {planConfig?.planVersion || 'undefined'}</div>
+          </div>
+        )}
+
+        {/* ═══ Admin: Setup PayPal Plans ═══ */}
         {isAdmin && !planConfigLoading && !planConfig?.configured && (
           <div className="card p-5 border-amber-200 bg-amber-50/30">
             <div className="flex items-start gap-3">
@@ -319,17 +330,30 @@ const handleSetupPlans = async () => {
           </div>
         )}
 
-        {/* ═══ Admin: Recreate PayPal Plans (Decimal Pricing) ═══ */}
-        {isAdmin && planConfig?.configured && planConfig?.planVersion < 2 && (
+{/* ═══ Admin: Recreate PayPal Plans (Decimal Pricing) ═══ */}
+        {planConfig?.configured && planConfig?.planVersion < 2 && (
           <div className="card p-5 border-blue-200 bg-blue-50/30">
             <div className="flex items-start gap-3">
               <RefreshCw className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold text-blue-800">PayPal Plans Need Update</p>
-                <p className="text-xs text-blue-700 mt-1">Your PayPal plans use old pricing (€1/unit). Update to support decimal pricing (€0.50/worker, €2.99/shop). This will recreate all billing plans with the new pricing structure.</p>
-                <button onClick={() => handleRecreatePlans()} disabled={setupLoading} className="btn-primary mt-3 !text-sm bg-blue-600 hover:bg-blue-700">
-                  {setupLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Updating plans...</> : <><RefreshCw className="w-4 h-4" /> Update PayPal Plans</>}
-                </button>
+                <p className="text-xs text-blue-700 mt-1">Your PayPal plans use old pricing (€1/unit). Update to support decimal pricing (€0.50/worker, €2.99/shop). This will recreate all billing plans with new pricing structure.</p>
+                {isAdmin ? (
+                  <button onClick={() => handleRecreatePlans()} disabled={setupLoading} className="btn-primary mt-3 !text-sm bg-blue-600 hover:bg-blue-700">
+                    {setupLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Updating plans...</> : <><RefreshCw className="w-4 h-4" /> Update PayPal Plans</>}
+                  </button>
+                ) : (
+                  <div className="mt-3 text-xs text-blue-600">
+                    <p>Contact your administrator to update PayPal plans, or</p>
+                    <button 
+                      onClick={() => handleRecreatePlans()} 
+                      disabled={setupLoading}
+                      className="text-blue-700 underline hover:no-underline mt-1"
+                    >
+                      {setupLoading ? 'Updating...' : 'click here to update manually'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
