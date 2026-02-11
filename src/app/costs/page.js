@@ -27,9 +27,10 @@ function CostsContent() {
   const [orgData, setOrgData] = useState(null);
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-const [setupLoading, setSetupLoading] = useState(false);
+  const [setupLoading, setSetupLoading] = useState(false);
   const [planConfig, setPlanConfig] = useState(null);
   const [planConfigLoading, setPlanConfigLoading] = useState(true);
+  const [justUpdatedPlans, setJustUpdatedPlans] = useState(false);
 
   const currentPeriod = new Date().toISOString().slice(0, 7);
   const today = new Date().toISOString().split('T')[0];
@@ -53,6 +54,14 @@ const [setupLoading, setSetupLoading] = useState(false);
     });
   };
   useEffect(() => { load(); }, [orgId]);
+
+  // Reset justUpdatedPlans flag after 10 seconds
+  useEffect(() => {
+    if (justUpdatedPlans) {
+      const timer = setTimeout(() => setJustUpdatedPlans(false), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [justUpdatedPlans]);
 
   // Handle PayPal return from subscription approval
   useEffect(() => {
@@ -130,12 +139,14 @@ const handleSetupPlans = async () => {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success('PayPal plans updated with decimal pricing! Please refresh the page.');
+        toast.success('PayPal plans updated with decimal pricing! Page will refresh automatically.');
+        // Update config immediately
         setPlanConfig(data);
+        setJustUpdatedPlans(true);
         // Force page reload after successful plan update
         setTimeout(() => {
           window.location.reload();
-        }, 1500);
+        }, 2000);
       } else {
         toast.error(data.error || 'Setup failed');
       }
@@ -338,8 +349,8 @@ const handleSetupPlans = async () => {
           </div>
         )}
 
-{/* ═══ Admin: Recreate PayPal Plans (Decimal Pricing) ═══ */}
-        {planConfig?.configured && planConfig?.planVersion < 2 && (
+        {/* ═══ Admin: Recreate PayPal Plans (Decimal Pricing) ═══ */}
+        {planConfig?.configured && planConfig?.planVersion < 2 && !setupLoading && !justUpdatedPlans && (
           <div className="card p-5 border-blue-200 bg-blue-50/30">
             <div className="flex items-start gap-3">
               <RefreshCw className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
