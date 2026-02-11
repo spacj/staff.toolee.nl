@@ -11,9 +11,12 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(req) {
   try {
+    const body = await req.json().catch(() => ({}));
+    const force = body.force === true;
+    
     // Check if plans already exist
     const configDoc = await adminDb.collection('config').doc('paypal').get();
-    if (configDoc.exists && configDoc.data()?.plans?.standardMonthly) {
+    if (configDoc.exists && configDoc.data()?.plans?.standardMonthly && !force) {
       return NextResponse.json({ message: 'Plans already set up', ...configDoc.data() });
     }
 
@@ -23,6 +26,7 @@ export async function POST(req) {
     await adminDb.collection('config').doc('paypal').set({
       productId: result.productId,
       plans: result.plans,
+      planVersion: 2, // Version 2 supports decimal pricing (€0.01/unit)
       createdAt: new Date().toISOString(),
     });
 

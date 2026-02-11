@@ -52,6 +52,9 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
       const data = await res.json();
 
       if (!res.ok) {
+        if (data.needsPlanRecreation) {
+          throw new Error('PayPal plans need to be updated to support decimal pricing. Please contact your administrator to recreate PayPal plans.');
+        }
         throw new Error(data.error || 'Failed to create subscription');
       }
 
