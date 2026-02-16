@@ -1,0 +1,143 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { -webkit-tap-highlight-color: transparent; }
+  html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  body {
+    @apply bg-surface-50 text-surface-800 font-body;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+  ::selection { @apply bg-brand-200 text-brand-900; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-surface-300/60 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-surface-400; }
+}
+
+@layer components {
+  /* ─── Buttons ────────────────────────────────── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 
+           bg-gradient-to-b from-brand-500 to-brand-600 text-white font-medium text-sm rounded-xl
+           hover:from-brand-600 hover:to-brand-700 active:from-brand-700 active:to-brand-800
+           transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-brand-500/20
+           focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 
+           bg-white text-surface-700 font-medium text-sm rounded-xl
+           border border-surface-200 hover:bg-surface-50 hover:border-surface-300 active:bg-surface-100
+           transition-all duration-200 shadow-card hover:shadow-card-hover
+           focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 
+           bg-gradient-to-b from-danger-500 to-danger-600 text-white font-medium text-sm rounded-xl
+           hover:from-danger-600 hover:to-red-700 active:from-red-700 active:to-red-800
+           transition-all duration-200 shadow-sm
+           focus:outline-none focus:ring-2 focus:ring-danger-400/40 focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-surface-600 font-medium text-sm rounded-xl
+           hover:bg-surface-100 active:bg-surface-200 transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2;
+  }
+  .btn-icon {
+    @apply inline-flex items-center justify-center w-10 h-10 rounded-xl text-surface-500
+           hover:bg-surface-100 hover:text-surface-700 active:bg-surface-200 transition-all duration-150
+           focus:outline-none focus:ring-2 focus:ring-brand-500/30;
+  }
+
+  /* ─── Cards ──────────────────────────────────── */
+  .card {
+    @apply bg-white rounded-2xl border border-surface-200/70 shadow-card transition-all duration-200;
+  }
+  .card-hover { @apply card hover:shadow-card-hover hover:border-surface-300/80 hover:-translate-y-0.5; }
+
+  .stat-card {
+    @apply bg-white rounded-2xl border border-surface-200/70 shadow-card p-5 flex flex-col gap-1.5
+           transition-all duration-200 hover:shadow-card-hover;
+  }
+
+  /* ─── Forms ──────────────────────────────────── */
+  .input-field {
+    @apply w-full px-4 py-2.5 bg-surface-50/50 border border-surface-200 rounded-xl text-sm text-surface-800
+           placeholder:text-surface-400 transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 focus:bg-white
+           hover:border-surface-300;
+  }
+  .select-field {
+    @apply input-field appearance-none bg-no-repeat cursor-pointer pr-10;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.75rem center;
+    background-size: 1.25em 1.25em;
+  }
+  .label { @apply block text-sm font-medium text-surface-600 mb-1.5; }
+
+  /* ─── Badges ─────────────────────────────────── */
+  .badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide; }
+  .badge-admin { @apply badge bg-brand-100 text-brand-700; }
+  .badge-manager { @apply badge bg-purple-100 text-purple-700; }
+  .badge-worker { @apply badge bg-emerald-100 text-emerald-700; }
+  .badge-morning { @apply badge bg-amber-100 text-amber-700; }
+  .badge-afternoon { @apply badge bg-orange-100 text-orange-700; }
+  .badge-night { @apply badge bg-indigo-100 text-indigo-700; }
+  .badge-rest { @apply badge bg-emerald-100 text-emerald-700; }
+
+  /* ─── Layout ─────────────────────────────────── */
+  .page-header { @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6; }
+  .page-title { @apply text-2xl md:text-3xl font-display font-bold text-surface-900 tracking-tight; }
+  .section-title { @apply text-lg font-display font-semibold text-surface-800; }
+
+  /* ─── Table ──────────────────────────────────── */
+  .table-container { @apply card overflow-hidden; }
+  .table-container table { @apply w-full text-sm; }
+  .table-container thead { @apply bg-surface-50/80 border-b border-surface-200; }
+  .table-container th { @apply px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider; }
+  .table-container td { @apply px-4 py-3.5 text-surface-700 border-b border-surface-100; }
+  .table-container tbody tr { @apply hover:bg-surface-50/50 transition-colors; }
+
+  /* ─── Nav ────────────────────────────────────── */
+  .mobile-nav-item { @apply flex flex-col items-center gap-0.5 py-2 px-3 text-[10px] font-medium rounded-xl transition-all; }
+  .shift-block { @apply rounded-lg px-2 py-1 text-xs font-medium truncate cursor-pointer transition-all hover:scale-[1.02]; }
+
+  /* ─── Overlays ───────────────────────────────── */
+  .overlay { @apply fixed inset-0 bg-black/30 backdrop-blur-[2px] z-40 transition-opacity; }
+  .dropdown-menu { @apply absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-lg border border-surface-200 z-[60] py-1; }
+  .dropdown-backdrop { @apply fixed inset-0 z-[55]; }
+  .dropdown-item { @apply flex items-center gap-2 w-full px-3 py-2 text-sm text-surface-700 hover:bg-surface-50 transition-colors; }
+  .dropdown-item-danger { @apply dropdown-item text-red-600 hover:bg-red-50; }
+
+  .modal {
+    @apply fixed inset-x-4 top-1/2 -translate-y-1/2 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2
+           sm:max-w-lg sm:w-full bg-white rounded-2xl shadow-xl z-50 max-h-[90vh] overflow-y-auto;
+  }
+  .drawer { @apply fixed inset-y-0 right-0 w-full sm:w-[420px] bg-white shadow-2xl z-50 overflow-y-auto; }
+}
+
+@layer utilities {
+  .text-gradient { @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-600 to-brand-400; }
+  .animate-in { animation: animateIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+  .slide-in-from-bottom-4 { animation: slideInFromBottom 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+  .animate-stagger > * { animation: slideUp 0.5s ease-out backwards; }
+  .animate-stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .animate-stagger > *:nth-child(2) { animation-delay: 50ms; }
+  .animate-stagger > *:nth-child(3) { animation-delay: 100ms; }
+  .animate-stagger > *:nth-child(4) { animation-delay: 150ms; }
+  .animate-stagger > *:nth-child(5) { animation-delay: 200ms; }
+  .animate-stagger > *:nth-child(6) { animation-delay: 250ms; }
+  .animate-stagger > *:nth-child(7) { animation-delay: 300ms; }
+  .animate-stagger > *:nth-child(8) { animation-delay: 350ms; }
+}
+
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes animateIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+@keyframes slideInFromBottom { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

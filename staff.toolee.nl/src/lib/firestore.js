@@ -1,0 +1,315 @@
+import {
+  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
+  query, where, orderBy, limit, serverTimestamp, writeBatch,
+  onSnapshot, Timestamp
+} from 'firebase/firestore';
+import { db } from './firebase';
+import { getTier } from './pricing';
+
+const C = {
+  USERS: 'users', ORGANIZATIONS: 'organizations', WORKERS: 'workers',
+  SHOPS: 'shops', SHIFT_TEMPLATES: 'shiftTemplates', SHIFTS: 'shifts',
+  SHIFT_PREFERENCES: 'shiftPreferences', ATTENDANCE: 'attendance',
+  PERMITS: 'permits', PAYMENTS: 'payments', NOTIFICATIONS: 'notifications',
+  ACTIVITY_LOG: 'activityLog', INVITES: 'invites',
+};
+
+// ─── Helpers ──────────────────────────────────────────
+function ser(docSnap) {
+  if (!docSnap.exists()) return null;
+  const d = docSnap.data();
+  return { id: docSnap.id, ...d,
+    createdAt: d.createdAt?.toDate?.()?.toISOString() || d.createdAt,
+    updatedAt: d.updatedAt?.toDate?.()?.toISOString() || d.updatedAt,
+  };
+}
+function serAll(snap) { return snap.docs.map(ser); }
+const ts = () => serverTimestamp();
+
+async function add(col, data) {
+  const ref = await addDoc(collection(db, col), { ...data, createdAt: ts(), updatedAt: ts() });
+  return ref.id;
+}
+async function upd(col, id, data) { await updateDoc(doc(db, col, id), { ...data, updatedAt: ts() }); }
+async function del(col, id) { await deleteDoc(doc(db, col, id)); }
+async function get1(col, id) { return ser(await getDoc(doc(db, col, id))); }
+async function getAll(col, ...constraints) {
+  return serAll(await getDocs(query(collection(db, col), ...constraints)));
+}
+
+// ─── Users ────────────────────────────────────────────
+export const getUserProfile = (uid) => get1(C.USERS, uid);
+export const updateUserProfile = (uid, data) => upd(C.USERS, uid, data);
+
+// ─── Organizations ────────────────────────────────────
+export const getOrganization = (id) => get1(C.ORGANIZATIONS, id);
+export const updateOrganization = (id, data) => upd(C.ORGANIZATIONS, id, data);
+
+export async function syncOrgPlan(orgId) {
+  const workers = await getAll(C.WORKERS, where('orgId', '==', orgId), where('status', '==', 'active'));
+  const shops = await getAll(C.SHOPS, where('orgId', '==', orgId));
+  const newTier = getTier(workers.length);
+  const billableShops = Math.max(0, shops.length - 1);
+  const monthlyCost = newTier === 'standard' ? workers.length * 2 + billableShops * 15 : newTier === 'enterprise' ? 99 : 0;
+  await upd(C.ORGANIZATIONS, orgId, { plan: newTier, activeWorkerCount: workers.length, shopCount: shops.length, monthlyCost });
+
+  // Sync PayPal subscription quantity (fire-and-forget)
+  try {
+    const org = await get1(C.ORGANIZATIONS, orgId);
+    const subId = org?.subscriptionId;
+    if (subId && org.subscriptionStatus === 'active') {
+      if (newTier === 'free') {
+        fetch('/api/paypal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriptionId: subId, action: 'suspend' }) });
+      } else if (newTier === 'standard') {
+        const qty = Math.round(monthlyCost);
+        if (qty !== (org.subscriptionQuantity || 0)) {
+          fetch('/api/paypal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriptionId: subId, action: 'update_quantity', quantity: qty }) });
+          await upd(C.ORGANIZATIONS, orgId, { subscriptionQuantity: qty });
+        }
+      }
+    } else if (subId && org.subscriptionStatus === 'suspended' && newTier !== 'free') {
+      fetch('/api/paypal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriptionId: subId, action: 'activate' }) });
+    }
+  } catch {}
+  return { plan: newTier, activeWorkerCount: workers.length, shopCount: shops.length };
+}
+
+// ─── Invites ──────────────────────────────────────────
+function genCode() { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 8; i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
+export async function createInvite(data) { const code = genCode(); const ref = await addDoc(collection(db, C.INVITES), { ...data, code, used: false, createdAt: ts() }); return { id: ref.id, code }; }
+export async function getInviteByCode(code) { const snap = await getDocs(query(collection(db, C.INVITES), where('code', '==', code.toUpperCase()), where('used', '==', false))); return snap.empty ? null : ser(snap.docs[0]); }
+export async function markInviteUsed(id, userId) { await upd(C.INVITES, id, { used: true, usedBy: userId, usedAt: ts() }); }
+export const getInvites = (orgId) => getAll(C.INVITES, where('orgId', '==', orgId), orderBy('createdAt', 'desc'));
+
+// ─── Workers ──────────────────────────────────────────
+export async function getWorkers(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  if (filters.shopId) c.push(where('shopId', '==', filters.shopId));
+  if (filters.status) c.push(where('status', '==', filters.status));
+  c.push(orderBy('lastName', 'asc'));
+  return getAll(C.WORKERS, ...c);
+}
+export const getWorker = (id) => get1(C.WORKERS, id);
+export const createWorker = (data) => add(C.WORKERS, { ...data, status: data.status || 'active' });
+export const updateWorker = (id, data) => upd(C.WORKERS, id, data);
+export const deleteWorker = (id) => del(C.WORKERS, id);
+
+// ─── Shops ────────────────────────────────────────────
+export const getShops = (orgId) => getAll(C.SHOPS, where('orgId', '==', orgId), orderBy('name', 'asc'));
+export const getShop = (id) => get1(C.SHOPS, id);
+export const createShop = (data) => add(C.SHOPS, { ...data, workerCount: 0 });
+export const updateShop = (id, data) => upd(C.SHOPS, id, data);
+export const deleteShop = (id) => del(C.SHOPS, id);
+
+// ─── Shift Templates ─────────────────────────────────
+export async function getShiftTemplates(orgId, shopId) {
+  const c = [where('orgId', '==', orgId)];
+  if (shopId) c.push(where('shopId', '==', shopId));
+  c.push(orderBy('startTime', 'asc'));
+  return getAll(C.SHIFT_TEMPLATES, ...c);
+}
+export const getShiftTemplate = (id) => get1(C.SHIFT_TEMPLATES, id);
+export const createShiftTemplate = (data) => add(C.SHIFT_TEMPLATES, data);
+export const updateShiftTemplate = (id, data) => upd(C.SHIFT_TEMPLATES, id, data);
+export const deleteShiftTemplate = (id) => del(C.SHIFT_TEMPLATES, id);
+
+// ─── Shifts (assigned) ───────────────────────────────
+export async function getShifts(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  if (filters.workerId) c.push(where('workerId', '==', filters.workerId));
+  if (filters.shopId) c.push(where('shopId', '==', filters.shopId));
+  if (filters.startDate) c.push(where('date', '>=', filters.startDate));
+  if (filters.endDate) c.push(where('date', '<=', filters.endDate));
+  c.push(orderBy('date', 'asc'));
+  return getAll(C.SHIFTS, ...c);
+}
+export const createShift = (data) => add(C.SHIFTS, data);
+export const updateShift = (id, data) => upd(C.SHIFTS, id, data);
+export const deleteShift = (id) => del(C.SHIFTS, id);
+export async function bulkCreateShifts(shifts) {
+  const batch = writeBatch(db);
+  shifts.forEach(s => { const ref = doc(collection(db, C.SHIFTS)); batch.set(ref, { ...s, createdAt: ts(), updatedAt: ts() }); });
+  await batch.commit();
+}
+
+// ─── Shift Preferences ───────────────────────────────
+export const getShiftPreferences = (workerId) => getAll(C.SHIFT_PREFERENCES, where('workerId', '==', workerId));
+export async function setShiftPreference(data) {
+  const snap = await getDocs(query(collection(db, C.SHIFT_PREFERENCES), where('workerId', '==', data.workerId), where('dayOfWeek', '==', data.dayOfWeek)));
+  if (snap.empty) await add(C.SHIFT_PREFERENCES, data);
+  else await upd(C.SHIFT_PREFERENCES, snap.docs[0].id, data);
+}
+
+// ─── Attendance (multi-entry per day, with approval) ──
+export async function getAttendance(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  if (filters.workerId) c.push(where('workerId', '==', filters.workerId));
+  if (filters.shopId) c.push(where('shopId', '==', filters.shopId));
+  if (filters.startDate) c.push(where('date', '>=', filters.startDate));
+  if (filters.endDate) c.push(where('date', '<=', filters.endDate));
+  if (filters.approvalStatus) c.push(where('approvalStatus', '==', filters.approvalStatus));
+  c.push(orderBy('date', 'desc'));
+  if (filters.limit) c.push(limit(filters.limit));
+  return getAll(C.ATTENDANCE, ...c);
+}
+export const updateAttendance = (id, data) => upd(C.ATTENDANCE, id, data);
+
+// Clock in: creates a new attendance doc with one entry, or adds entry to existing doc for same day
+export async function clockIn(data) {
+  const { workerId, date } = data;
+  // Check if there's already a doc for this worker+date
+  const existing = await getDocs(query(
+    collection(db, C.ATTENDANCE),
+    where('workerId', '==', workerId),
+    where('date', '==', date)
+  ));
+  const now = new Date().toISOString();
+  if (!existing.empty) {
+    // Add a new time entry to the existing day record
+    const existingDoc = existing.docs[0];
+    const existingData = existingDoc.data();
+    const entries = existingData.entries || [];
+    // Check no open entry
+    const openEntry = entries.find(e => !e.clockOut);
+    if (openEntry) throw new Error('Already clocked in. Clock out first.');
+    entries.push({ clockIn: now, clockOut: null });
+    await upd(C.ATTENDANCE, existingDoc.id, { entries, status: 'clocked-in', approvalStatus: 'pending' });
+    return existingDoc.id;
+  } else {
+    // Create new attendance doc for this day
+    return add(C.ATTENDANCE, {
+      ...data,
+      entries: [{ clockIn: now, clockOut: null }],
+      status: 'clocked-in',
+      approvalStatus: 'pending',
+      totalHours: 0,
+      approvedBy: null, approvedAt: null,
+    });
+  }
+}
+
+// Clock out: closes the open entry in today's attendance doc
+export async function clockOut(attendanceId) {
+  const rec = await get1(C.ATTENDANCE, attendanceId);
+  if (!rec) throw new Error('Attendance record not found.');
+  const entries = rec.entries || [];
+  const openIdx = entries.findIndex(e => !e.clockOut);
+  if (openIdx === -1) throw new Error('No open clock-in entry.');
+  const now = new Date().toISOString();
+  entries[openIdx].clockOut = now;
+  // Calculate total hours across all entries
+  const totalHours = entries.reduce((sum, e) => {
+    if (!e.clockIn || !e.clockOut) return sum;
+    return sum + Math.max(0, (new Date(e.clockOut) - new Date(e.clockIn)) / 3600000);
+  }, 0);
+  const allClosed = entries.every(e => e.clockOut);
+  await upd(C.ATTENDANCE, attendanceId, {
+    entries,
+    totalHours: Math.round(totalHours * 100) / 100,
+    status: allClosed ? 'completed' : 'clocked-in',
+  });
+}
+
+// Get active clock in for today
+export async function getActiveClockIn(workerId, date) {
+  try {
+    const snap = await getDocs(query(
+      collection(db, C.ATTENDANCE),
+      where('workerId', '==', workerId),
+      where('date', '==', date),
+      where('status', '==', 'clocked-in')
+    ));
+    return snap.empty ? null : ser(snap.docs[0]);
+  } catch (e) {
+    const snap = await getDocs(query(
+      collection(db, C.ATTENDANCE),
+      where('workerId', '==', workerId),
+      where('status', '==', 'clocked-in')
+    ));
+    const match = snap.docs.find(d => d.data().date === date);
+    return match ? ser(match) : null;
+  }
+}
+
+// Approve/reject attendance hours
+export async function approveAttendance(attendanceId, approvedBy, approved, notes) {
+  await upd(C.ATTENDANCE, attendanceId, {
+    approvalStatus: approved ? 'approved' : 'rejected',
+    approvedBy,
+    approvedAt: new Date().toISOString(),
+    adminNotes: notes || '',
+  });
+}
+
+// ─── Permits ──────────────────────────────────────────
+export async function getPermits(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  if (filters.workerId) c.push(where('workerId', '==', filters.workerId));
+  if (filters.status) c.push(where('status', '==', filters.status));
+  c.push(orderBy('createdAt', 'desc'));
+  if (filters.limit) c.push(limit(filters.limit));
+  return getAll(C.PERMITS, ...c);
+}
+export const createPermit = (data) => add(C.PERMITS, { ...data, status: 'pending' });
+export const updatePermit = (id, data) => upd(C.PERMITS, id, data);
+export const deletePermit = (id) => del(C.PERMITS, id);
+
+// ─── Payments ─────────────────────────────────────────
+export async function getPayments(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  c.push(orderBy('createdAt', 'desc'));
+  if (filters.limit) c.push(limit(filters.limit));
+  return getAll(C.PAYMENTS, ...c);
+}
+export const createPayment = (data) => add(C.PAYMENTS, data);
+
+// ─── Notifications ────────────────────────────────────
+export async function getNotifications(uid, lim = 20) {
+  return getAll(C.NOTIFICATIONS, where('recipientId', '==', uid), orderBy('createdAt', 'desc'), limit(lim));
+}
+export const markNotificationRead = (id) => upd(C.NOTIFICATIONS, id, { read: true });
+export async function markAllNotificationsRead(uid) {
+  const unread = await getDocs(query(collection(db, C.NOTIFICATIONS), where('recipientId', '==', uid), where('read', '==', false)));
+  const batch = writeBatch(db);
+  unread.docs.forEach(d => batch.update(d.ref, { read: true }));
+  await batch.commit();
+}
+export const createNotification = (data) => add(C.NOTIFICATIONS, { ...data, read: false });
+
+// Send notification to all managers in org
+export async function notifyManagers(orgId, data) {
+  const users = await getDocs(query(collection(db, C.USERS), where('orgId', '==', orgId)));
+  const managers = users.docs.filter(d => ['admin', 'manager'].includes(d.data().role));
+  for (const m of managers) {
+    await createNotification({ ...data, recipientId: m.id, orgId });
+  }
+}
+
+// Send notification to a specific worker
+export async function notifyWorker(workerId, orgId, data) {
+  // Find user by workerId link
+  const users = await getDocs(query(collection(db, C.USERS), where('orgId', '==', orgId), where('workerId', '==', workerId)));
+  for (const u of users.docs) {
+    await createNotification({ ...data, recipientId: u.id, orgId });
+  }
+}
+
+// Real-time listener for notifications
+export function onNotifications(uid, callback) {
+  return onSnapshot(
+    query(collection(db, C.NOTIFICATIONS), where('recipientId', '==', uid), orderBy('createdAt', 'desc'), limit(20)),
+    (snap) => callback(serAll(snap)),
+    (err) => console.warn('Notification listener error:', err)
+  );
+}
+
+// ─── Activity Log ─────────────────────────────────────
+export async function logActivity(data) { await add(C.ACTIVITY_LOG, data); }
+export async function getActivityLog(lim = 20) { return getAll(C.ACTIVITY_LOG, orderBy('createdAt', 'desc'), limit(lim)); }
+
+export { C as COLLECTIONS };

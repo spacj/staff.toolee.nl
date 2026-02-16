@@ -1,0 +1,109 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuth() { return request.auth != null; }
+    function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function isAdmin() { return isAuth() && userDoc().role == 'admin'; }
+    function isManager() { return isAuth() && (userDoc().role == 'admin' || userDoc().role == 'manager'); }
+
+    // Users: anyone can read, only self or admin can write
+    match /users/{uid} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.auth.uid == uid;
+      allow update: if isAuth() && (request.auth.uid == uid || isAdmin());
+      allow delete: if isAuth() && request.auth.uid == uid;
+    }
+
+    // Organizations: all authenticated can read, managers can update, owner can delete
+    match /organizations/{orgId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isManager();
+      allow delete: if isAuth() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // Config (PayPal plan IDs etc): admins write, all auth read
+    match /config/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // Invites: public read (unauthenticated /join page needs to verify codes)
+    match /invites/{id} {
+      allow read: if true;
+      allow create: if isManager();
+      allow update: if isAuth();
+      allow delete: if isAdmin();
+    }
+
+    // Workers: all auth read, managers+ write
+    match /workers/{id} {
+      allow read: if isAuth();
+      allow create: if isManager();
+      allow update: if isAuth();
+      allow delete: if isAdmin();
+    }
+
+    // Shops: all auth read, managers+ write
+    match /shops/{id} {
+      allow read: if isAuth();
+      allow create: if isManager();
+      allow update: if isManager();
+      allow delete: if isAdmin();
+    }
+
+    // Shift Templates: all auth read, managers+ write
+    match /shiftTemplates/{id} {
+      allow read: if isAuth();
+      allow create: if isManager();
+      allow update: if isManager();
+      allow delete: if isManager();
+    }
+
+    // Shifts: all auth read, managers+ write
+    match /shifts/{id} {
+      allow read: if isAuth();
+      allow create: if isManager();
+      allow update: if isManager();
+      allow delete: if isManager();
+    }
+
+    // Shift Preferences: all auth read/write (workers set their own)
+    match /shiftPreferences/{id} {
+      allow read, write: if isAuth();
+    }
+
+    // Attendance: all auth read/create/update (workers clock in/out)
+    match /attendance/{id} {
+      allow read, create, update: if isAuth();
+    }
+
+    // Permits: all auth read/create (workers request), managers approve/deny/delete
+    match /permits/{id} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+      allow delete: if isManager();
+    }
+
+    // Payments: all auth read, managers/admins create, admin update (webhooks use admin SDK which bypasses rules)
+    match /payments/{id} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAdmin();
+    }
+
+    // Notifications: all auth read/update own, managers create
+    match /notifications/{id} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+    }
+
+    // Activity Log: all auth read/create
+    match /activityLog/{id} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+    }
+  }
+}
