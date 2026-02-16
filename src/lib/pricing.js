@@ -2,10 +2,11 @@
  * StaffHub Pricing & Tier Enforcement
  *
  * Free:       0–4 workers, 1 shop  → €0
- * Standard:   5–20 workers         → €2/worker + €15/extra shop (1st shop free)
- * Enterprise: 21+ workers          → €99/month flat
+ * Standard:   5–29 workers         → €2/worker + €15/extra shop (1st shop free)
+ * Enterprise: 30+ workers          → €299/month (€189 with discount)
  *
- * Yearly billing = monthly × 10 (2 months free, ~17% discount)
+ * Yearly billing for Standard = monthly × 10 (2 months free, ~17% discount)
+ * Enterprise has a fixed discounted price of €189/month
  *
  * Payment: PayPal Orders API (one-time capture per period).
  * No subscriptions/plans needed. Just pay → store receipt → check period.
@@ -14,8 +15,9 @@ const PRICE_PER_WORKER = 2;
 const PRICE_PER_SHOP = 15;
 const FREE_WORKER_LIMIT = 5;
 const FREE_SHOP_LIMIT = 1;
-const ENTERPRISE_THRESHOLD = 21;
-const ENTERPRISE_PRICE_MONTHLY = 99;
+const ENTERPRISE_THRESHOLD = 30;
+const ENTERPRISE_PRICE_MONTHLY = 299;
+const ENTERPRISE_DISCOUNTED_PRICE = 189;
 const YEARLY_MULTIPLIER = 10; // ×10 = pay for 10 months, get 12
 
 export const TIERS = { FREE: 'free', STANDARD: 'standard', ENTERPRISE: 'enterprise' };
@@ -35,9 +37,9 @@ export function getTierInfo(tier) {
     standard: { name: 'Standard', badge: 'bg-brand-100 text-brand-700', price: `€${PRICE_PER_WORKER}`, period: '/worker/mo',
       tagline: `${FREE_WORKER_LIMIT}–${ENTERPRISE_THRESHOLD - 1} workers`,
       features: ['Everything in Free', `€${PRICE_PER_WORKER}/worker/month`, '1st shop free, then €' + PRICE_PER_SHOP + '/shop/mo', 'Save ~17% with yearly billing', 'Attendance tracking', 'Cost analytics'] },
-    enterprise: { name: 'Enterprise', badge: 'bg-purple-100 text-purple-700', price: '€99', period: '/month',
+    enterprise: { name: 'Enterprise', badge: 'bg-purple-100 text-purple-700', price: `€${ENTERPRISE_DISCOUNTED_PRICE}`, period: '/mo (€299 reg)',
       tagline: `${ENTERPRISE_THRESHOLD}+ workers`,
-      features: ['Everything in Standard', 'Unlimited workers & shops', 'Flat pricing', 'Priority support'] },
+      features: ['Everything in Standard', 'Unlimited workers & shops', 'Flat pricing', `€${ENTERPRISE_DISCOUNTED_PRICE}/mo (was €${ENTERPRISE_PRICE_MONTHLY})`, 'Priority support'] },
   };
   return tiers[tier] || tiers.free;
 }
@@ -54,11 +56,10 @@ export function calculateCost(workerCount, shopCount, cycle = 'monthly') {
   }
 
   if (tier === TIERS.ENTERPRISE) {
-    const monthly = ENTERPRISE_PRICE_MONTHLY;
-    const yearly = monthly * YEARLY_MULTIPLIER;
-    const total = isYearly ? yearly : monthly;
-    const monthlyEquiv = isYearly ? yearly / 12 : monthly;
-    const savings = isYearly ? (monthly * 12) - yearly : 0;
+    const monthly = isYearly ? ENTERPRISE_DISCOUNTED_PRICE : ENTERPRISE_PRICE_MONTHLY;
+    const total = monthly;
+    const monthlyEquiv = total;
+    const savings = ENTERPRISE_PRICE_MONTHLY - ENTERPRISE_DISCOUNTED_PRICE;
     return { total, monthlyEquivalent: Math.round(monthlyEquiv * 100) / 100, workerCost: 0, shopCost: 0, tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings };
   }
 
@@ -177,5 +178,5 @@ export function formatCurrency(amount) {
 
 export {
   PRICE_PER_WORKER, PRICE_PER_SHOP, FREE_WORKER_LIMIT, FREE_SHOP_LIMIT,
-  ENTERPRISE_THRESHOLD, ENTERPRISE_PRICE_MONTHLY, YEARLY_MULTIPLIER,
+  ENTERPRISE_THRESHOLD, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE, YEARLY_MULTIPLIER,
 };

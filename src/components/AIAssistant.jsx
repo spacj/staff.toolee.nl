@@ -77,7 +77,8 @@ export default function AIAssistant({ contextData }) {
       <button
         onClick={() => setOpen(!open)}
         className={cn(
-          'fixed bottom-6 right-6 z-50 w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-105',
+          'fixed right-6 z-50 w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-105',
+          'bottom-20 sm:bottom-6', // Mobile: above nav, Desktop: bottom-6
           open ? 'bg-surface-800 rotate-0' : 'bg-gradient-to-br from-brand-500 to-brand-700 hover:shadow-brand-500/30 hover:shadow-xl'
         )}
       >
@@ -86,7 +87,8 @@ export default function AIAssistant({ contextData }) {
 
       {/* Panel */}
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-[380px] max-w-[calc(100vw-48px)] h-[520px] max-h-[calc(100vh-120px)] bg-white rounded-2xl shadow-2xl border border-surface-200 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
+        <div className="fixed right-6 z-50 w-[380px] max-w-[calc(100vw-48px)] bg-white rounded-2xl shadow-2xl border border-surface-200 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4"
+          style={{ bottom: 'calc(80px + 5rem)', maxHeight: 'calc(100vh - 200px)' }}>
           {/* Header */}
           <div className="px-4 py-3 border-b border-surface-100 bg-gradient-to-r from-surface-50 to-white">
             <div className="flex items-center gap-2 mb-2">

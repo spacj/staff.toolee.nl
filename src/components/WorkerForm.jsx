@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { createWorker, updateWorker, createInvite, getShops, getWorkers, syncOrgPlan } from '@/lib/firestore';
+import { createWorker, updateWorker, createInvite, getShops, getWorkers, syncOrgPlan, updateUserProfile } from '@/lib/firestore';
 import { canAddWorker, formatCurrency } from '@/lib/pricing';
 import { useAuth } from '@/contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -66,6 +66,10 @@ export default function WorkerForm({ worker, onSuccess, onCancel }) {
       const { sendInvite, ...data } = form;
       if (isEditing) {
         await updateWorker(worker.id, data);
+        // Also update user profile role if userId exists and role changed
+        if (worker.userId && worker.role !== form.role) {
+          await updateUserProfile(worker.userId, { role: form.role });
+        }
         toast.success('Worker updated');
         // Sync plan in case status changed
         await syncOrgPlan(orgId).catch(() => {});
