@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 import { useAuth } from '@/contexts/AuthContext';
 import { updateOrganization, createPayment } from '@/lib/firestore';
-import { formatCurrency, calculateCost, getSubscriptionQuantity, CYCLES } from '@/lib/pricing';
+import { formatCurrency, calculateCost, getSubscriptionQuantity, CYCLES, PRICE_PER_WORKER, PRICE_PER_SHOP } from '@/lib/pricing';
 import { CheckCircle, AlertCircle, Zap, CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -124,12 +124,12 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
         {cost.tier === 'standard' && (
           <>
             <div className="flex justify-between">
-              <span className="text-surface-500">{workerCount} workers × {formatCurrency(2)}/mo{!isMonthly ? ' × 10' : ''}</span>
+              <span className="text-surface-500">{workerCount} workers × {formatCurrency(PRICE_PER_WORKER)}/mo{!isMonthly ? ' × 10' : ''}</span>
               <span className="text-surface-700">{formatCurrency(cost.workerCost)}</span>
             </div>
             {cost.billableShops > 0 && (
               <div className="flex justify-between">
-                <span className="text-surface-500">{cost.billableShops} extra shop{cost.billableShops > 1 ? 's' : ''} × {formatCurrency(15)}/mo{!isMonthly ? ' × 10' : ''}</span>
+                <span className="text-surface-500">{cost.billableShops} extra shop{cost.billableShops > 1 ? 's' : ''} × {formatCurrency(PRICE_PER_SHOP)}/mo{!isMonthly ? ' × 10' : ''}</span>
                 <span className="text-surface-700">{formatCurrency(cost.shopCost)}</span>
               </div>
             )}
@@ -176,7 +176,7 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
           style={{ layout: 'vertical', color: 'blue', shape: 'rect', label: 'subscribe', height: 48 }}
           createSubscription={(data, actions) => {
             const opts = { plan_id: planId };
-            // Standard plans: set quantity = total cost (€1/unit)
+            // Standard plans: set quantity = total cost in cents (€0.01/unit)
             if (tier === 'standard' && quantity) {
               opts.quantity = String(quantity);
             }

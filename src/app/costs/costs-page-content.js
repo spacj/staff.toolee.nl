@@ -1,5 +1,5 @@
 'use client';
-import { Suspense, useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
@@ -12,7 +12,7 @@ import { cn } from '@/utils/helpers';
 import { CreditCard, TrendingUp, Users, Store, CheckCircle, AlertTriangle, XCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-function CostsContent() {
+export default function CostsPageContent() {
   const { orgId, organization, user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -36,7 +36,7 @@ function CostsContent() {
     getPayments({ orgId, limit: 20 }).then(setPayments);
     getOrganization(orgId).then(setOrgData);
   };
-
+  
   useEffect(() => { load(); }, [orgId]);
 
   useEffect(() => {
@@ -101,9 +101,9 @@ function CostsContent() {
                     'text-amber-800': hasSuspendedSubscription,
                     'text-red-800': hasCancelledSubscription,
                   })}>
-                    {hasActiveSubscription && 'Active Subscription'}
-                    {hasSuspendedSubscription && 'Suspended Subscription'}
-                    {hasCancelledSubscription && 'Cancelled Subscription'}
+                    {hasActiveSubscription && '✓ Active Subscription'}
+                    {hasSuspendedSubscription && '⚠ Suspended Subscription'}
+                    {hasCancelledSubscription && '✗ Cancelled Subscription'}
                   </p>
                   {subscriptionCost && (
                     <p className={cn('text-xs mt-1', {
@@ -194,7 +194,7 @@ function CostsContent() {
                   <p className="text-sm font-medium text-surface-800">{p.period || p.createdAt?.slice(0, 10)}</p>
                   <p className="text-xs text-surface-500 mt-0.5">{formatCurrency(p.amount || 0)}</p>
                 </div>
-                <p className="text-xs text-emerald-600">{p.status || 'Completed'}</p>
+                <p className="text-xs text-emerald-600">✓ {p.status || 'Completed'}</p>
               </div>
             ))}
           </div>
@@ -210,23 +210,5 @@ function CostsContent() {
         </Modal>
       </div>
     </Layout>
-  );
-}
-
-function LoadingFallback() {
-  return (
-    <Layout>
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
-      </div>
-    </Layout>
-  );
-}
-
-export default function CostsPage() {
-  return (
-    <Suspense fallback={<LoadingFallback />}>
-      <CostsContent />
-    </Suspense>
   );
 }

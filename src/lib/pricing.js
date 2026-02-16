@@ -10,8 +10,8 @@
  * Payment: PayPal Orders API (one-time capture per period).
  * No subscriptions/plans needed. Just pay → store receipt → check period.
  */
-const PRICE_PER_WORKER = 2;
-const PRICE_PER_SHOP = 15;
+const PRICE_PER_WORKER = 0.50;
+const PRICE_PER_SHOP = 2.99;
 const FREE_WORKER_LIMIT = 5;
 const FREE_SHOP_LIMIT = 1;
 const ENTERPRISE_THRESHOLD = 21;
@@ -95,7 +95,9 @@ export function getSubscriptionQuantity(workerCount, shopCount) {
   const tier = getTier(workerCount);
   if (tier !== TIERS.STANDARD) return null;
   const billableShops = Math.max(0, shopCount - 1);
-  return Math.round(workerCount * PRICE_PER_WORKER + billableShops * PRICE_PER_SHOP);
+  const total = workerCount * PRICE_PER_WORKER + billableShops * PRICE_PER_SHOP;
+  // Return total cost in cents as PayPal quantity expects an integer
+  return Math.round(total * 100);
 }
 
 /**
