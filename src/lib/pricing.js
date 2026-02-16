@@ -10,8 +10,8 @@
  * Payment: PayPal Orders API (one-time capture per period).
  * No subscriptions/plans needed. Just pay → store receipt → check period.
  */
-const PRICE_PER_WORKER = 0.50;
-const PRICE_PER_SHOP = 2.99;
+const PRICE_PER_WORKER = 2;
+const PRICE_PER_SHOP = 15;
 const FREE_WORKER_LIMIT = 5;
 const FREE_SHOP_LIMIT = 1;
 const ENTERPRISE_THRESHOLD = 21;
@@ -32,7 +32,7 @@ export function getTierInfo(tier) {
     free: { name: 'Free', badge: 'bg-emerald-100 text-emerald-700', price: '€0', period: '',
       tagline: `Up to ${FREE_WORKER_LIMIT - 1} workers & ${FREE_SHOP_LIMIT} shop`,
       features: [`Up to ${FREE_WORKER_LIMIT - 1} workers`, `${FREE_SHOP_LIMIT} shop included`, 'Shift scheduling', 'Clock in/out', 'Calendar'] },
-    standard: { name: 'Standard', badge: 'bg-brand-100 text-brand-700', price: '€2', period: '/worker/mo',
+    standard: { name: 'Standard', badge: 'bg-brand-100 text-brand-700', price: `€${PRICE_PER_WORKER}`, period: '/worker/mo',
       tagline: `${FREE_WORKER_LIMIT}–${ENTERPRISE_THRESHOLD - 1} workers`,
       features: ['Everything in Free', `€${PRICE_PER_WORKER}/worker/month`, '1st shop free, then €' + PRICE_PER_SHOP + '/shop/mo', 'Save ~17% with yearly billing', 'Attendance tracking', 'Cost analytics'] },
     enterprise: { name: 'Enterprise', badge: 'bg-purple-100 text-purple-700', price: '€99', period: '/month',

@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import { PRICE_PER_WORKER, PRICE_PER_SHOP } from '@/lib/pricing';
 import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight } from 'lucide-react';
 
 const features = [
@@ -17,8 +18,8 @@ const features = [
 const plans = [
   { name: 'Free', price: '€0', period: '/month', desc: 'Small teams getting started', badge: 'bg-emerald-100 text-emerald-700',
     features: ['Up to 4 workers', '1 shop included', 'Shift scheduling', 'Clock in/out', 'Calendar view'], cta: 'Get Started Free', href: '/register' },
-  { name: 'Standard', price: '€2', period: '/worker/mo', desc: 'Growing teams with shops', badge: 'bg-brand-100 text-brand-700', popular: true,
-    features: ['5–20 workers', '1st shop free, +€15/shop', 'Save ~17% yearly', 'Auto-adjusts billing', 'Full analytics', 'AI assistant'], cta: 'Start Free Trial', href: '/register' },
+  { name: 'Standard', price: `€${PRICE_PER_WORKER}`, period: '/worker/mo', desc: 'Growing teams with shops', badge: 'bg-brand-100 text-brand-700', popular: true,
+    features: ['5–20 workers', `1st shop free, +€${PRICE_PER_SHOP}/shop`, 'Save ~17% yearly', 'Auto-adjusts billing', 'Full analytics', 'AI assistant'], cta: 'Start Free Trial', href: '/register' },
   { name: 'Enterprise', price: '€99', period: '/month flat', desc: 'Large operations, unlimited', badge: 'bg-purple-100 text-purple-700',
     features: ['Unlimited workers & shops', '€990/year (save 2 months)', 'Priority support', 'Custom integrations', 'Everything included'], cta: 'Contact Sales', href: '/register' },
 ];
