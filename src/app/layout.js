@@ -3,10 +3,15 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
 import CookieConsent from '@/components/CookieConsent';
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export const metadata = {
   title: 'StaffHub — Staff Management Platform',
   description: 'Manage your team, shifts, costs, and projects all in one place.',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover',
   themeColor: '#4c6ef5',
 };
 
