@@ -7,12 +7,12 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  themeColor: '#4c6ef5',
 };
 
 export const metadata = {
   title: 'StaffHub — Staff Management Platform',
   description: 'Manage your team, shifts, costs, and projects all in one place.',
-  themeColor: '#4c6ef5',
 };
 
 export default function RootLayout({ children }) {
