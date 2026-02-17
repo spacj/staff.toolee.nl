@@ -11,7 +11,7 @@ const C = {
   SHOPS: 'shops', SHIFT_TEMPLATES: 'shiftTemplates', SHIFTS: 'shifts',
   SHIFT_PREFERENCES: 'shiftPreferences', ATTENDANCE: 'attendance',
   PERMITS: 'permits', PAYMENTS: 'payments', NOTIFICATIONS: 'notifications',
-  ACTIVITY_LOG: 'activityLog', INVITES: 'invites',
+  ACTIVITY_LOG: 'activityLog', INVITES: 'invites', REFERRALS: 'referrals',
 };
 
 // ─── Helpers ──────────────────────────────────────────
@@ -38,7 +38,10 @@ async function getAll(col, ...constraints) {
 }
 
 // ─── Users ────────────────────────────────────────────
-export const getUserProfile = (uid) => get1(C.USERS, uid);
+export const getUserByReferralCode = async (code) => {
+  const snap = await getDocs(query(collection(db, C.USERS), where('referralCode', '==', code.toUpperCase())));
+  return snap.empty ? null : ser(snap.docs[0]);
+};
 export const updateUserProfile = (uid, data) => upd(C.USERS, uid, data);
 
 // ─── Organizations ────────────────────────────────────
@@ -79,6 +82,17 @@ export async function createInvite(data) { const code = genCode(); const ref = a
 export async function getInviteByCode(code) { const snap = await getDocs(query(collection(db, C.INVITES), where('code', '==', code.toUpperCase()), where('used', '==', false))); return snap.empty ? null : ser(snap.docs[0]); }
 export async function markInviteUsed(id, userId) { await upd(C.INVITES, id, { used: true, usedBy: userId, usedAt: ts() }); }
 export const getInvites = (orgId) => getAll(C.INVITES, where('orgId', '==', orgId), orderBy('createdAt', 'desc'));
+
+// ─── Referrals ──────────────────────────────────────────
+export async function createReferral(data) { return add(C.REFERRALS, data); }
+export async function getReferrals(filters = {}) {
+  const c = [];
+  if (filters.referrerId) c.push(where('referrerId', '==', filters.referrerId));
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  c.push(orderBy('createdAt', 'desc'));
+  return getAll(C.REFERRALS, ...c);
+}
+export const getReferral = (id) => get1(C.REFERRALS, id);
 
 // ─── Workers ──────────────────────────────────────────
 export async function getWorkers(filters = {}) {

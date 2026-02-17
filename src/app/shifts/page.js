@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate, getShops } from '@/lib/firestore';
+import { getShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate, getShops, getWorkers } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
 import { DAY_LABELS } from '@/lib/scheduling';
-import { ClipboardList, Plus, Pencil, Trash2, Clock, Users, Store, Calendar } from 'lucide-react';
+import { ClipboardList, Plus, Pencil, Trash2, Clock, Users, Store, Calendar, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const SHIFT_TYPES = ['morning', 'afternoon', 'evening', 'night', 'split', 'custom'];
@@ -25,19 +25,21 @@ export default function ShiftTemplatesPage() {
     daysOfWeek: [1, 2, 3, 4, 5], // Mon-Fri default
     usePerDayRequirements: false,
     requiredByDay: {}, // { "1": 2, "6": 3 } — day-specific overrides
+    rules: [], // extra rules: [{ type: 'incompatible_workers', workers: ['id1', 'id2'] }]
   });
-  const [saving, setSaving] = useState(false);
+  const [workers, setWorkers] = useState([]);
 
   const load = () => {
     if (!orgId) return;
     getShiftTemplates(orgId).then(setTemplates);
     getShops(orgId).then(setShops);
+    getWorkers({ orgId }).then(setWorkers);
   };
   useEffect(() => { load(); }, [orgId]);
 
   const openAdd = () => {
     setEdit(null);
-    setForm({ name: '', shopId: shops[0]?.id || '', type: 'morning', startTime: '06:00', endTime: '14:00', requiredWorkers: 1, breakMinutes: 30, notes: '', daysOfWeek: [1, 2, 3, 4, 5], usePerDayRequirements: false, requiredByDay: {} });
+    setForm({ name: '', shopId: shops[0]?.id || '', type: 'morning', startTime: '06:00', endTime: '14:00', requiredWorkers: 1, breakMinutes: 30, notes: '', daysOfWeek: [1, 2, 3, 4, 5], usePerDayRequirements: false, requiredByDay: {}, rules: [] });
     setShowForm(true);
   };
 
@@ -52,6 +54,7 @@ export default function ShiftTemplatesPage() {
       daysOfWeek: t.daysOfWeek || [0,1,2,3,4,5,6],
       usePerDayRequirements: hasPerDay,
       requiredByDay: t.requiredByDay || {},
+      rules: t.rules || [],
     });
     setShowForm(true);
   };
@@ -93,9 +96,16 @@ export default function ShiftTemplatesPage() {
     setSaving(false);
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this shift template?')) return;
-    await deleteShiftTemplate(id); toast.success('Deleted'); load();
+  const addRule = () => {
+    setForm(f => ({ ...f, rules: [...f.rules, { type: 'incompatible_workers', workers: [] }] }));
+  };
+
+  const removeRule = (idx) => {
+    setForm(f => ({ ...f, rules: f.rules.filter((_, i) => i !== idx) }));
+  };
+
+  const updateRule = (idx, rule) => {
+    setForm(f => ({ ...f, rules: f.rules.map((r, i) => i === idx ? rule : r) }));
   };
 
   const grouped = shops.map(s => ({ shop: s, templates: templates.filter(t => t.shopId === s.id) }));
@@ -140,9 +150,10 @@ export default function ShiftTemplatesPage() {
                       <div className="flex items-center gap-4 mt-1 text-xs text-surface-500 flex-wrap">
                         <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {t.startTime} → {t.endTime} ({calcHours(t.startTime, t.endTime)}h)</span>
                         <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {t.requiredWorkers} needed</span>
-                        <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {dayLabelsForTemplate(t)}</span>
-                        {t.breakMinutes > 0 && <span>{t.breakMinutes}min break</span>}
-                      </div>
+                         <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {dayLabelsForTemplate(t)}</span>
+                         {t.breakMinutes > 0 && <span>{t.breakMinutes}min break</span>}
+                         {t.rules && t.rules.length > 0 && <span>Extra rules: {t.rules.length}</span>}
+                       </div>
                       {t.requiredByDay && Object.keys(t.requiredByDay).length > 0 && (
                         <div className="flex gap-1.5 mt-1.5">
                           {Object.entries(t.requiredByDay).map(([d, n]) => (
@@ -240,7 +251,27 @@ export default function ShiftTemplatesPage() {
               )}
             </div>
 
-            <div><label className="label">Notes</label><textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} className="input-field resize-none" /></div>
+            {/* Extra Rules */}
+            <div>
+              <label className="label mb-2">Extra Rules</label>
+              <div className="space-y-2">
+                {form.rules.map((rule, idx) => (
+                  <div key={idx} className="flex items-center gap-2 p-2 bg-surface-50 rounded">
+                    <select value={rule.type} onChange={e => updateRule(idx, { ...rule, type: e.target.value })} className="input-field !w-40">
+                      <option value="incompatible_workers">Incompatible Workers</option>
+                      <option value="required_skills">Required Skills</option>
+                    </select>
+                    {rule.type === 'incompatible_workers' && (
+                      <select multiple value={rule.workers || []} onChange={e => updateRule(idx, { ...rule, workers: Array.from(e.target.selectedOptions, o => o.value) })} className="input-field flex-1">
+                        {workers.map(w => <option key={w.id} value={w.id}>{w.firstName} {w.lastName}</option>)}
+                      </select>
+                    )}
+                    <button type="button" onClick={() => removeRule(idx)} className="btn-icon !w-6 !h-6"><X className="w-3 h-3" /></button>
+                  </div>
+                ))}
+                <button type="button" onClick={addRule} className="text-sm text-brand-600 hover:underline">+ Add Rule</button>
+              </div>
+            </div>
             <p className="text-xs text-surface-400 bg-surface-50 p-3 rounded-xl">Duration: <strong>{calcHours(form.startTime, form.endTime)}h</strong> (net: {(parseFloat(calcHours(form.startTime, form.endTime)) - (parseInt(form.breakMinutes) || 0) / 60).toFixed(1)}h after break) · Runs {form.daysOfWeek.length} day{form.daysOfWeek.length !== 1 ? 's' : ''}/week</p>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>

@@ -13,6 +13,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { getUserProfile, createReferral, getUserByReferralCode } from '@/lib/firestore';
 
 const AuthContext = createContext({});
 
@@ -60,7 +61,7 @@ export function AuthProvider({ children }) {
   }, [loadProfile]);
 
   // ─── Admin Registration ──────────────────────────────
-  const registerAdmin = async (email, password, displayName, companyName) => {
+  const registerAdmin = async (email, password, displayName, companyName, referralCode) => {
     // 1. Create Firebase Auth user
     const result = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(result.user, { displayName });
@@ -76,6 +77,12 @@ export function AuthProvider({ children }) {
     });
 
     // 3. Create admin user profile
+    const genReferralCode = () => {
+      const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let s = '';
+      for (let i = 0; i < 8; i++) s += c[Math.floor(Math.random() * c.length)];
+      return s;
+    };
     const profileData = {
       uid: result.user.uid,
       email,
@@ -83,10 +90,29 @@ export function AuthProvider({ children }) {
       photoURL: '',
       role: 'admin',
       orgId,
+      referralCode: genReferralCode(),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
     await setDoc(doc(db, 'users', result.user.uid), profileData);
+
+    // Handle referral
+    if (referralCode) {
+      try {
+        const referrer = await getUserByReferralCode(referralCode);
+        if (referrer) {
+          await createReferral({
+            referrerId: referrer.uid,
+            referredId: result.user.uid,
+            orgId,
+            referralCode: referralCode.toUpperCase(),
+            createdAt: serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        // Ignore referral errors
+      }
+    }
 
     // 4. Set state immediately so Layout doesn't redirect
     setUser(result.user);

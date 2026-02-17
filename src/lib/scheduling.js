@@ -218,10 +218,19 @@ export function generateWeeklySchedule({ workers, templates, weekStart, leaves =
         const last = workerLastShift[worker.id];
         if (last?.date === dateStr && isNightShift(last.startTime) && isMorningShift(tpl.startTime)) continue;
 
-        // Salaried workers: respect weekly hour cap
-        if (worker.payType === 'salaried' && worker.fixedHoursWeek) {
-          if ((workerHours[worker.id] || 0) + tplHours > worker.fixedHoursWeek + 2) continue; // +2 buffer
+        // Check rules
+        let violatesRule = false;
+        for (const rule of tpl.rules || []) {
+          if (rule.type === 'incompatible_workers') {
+            const assignedForThisShift = assignments.filter(a => a.date === dateStr && a.templateId === tpl.id);
+            const assignedWorkerIds = assignedForThisShift.map(a => a.workerId);
+            if (rule.workers.includes(worker.id) && assignedWorkerIds.some(id => rule.workers.includes(id))) {
+              violatesRule = true;
+              break;
+            }
+          }
         }
+        if (violatesRule) continue;
 
         // Assign!
         assignments.push({

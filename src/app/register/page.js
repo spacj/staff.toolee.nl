@@ -20,6 +20,7 @@ export default function RegisterPage() {
     email: '',
     password: '',
     confirmPassword: '',
+    referralCode: '',
   });
 
   const handleChange = (e) => {
@@ -48,7 +49,7 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await registerAdmin(form.email, form.password, form.displayName, form.companyName);
+      await registerAdmin(form.email, form.password, form.displayName, form.companyName, form.referralCode);
       toast.success('Company registered! Welcome to StaffHub.');
       router.push('/dashboard');
     } catch (err) {
@@ -111,6 +112,13 @@ export default function RegisterPage() {
                       placeholder="Acme Inc." className="input-field pl-10" required autoFocus
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="label">Referral Code (optional)</label>
+                  <input
+                    name="referralCode" value={form.referralCode} onChange={handleChange}
+                    placeholder="Enter referral code if you have one" className="input-field"
+                  />
                 </div>
                 <button type="submit" className="btn-primary w-full !py-3">
                   Continue <ArrowRight className="w-4 h-4" />

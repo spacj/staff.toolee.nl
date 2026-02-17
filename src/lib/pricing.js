@@ -13,7 +13,7 @@
  */
 const PRICE_PER_WORKER = 2;
 const PRICE_PER_SHOP = 15;
-const FREE_WORKER_LIMIT = 5;
+const FREE_WORKER_LIMIT = 10;
 const FREE_SHOP_LIMIT = 1;
 const ENTERPRISE_THRESHOLD = 30;
 const ENTERPRISE_PRICE_MONTHLY = 299;
@@ -32,10 +32,10 @@ export function getTier(workerCount) {
 export function getTierInfo(tier) {
   const tiers = {
     free: { name: 'Free', badge: 'bg-emerald-100 text-emerald-700', price: '€0', period: '',
-      tagline: `Up to ${FREE_WORKER_LIMIT - 1} workers & ${FREE_SHOP_LIMIT} shop`,
-      features: [`Up to ${FREE_WORKER_LIMIT - 1} workers`, `${FREE_SHOP_LIMIT} shop included`, 'Shift scheduling', 'Clock in/out', 'Calendar'] },
+      tagline: `Up to ${FREE_WORKER_LIMIT} workers & ${FREE_SHOP_LIMIT} shop`,
+      features: [`Up to ${FREE_WORKER_LIMIT} workers`, `${FREE_SHOP_LIMIT} shop included`, 'Shift scheduling', 'Clock in/out', 'Calendar'] },
     standard: { name: 'Standard', badge: 'bg-brand-100 text-brand-700', price: `€${PRICE_PER_WORKER}`, period: '/worker/mo',
-      tagline: `${FREE_WORKER_LIMIT}–${ENTERPRISE_THRESHOLD - 1} workers`,
+      tagline: `${FREE_WORKER_LIMIT + 1}–${ENTERPRISE_THRESHOLD - 1} workers`,
       features: ['Everything in Free', `€${PRICE_PER_WORKER}/worker/month`, '1st shop free, then €' + PRICE_PER_SHOP + '/shop/mo', 'Save ~17% with yearly billing', 'Attendance tracking', 'Cost analytics'] },
     enterprise: { name: 'Enterprise', badge: 'bg-purple-100 text-purple-700', price: `€${ENTERPRISE_DISCOUNTED_PRICE}`, period: '/mo (€299 reg)',
       tagline: `${ENTERPRISE_THRESHOLD}+ workers`,
@@ -147,7 +147,7 @@ export function canAddWorker(currentActiveWorkers, currentShopCount, orgPlan) {
   if (currentTier === TIERS.FREE && newTier === TIERS.STANDARD) {
     return {
       allowed: true, requiresUpgrade: true,
-      message: `Adding a ${FREE_WORKER_LIMIT}th worker upgrades you to Standard at ${formatCurrency(newCost.total)}/month.`,
+      message: `Adding an ${FREE_WORKER_LIMIT + 1}th worker upgrades you to Standard at ${formatCurrency(newCost.total)}/month.`,
       newTier: TIERS.STANDARD, newCost,
     };
   }
