@@ -4,7 +4,7 @@ import { createWorker, updateWorker, createInvite, getShops, getWorkers, syncOrg
 import { canAddWorker, formatCurrency } from '@/lib/pricing';
 import { useAuth } from '@/contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { Copy, Check, Ticket, AlertTriangle, ArrowUpCircle } from 'lucide-react';
+import { Copy, Check, Ticket, AlertTriangle, ArrowUpCircle, MessageCircle } from 'lucide-react';
 
 const POSITIONS = ['Barista', 'Cashier', 'Shop Manager', 'Sales Associate', 'Stock Clerk', 'Cleaner', 'Security', 'Chef', 'Waiter', 'Driver', 'Other'];
 
@@ -88,6 +88,23 @@ export default function WorkerForm({ worker, onSuccess, onCancel }) {
     setLoading(false);
   };
 
+  const joinUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://staff.toolee.nl'}/join`;
+
+  const sendWhatsApp = () => {
+    const orgName = organization?.name || 'StaffHub';
+    const message = `Hi ${form.firstName}! You've been added to *${orgName}* on StaffHub.\n\nYour invite code: *${inviteResult.code}*\n\nJoin here: ${joinUrl}\n\nEnter the code above to create your account.`;
+    // Clean phone: remove spaces, dashes, ensure + prefix for international
+    let phone = (form.phone || '').replace(/[\s\-()]/g, '');
+    if (phone && !phone.startsWith('+')) {
+      // Default to NL country code if no prefix
+      phone = phone.startsWith('0') ? '+31' + phone.slice(1) : '+31' + phone;
+    }
+    const url = phone
+      ? `https://wa.me/${phone.replace('+', '')}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   if (inviteResult) {
     return (
       <div className="space-y-5 text-center">
@@ -101,7 +118,15 @@ export default function WorkerForm({ worker, onSuccess, onCancel }) {
             {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
           </button>
         </div>
-        <p className="text-xs text-surface-400">Worker visits <strong>/join</strong> and enters this code to create their account.</p>
+        <p className="text-xs text-surface-400">Worker visits <strong>{joinUrl}</strong> and enters this code to create their account.</p>
+
+        {/* Send via WhatsApp */}
+        <button onClick={sendWhatsApp}
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-[#25D366] hover:bg-[#1ebe57] text-white font-semibold text-sm rounded-xl transition-colors shadow-sm">
+          <MessageCircle className="w-5 h-5" />
+          Send Code via WhatsApp
+        </button>
+
         <div className="flex gap-3 pt-2">
           <button onClick={() => { setInviteResult(null); setUpgradeAccepted(false); setForm(f => ({ ...f, firstName: '', lastName: '', email: '', phone: '', sendInvite: true })); setActiveWorkerCount(c => c + 1); const check = canAddWorker(activeWorkerCount + 1, shopCount, organization?.plan); setUpgradeCheck(check); }} className="btn-secondary flex-1">Add Another</button>
           <button onClick={() => onSuccess?.()} className="btn-primary flex-1">Done</button>

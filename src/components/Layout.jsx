@@ -7,6 +7,7 @@ import Sidebar from './Sidebar';
 import MobileNav from './MobileNav';
 import TopBar from './TopBar';
 import AIAssistant from './AIAssistant';
+import SubscriptionAlert from './SubscriptionAlert';
 import useStore from '@/lib/store';
 import { getWorkers, getShops, getShifts, getAttendance } from '@/lib/firestore';
 
@@ -112,6 +113,7 @@ export default function Layout({ children }) {
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
+        <SubscriptionAlert />
         <TopBar />
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-6">

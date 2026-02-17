@@ -40,7 +40,10 @@ export default function Sidebar({ mobile, onClose }) {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
             <Shield className="w-4.5 h-4.5 text-white" />
           </div>
-          <span className="text-lg font-display font-bold tracking-tight">Staff<span className="text-brand-400">Hub</span></span>
+          <div className="flex flex-col leading-none">
+            <span className="text-lg font-display font-bold tracking-tight">Staff<span className="text-brand-400">Hub</span></span>
+            <span className="text-[9px] font-medium text-orange-400 tracking-wide">by toolee.nl</span>
+          </div>
         </Link>
       </div>
 
