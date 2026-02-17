@@ -10,7 +10,7 @@ import { Store, Plus, Pencil, Trash2, MapPin, Users, MoreVertical, Lock, Phone }
 import toast from 'react-hot-toast';
 
 export default function ShopsPage() {
-  const { orgId, isManager } = useAuth();
+  const { orgId, isAdmin, isManager } = useAuth();
   const [shops, setShops] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -57,7 +57,7 @@ export default function ShopsPage() {
             <h1 className="page-title">Shops</h1>
             <p className="text-surface-500 mt-1">{shops.length} location{shops.length !== 1 ? 's' : ''} · 1st shop free, then {formatCurrency(PRICE_PER_SHOP)}/mo</p>
           </div>
-          {isManager && <button onClick={openAdd} className="btn-primary"><Plus className="w-4 h-4" /> Add Shop</button>}
+          {isAdmin && <button onClick={openAdd} className="btn-primary"><Plus className="w-4 h-4" /> Add Shop</button>}
         </div>
 
         {!currentShopCheck.allowed && (
@@ -86,7 +86,7 @@ export default function ShopsPage() {
                         {s.phone && <p className="text-xs text-surface-400 flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3" /> {s.phone}</p>}
                       </div>
                     </div>
-                    {isManager && (
+                    {isAdmin && (
                       <div className="relative">
                         <button onClick={() => setMenuId(menuId === s.id ? null : s.id)} className="btn-icon !w-8 !h-8 opacity-0 group-hover:opacity-100 transition-opacity"><MoreVertical className="w-4 h-4" /></button>
                         {menuId === s.id && (

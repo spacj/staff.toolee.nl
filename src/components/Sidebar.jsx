@@ -20,6 +20,16 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 
+  const managerLinks = [
+    { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/staff', icon: Users, label: 'Staff' },
+    { href: '/shops', icon: Store, label: 'Shops' },
+    { href: '/shifts', icon: ClipboardList, label: 'Shift Templates' },
+    { href: '/calendar', icon: Calendar, label: 'Calendar' },
+    { href: '/attendance', icon: Clock, label: 'Attendance' },
+    { href: '/settings', icon: Settings, label: 'Settings' },
+  ];
+
   const workerLinks = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/time', icon: Clock, label: 'My Time' },
@@ -27,7 +37,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 
-  const links = isManager ? adminLinks : workerLinks;
+  const links = isAdmin ? adminLinks : isManager ? managerLinks : workerLinks;
 
   return (
     <div className={cn(

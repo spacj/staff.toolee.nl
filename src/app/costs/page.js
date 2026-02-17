@@ -13,7 +13,7 @@ import { CreditCard, TrendingUp, Users, Store, CheckCircle, AlertTriangle, XCirc
 import toast from 'react-hot-toast';
 
 function CostsContent() {
-  const { orgId, organization, user } = useAuth();
+  const { orgId, organization, user, isAdmin } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -120,7 +120,7 @@ function CostsContent() {
           </div>
         )}
 
-        {!hasActiveSubscription && !hasSuspendedSubscription && (
+        {!hasActiveSubscription && !hasSuspendedSubscription && isAdmin && (
           <div className="card p-5 border-blue-200 bg-blue-50/30">
             <div className="flex items-start justify-between">
               <div>
@@ -131,6 +131,12 @@ function CostsContent() {
                 <CreditCard className="w-4 h-4" /> Subscribe Now
               </button>
             </div>
+          </div>
+        )}
+
+        {!isAdmin && (
+          <div className="card p-5 border-surface-200 bg-surface-50/50">
+            <p className="text-sm text-surface-500">Billing and subscription management is restricted to admins. Contact your admin for changes.</p>
           </div>
         )}
 
@@ -200,14 +206,16 @@ function CostsContent() {
           </div>
         </div>
 
-        <Modal open={showSubscribe} onClose={() => setShowSubscribe(false)} title="Subscribe to StaffHub" size="lg">
-          <PayPalCheckout
-            tier={cost.tier}
-            workerCount={activeWorkers.length}
-            shopCount={shops.length}
-            onSuccess={() => { setShowSubscribe(false); load(); }}
-          />
-        </Modal>
+        {isAdmin && (
+          <Modal open={showSubscribe} onClose={() => setShowSubscribe(false)} title="Subscribe to StaffHub" size="lg">
+            <PayPalCheckout
+              tier={cost.tier}
+              workerCount={activeWorkers.length}
+              shopCount={shops.length}
+              onSuccess={() => { setShowSubscribe(false); load(); }}
+            />
+          </Modal>
+        )}
       </div>
     </Layout>
   );
