@@ -52,7 +52,7 @@ export default function LoginPage() {
           <div className="absolute bottom-20 right-20 w-[500px] h-[500px] bg-brand-300 rounded-full blur-3xl" />
         </div>
         <div className="relative z-10 flex flex-col justify-between px-16 py-12">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3 w-fit">
             <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
               <Shield className="w-6 h-6 text-white" />
             </div>
@@ -60,7 +60,7 @@ export default function LoginPage() {
               <span className="text-2xl font-display font-bold text-white tracking-tight leading-none">StaffHub</span>
               <span className="text-xs text-brand-200">by toolee.nl</span>
             </div>
-          </div>
+          </Link>
           
           <div>
             <h1 className="text-5xl font-display font-bold text-white leading-tight mb-6">
@@ -95,7 +95,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden flex flex-col items-center gap-2 mb-8">
-            <div className="flex items-center gap-2.5">
+            <Link href="/" className="flex items-center gap-2.5">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
                 <Shield className="w-5 h-5 text-white" />
               </div>
@@ -103,7 +103,7 @@ export default function LoginPage() {
                 <span className="text-2xl font-display font-bold text-slate-900 leading-none">StaffHub</span>
                 <span className="text-[10px] text-slate-400">by toolee.nl</span>
               </div>
-            </div>
+            </Link>
           </div>
 
           <div className="mb-8">
@@ -177,8 +177,15 @@ export default function LoginPage() {
             </div>
           </div>
           
-          <div className="lg:hidden mt-8 pt-6 border-t border-slate-200 flex items-center justify-center gap-2 text-sm text-slate-500">
-            <Heart className="w-4 h-4 text-red-500" /> Made by toolee.nl
+          <div className="lg:hidden mt-8 pt-6 border-t border-slate-200 flex flex-col items-center gap-3 text-sm text-slate-500">
+            <Link href="/" className="text-brand-600 hover:text-brand-700 font-medium">← Back to Home</Link>
+            <div className="flex items-center gap-2">
+              <Heart className="w-4 h-4 text-red-500" /> Made by toolee.nl
+            </div>
+          </div>
+          
+          <div className="hidden lg:block mt-8 text-center">
+            <Link href="/" className="text-sm text-slate-500 hover:text-slate-700">← Back to Home</Link>
           </div>
         </div>
       </div>
