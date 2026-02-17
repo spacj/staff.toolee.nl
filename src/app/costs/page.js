@@ -6,7 +6,7 @@ import Modal from '@/components/Modal';
 import PayPalCheckout from '@/components/PayPalCheckout';
 import { useAuth } from '@/contexts/AuthContext';
 import { getWorkers, getShops, getShifts, getPayments, getOrganization } from '@/lib/firestore';
-import { calculateCost, formatCurrency, getTierInfo } from '@/lib/pricing';
+import { calculateCost, formatCurrency, getTierInfo, FREE_WORKER_LIMIT } from '@/lib/pricing';
 import { calculateWorkerCost } from '@/lib/scheduling';
 import { cn } from '@/utils/helpers';
 import { CreditCard, TrendingUp, Users, Store, CheckCircle, AlertTriangle, XCircle, Loader2 } from 'lucide-react';
@@ -51,7 +51,8 @@ function CostsContent() {
   }, [searchParams, router]);
 
   const activeWorkers = workers.filter(w => w.status === 'active');
-  const cost = useMemo(() => calculateCost(activeWorkers.length, shops.length, 'monthly'), [activeWorkers.length, shops.length]);
+  const freeLimit = orgData?.freeWorkerLimit || organization?.freeWorkerLimit;
+  const cost = useMemo(() => calculateCost(activeWorkers.length, shops.length, 'monthly', freeLimit), [activeWorkers.length, shops.length, freeLimit]);
 
   const sub = orgData || organization || {};
   const hasActiveSubscription = sub.subscriptionStatus === 'active';
@@ -60,8 +61,8 @@ function CostsContent() {
   const subscriptionCycle = sub.subscriptionCycle || 'monthly';
   const subscriptionCost = useMemo(() => {
     if (!hasActiveSubscription && !hasSuspendedSubscription) return null;
-    return calculateCost(activeWorkers.length, shops.length, subscriptionCycle);
-  }, [activeWorkers.length, shops.length, subscriptionCycle, hasActiveSubscription, hasSuspendedSubscription]);
+    return calculateCost(activeWorkers.length, shops.length, subscriptionCycle, freeLimit);
+  }, [activeWorkers.length, shops.length, subscriptionCycle, hasActiveSubscription, hasSuspendedSubscription, freeLimit]);
 
   const laborCosts = useMemo(() => {
     return activeWorkers.map(w => {
@@ -83,6 +84,22 @@ function CostsContent() {
           <h1 className="page-title">Costs & Billing</h1>
           <p className="text-sm text-surface-500">Manage subscription, labor costs, and payment history</p>
         </div>
+
+        {freeLimit && freeLimit > FREE_WORKER_LIMIT && (
+          <div className="card p-5 border-l-4 border-l-purple-500 bg-purple-50/30">
+            <div className="flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-purple-800">
+                  Promo Code Active: {sub.promoCode}
+                </p>
+                <p className="text-xs text-purple-700 mt-1">
+                  Your plan includes {freeLimit} free workers instead of the standard {FREE_WORKER_LIMIT}. You only pay from the {freeLimit + 1}th worker onward!
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {(hasActiveSubscription || hasSuspendedSubscription || hasCancelledSubscription) && (
           <div className={cn('card p-5 border-l-4', {

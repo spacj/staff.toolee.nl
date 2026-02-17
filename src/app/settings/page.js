@@ -10,74 +10,11 @@ import {
   User, Bell, Palette, Shield, Save, Camera,
   Mail, Phone, Building, MapPin, Globe, Clock,
   ChevronRight, ToggleLeft, ToggleRight, AlertCircle,
-  Key, LogOut, Trash2, CheckCircle, Link2
+  Key, LogOut, Trash2, CheckCircle, Link2, Users
 } from 'lucide-react';
 
-function ReferralsTab({ orgId, isAdmin }) {
-  const [referrals, setReferrals] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (orgId) {
-      getReferrals({ orgId }).then(setReferrals).finally(() => setLoading(false));
-    }
-  }, [orgId]);
-
-  const totalReferrals = referrals.length;
-  const uniqueReferrers = [...new Set(referrals.map(r => r.referrerId))].length;
-
-  return (
-    <div className="space-y-6">
-      <div className="card">
-        <div className="px-6 py-5 border-b border-surface-100">
-          <h2 className="text-lg font-display font-semibold text-surface-900">Referral Statistics</h2>
-          <p className="text-sm text-surface-500 mt-0.5">Track referrals and conversions</p>
-        </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 bg-brand-50 rounded-xl">
-              <p className="text-2xl font-bold text-brand-700">{totalReferrals}</p>
-              <p className="text-sm text-brand-600">Total Referrals</p>
-            </div>
-            <div className="p-4 bg-emerald-50 rounded-xl">
-              <p className="text-2xl font-bold text-emerald-700">{uniqueReferrers}</p>
-              <p className="text-sm text-emerald-600">Unique Referrers</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="px-6 py-5 border-b border-surface-100">
-          <h2 className="text-lg font-display font-semibold text-surface-900">Referral History</h2>
-        </div>
-        <div className="divide-y divide-surface-100">
-          {loading ? (
-            <div className="p-6 text-center text-surface-400">Loading...</div>
-          ) : referrals.length === 0 ? (
-            <div className="p-6 text-center text-surface-400">No referrals yet.</div>
-          ) : (
-            referrals.map(r => (
-              <div key={r.id} className="px-6 py-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-surface-800">Referral Code: {r.referralCode}</p>
-                  <p className="text-xs text-surface-500">Created {new Date(r.createdAt).toLocaleDateString()}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-surface-700">Referred User</p>
-                  <p className="text-xs text-surface-500">ID: {r.referredId.slice(0, 8)}...</p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function SettingsPage() {
-  const { user, userProfile, role, signOut, linkGoogleAccount, organization } = useAuth();
+  const { user, userProfile, role, signOut, linkGoogleAccount, organization, isAdmin, orgId } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState({
@@ -113,57 +50,15 @@ export default function SettingsPage() {
       setProfile((prev) => ({
         ...prev,
         displayName: userProfile.displayName || '',
-        email: user?.email || '',
+        email: userProfile.email || '',
         phone: userProfile.phone || '',
         company: userProfile.company || '',
         location: userProfile.location || '',
         timezone: userProfile.timezone || prev.timezone,
         language: userProfile.language || 'en',
       }));
-      if (userProfile.notifications) setNotifications(userProfile.notifications);
-      if (userProfile.appearance) setAppearance(userProfile.appearance);
     }
-  }, [userProfile, user]);
-
-  const handleSaveProfile = async () => {
-    setLoading(true);
-    try {
-      await updateUserProfile(user.uid, {
-        displayName: profile.displayName,
-        phone: profile.phone,
-        company: profile.company,
-        location: profile.location,
-        timezone: profile.timezone,
-        language: profile.language,
-      });
-      toast.success('Profile updated');
-    } catch (err) {
-      toast.error('Failed to update profile');
-    }
-    setLoading(false);
-  };
-
-  const handleSaveNotifications = async () => {
-    setLoading(true);
-    try {
-      await updateUserProfile(user.uid, { notifications });
-      toast.success('Notification preferences saved');
-    } catch (err) {
-      toast.error('Failed to save preferences');
-    }
-    setLoading(false);
-  };
-
-  const handleSaveAppearance = async () => {
-    setLoading(true);
-    try {
-      await updateUserProfile(user.uid, { appearance });
-      toast.success('Appearance settings saved');
-    } catch (err) {
-      toast.error('Failed to save settings');
-    }
-    setLoading(false);
-  };
+  }, [userProfile]);
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
@@ -189,69 +84,48 @@ export default function SettingsPage() {
     </div>
   );
 
-          {/* Referrals Tab */}
-          {activeTab === 'referrals' && isAdmin && (
-            <ReferralsTab orgId={orgId} isAdmin={isAdmin} />
-          )}
-        </div>
-      </div>
-    </Layout>
-  );
-}
-    }, [orgId]);
-
-    const totalReferrals = referrals.length;
-    const uniqueReferrers = [...new Set(referrals.map(r => r.referrerId))].length;
-
-    return (
-      <div className="space-y-6">
-        <div className="card">
-          <div className="px-6 py-5 border-b border-surface-100">
-            <h2 className="text-lg font-display font-semibold text-surface-900">Referral Statistics</h2>
-            <p className="text-sm text-surface-500 mt-0.5">Track referrals and conversions</p>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-4 bg-brand-50 rounded-xl">
-                <p className="text-2xl font-bold text-brand-700">{totalReferrals}</p>
-                <p className="text-sm text-brand-600">Total Referrals</p>
-              </div>
-              <div className="p-4 bg-emerald-50 rounded-xl">
-                <p className="text-2xl font-bold text-emerald-700">{uniqueReferrers}</p>
-                <p className="text-sm text-emerald-600">Unique Referrers</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="px-6 py-5 border-b border-surface-100">
-            <h2 className="text-lg font-display font-semibold text-surface-900">Referral History</h2>
-          </div>
-          <div className="divide-y divide-surface-100">
-            {loading ? (
-              <div className="p-6 text-center text-surface-400">Loading...</div>
-            ) : referrals.length === 0 ? (
-              <div className="p-6 text-center text-surface-400">No referrals yet.</div>
-            ) : (
-              referrals.map(r => (
-                <div key={r.id} className="px-6 py-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-surface-800">Referral Code: {r.referralCode}</p>
-                    <p className="text-xs text-surface-500">Created {new Date(r.createdAt).toLocaleDateString()}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-surface-700">Referred User</p>
-                    <p className="text-xs text-surface-500">ID: {r.referredId.slice(0, 8)}...</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    );
+  const handleSaveProfile = async () => {
+    setLoading(true);
+    try {
+      await updateUserProfile(user.uid, {
+        displayName: profile.displayName,
+        phone: profile.phone,
+        company: profile.company,
+        location: profile.location,
+        timezone: profile.timezone,
+        language: profile.language,
+      });
+      toast.success('Profile updated successfully');
+    } catch (err) {
+      toast.error('Failed to update profile');
+    }
+    setLoading(false);
   };
+
+  const handleSaveNotifications = async () => {
+    setLoading(true);
+    try {
+      await updateUserProfile(user.uid, { notifications });
+      toast.success('Notification preferences updated');
+    } catch (err) {
+      toast.error('Failed to update preferences');
+    }
+    setLoading(false);
+  };
+
+  const handleSaveAppearance = async () => {
+    setLoading(true);
+    try {
+      await updateUserProfile(user.uid, { appearance });
+      toast.success('Appearance settings updated');
+    } catch (err) {
+      toast.error('Failed to update settings');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <Layout>
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-display font-bold text-surface-900">Settings</h1>
@@ -694,10 +568,73 @@ export default function SettingsPage() {
 
           {/* Referrals Tab */}
           {activeTab === 'referrals' && isAdmin && (
-            <ReferralsTab />
+            <ReferralsTab orgId={orgId} />
           )}
         </div>
       </div>
     </Layout>
+  );
+}
+
+function ReferralsTab({ orgId }) {
+  const [referrals, setReferrals] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (orgId) {
+      getReferrals({ orgId }).then(setReferrals).finally(() => setLoading(false));
+    }
+  }, [orgId]);
+
+  const totalReferrals = referrals.length;
+  const uniqueReferrers = [...new Set(referrals.map(r => r.referrerId))].length;
+
+  return (
+    <div className="space-y-6">
+      <div className="card">
+        <div className="px-6 py-5 border-b border-surface-100">
+          <h2 className="text-lg font-display font-semibold text-surface-900">Referral Statistics</h2>
+          <p className="text-sm text-surface-500 mt-0.5">Track referrals and conversions</p>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-4 bg-brand-50 rounded-xl">
+              <p className="text-2xl font-bold text-brand-700">{totalReferrals}</p>
+              <p className="text-sm text-brand-600">Total Referrals</p>
+            </div>
+            <div className="p-4 bg-emerald-50 rounded-xl">
+              <p className="text-2xl font-bold text-emerald-700">{uniqueReferrers}</p>
+              <p className="text-sm text-emerald-600">Unique Referrers</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="px-6 py-5 border-b border-surface-100">
+          <h2 className="text-lg font-display font-semibold text-surface-900">Referral History</h2>
+        </div>
+        <div className="divide-y divide-surface-100">
+          {loading ? (
+            <div className="p-6 text-center text-surface-400">Loading...</div>
+          ) : referrals.length === 0 ? (
+            <div className="p-6 text-center text-surface-400">No referrals yet.</div>
+          ) : (
+            referrals.map(r => (
+              <div key={r.id} className="px-6 py-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-surface-800">Referral Code: {r.referralCode}</p>
+                  <p className="text-xs text-surface-500">Created {new Date(r.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-surface-700">Referred User</p>
+                  <p className="text-xs text-surface-500">ID: {r.referredId.slice(0, 8)}...</p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

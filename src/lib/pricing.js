@@ -13,7 +13,8 @@
  */
 const PRICE_PER_WORKER = 2;
 const PRICE_PER_SHOP = 15;
-const FREE_WORKER_LIMIT = 10;
+const FREE_WORKER_LIMIT = 4;
+const PROMO_WORKER_LIMIT = 10;
 const FREE_SHOP_LIMIT = 1;
 const ENTERPRISE_THRESHOLD = 30;
 const ENTERPRISE_PRICE_MONTHLY = 299;
@@ -23,8 +24,8 @@ const YEARLY_MULTIPLIER = 10; // ×10 = pay for 10 months, get 12
 export const TIERS = { FREE: 'free', STANDARD: 'standard', ENTERPRISE: 'enterprise' };
 export const CYCLES = { MONTHLY: 'monthly', YEARLY: 'yearly' };
 
-export function getTier(workerCount) {
-  if (workerCount < FREE_WORKER_LIMIT) return TIERS.FREE;
+export function getTier(workerCount, freeLimit = FREE_WORKER_LIMIT) {
+  if (workerCount <= freeLimit) return TIERS.FREE;
   if (workerCount < ENTERPRISE_THRESHOLD) return TIERS.STANDARD;
   return TIERS.ENTERPRISE;
 }
@@ -47,12 +48,12 @@ export function getTierInfo(tier) {
 /**
  * Calculate cost for a given billing cycle
  */
-export function calculateCost(workerCount, shopCount, cycle = 'monthly') {
-  const tier = getTier(workerCount);
+export function calculateCost(workerCount, shopCount, cycle = 'monthly', freeLimit = FREE_WORKER_LIMIT) {
+  const tier = getTier(workerCount, freeLimit);
   const isYearly = cycle === 'yearly';
 
   if (tier === TIERS.FREE) {
-    return { total: 0, monthlyEquivalent: 0, workerCost: 0, shopCost: 0, tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings: 0 };
+    return { total: 0, monthlyEquivalent: 0, workerCost: 0, shopCost: 0, tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings: 0, freeLimit };
   }
 
   if (tier === TIERS.ENTERPRISE) {
@@ -60,7 +61,7 @@ export function calculateCost(workerCount, shopCount, cycle = 'monthly') {
     const total = monthly;
     const monthlyEquiv = total;
     const savings = ENTERPRISE_PRICE_MONTHLY - ENTERPRISE_DISCOUNTED_PRICE;
-    return { total, monthlyEquivalent: Math.round(monthlyEquiv * 100) / 100, workerCost: 0, shopCost: 0, tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings };
+    return { total, monthlyEquivalent: Math.round(monthlyEquiv * 100) / 100, workerCost: 0, shopCost: 0, tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings, freeLimit };
   }
 
   // Standard — first shop is free, additional shops €15/mo each
@@ -78,7 +79,7 @@ export function calculateCost(workerCount, shopCount, cycle = 'monthly') {
     workerCost: isYearly ? Math.round(workerCostMonthly * YEARLY_MULTIPLIER * 100) / 100 : workerCostMonthly,
     shopCost: isYearly ? Math.round(shopCostMonthly * YEARLY_MULTIPLIER * 100) / 100 : shopCostMonthly,
     monthlyTotal, billableShops,
-    tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings,
+    tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings, freeLimit,
   };
 }
 
@@ -138,16 +139,16 @@ export function calcPaidThrough(cycle = 'monthly') {
   return d.toISOString().split('T')[0];
 }
 
-export function canAddWorker(currentActiveWorkers, currentShopCount, orgPlan) {
+export function canAddWorker(currentActiveWorkers, currentShopCount, orgPlan, freeLimit = FREE_WORKER_LIMIT) {
   const afterCount = currentActiveWorkers + 1;
-  const currentTier = getTier(currentActiveWorkers);
-  const newTier = getTier(afterCount);
-  const newCost = calculateCost(afterCount, currentShopCount, 'monthly');
+  const currentTier = getTier(currentActiveWorkers, freeLimit);
+  const newTier = getTier(afterCount, freeLimit);
+  const newCost = calculateCost(afterCount, currentShopCount, 'monthly', freeLimit);
 
   if (currentTier === TIERS.FREE && newTier === TIERS.STANDARD) {
     return {
       allowed: true, requiresUpgrade: true,
-      message: `Adding an ${FREE_WORKER_LIMIT + 1}th worker upgrades you to Standard at ${formatCurrency(newCost.total)}/month.`,
+      message: `Adding a ${freeLimit + 1}th worker upgrades you to Standard at ${formatCurrency(newCost.total)}/month.`,
       newTier: TIERS.STANDARD, newCost,
     };
   }
@@ -161,8 +162,8 @@ export function canAddWorker(currentActiveWorkers, currentShopCount, orgPlan) {
   return { allowed: true, requiresUpgrade: false, message: null, newTier: currentTier, newCost };
 }
 
-export function canAddShop(currentShopCount, currentActiveWorkers) {
-  const tier = getTier(currentActiveWorkers);
+export function canAddShop(currentShopCount, currentActiveWorkers, freeLimit = FREE_WORKER_LIMIT) {
+  const tier = getTier(currentActiveWorkers, freeLimit);
   if (tier === TIERS.FREE && currentShopCount >= FREE_SHOP_LIMIT) {
     return { allowed: false, message: `Free plan includes ${FREE_SHOP_LIMIT} shop. Add more workers to unlock Standard.` };
   }
@@ -179,4 +180,5 @@ export function formatCurrency(amount) {
 export {
   PRICE_PER_WORKER, PRICE_PER_SHOP, FREE_WORKER_LIMIT, FREE_SHOP_LIMIT,
   ENTERPRISE_THRESHOLD, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE, YEARLY_MULTIPLIER,
+  PROMO_WORKER_LIMIT,
 };

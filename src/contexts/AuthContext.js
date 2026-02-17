@@ -14,6 +14,13 @@ import {
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { getUserProfile, createReferral, getUserByReferralCode } from '@/lib/firestore';
+import { PROMO_WORKER_LIMIT } from '@/lib/pricing';
+
+const PROMO_CODES = {
+  'TOOLEE10': PROMO_WORKER_LIMIT,
+  'STAFF10': PROMO_WORKER_LIMIT,
+  'LAUNCH10': PROMO_WORKER_LIMIT,
+};
 
 const AuthContext = createContext({});
 
@@ -68,10 +75,13 @@ export function AuthProvider({ children }) {
 
     // 2. Create organization
     const orgId = result.user.uid + '_org';
+    const promoFreeLimit = referralCode ? PROMO_CODES[referralCode.toUpperCase()] : null;
     await setDoc(doc(db, 'organizations', orgId), {
       name: companyName,
       ownerId: result.user.uid,
       plan: 'free',
+      freeWorkerLimit: promoFreeLimit || null,
+      promoCode: promoFreeLimit ? referralCode.toUpperCase() : null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });

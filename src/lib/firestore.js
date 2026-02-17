@@ -4,7 +4,7 @@ import {
   onSnapshot, Timestamp
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { getTier, calculateCost } from './pricing';
+import { getTier, calculateCost, FREE_WORKER_LIMIT } from './pricing';
 
 const C = {
   USERS: 'users', ORGANIZATIONS: 'organizations', WORKERS: 'workers',
@@ -51,8 +51,10 @@ export const updateOrganization = (id, data) => upd(C.ORGANIZATIONS, id, data);
 export async function syncOrgPlan(orgId) {
   const workers = await getAll(C.WORKERS, where('orgId', '==', orgId), where('status', '==', 'active'));
   const shops = await getAll(C.SHOPS, where('orgId', '==', orgId));
-  const newTier = getTier(workers.length);
-  const cost = calculateCost(workers.length, shops.length, 'monthly');
+  const org = await get1(C.ORGANIZATIONS, orgId);
+  const freeLimit = org?.freeWorkerLimit;
+  const newTier = getTier(workers.length, freeLimit);
+  const cost = calculateCost(workers.length, shops.length, 'monthly', freeLimit);
   await upd(C.ORGANIZATIONS, orgId, { plan: newTier, activeWorkerCount: workers.length, shopCount: shops.length, monthlyCost: cost.total });
 
   // Sync PayPal subscription quantity (fire-and-forget)
