@@ -22,8 +22,11 @@ export default function AIAssistant({ contextData }) {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
+  // Only auto-focus on desktop (not mobile) to prevent keyboard from opening
   useEffect(() => {
-    if (open && inputRef.current) inputRef.current.focus();
+    if (open && inputRef.current && window.innerWidth >= 640) {
+      inputRef.current.focus();
+    }
   }, [open, feature]);
 
   const switchFeature = (f) => {
