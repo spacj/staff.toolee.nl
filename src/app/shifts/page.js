@@ -28,6 +28,7 @@ export default function ShiftTemplatesPage() {
     rules: [], // extra rules: [{ type: 'incompatible_workers', workers: ['id1', 'id2'] }]
   });
   const [workers, setWorkers] = useState([]);
+  const [saving, setSaving] = useState(false);
 
   const load = () => {
     if (!orgId) return;
