@@ -363,6 +363,25 @@ export default function CalendarPage() {
               <div><span className="text-surface-400 text-xs block">Shops</span><strong className="text-surface-800">{shops.length}</strong></div>
             </div>
 
+            {/* Template breakdown — shows which days each template runs */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-surface-500 uppercase tracking-wider">Templates in use</p>
+              {templates.map(t => {
+                const days = t.daysOfWeek && t.daysOfWeek.length > 0 ? t.daysOfWeek : [0,1,2,3,4,5,6];
+                const dayStr = days.length === 7 ? 'Every day' : JSON.stringify([...days].sort()) === JSON.stringify([1,2,3,4,5]) ? 'Mon–Fri' : JSON.stringify([...days].sort()) === JSON.stringify([0,6]) ? 'Weekends' : days.sort((a,b)=>a-b).map(d => DAY_LABELS[d]).join(', ');
+                return (
+                  <div key={t.id} className="flex items-center justify-between p-2 bg-white border border-surface-100 rounded-lg text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-semibold text-surface-800 truncate">{t.name}</span>
+                      <span className="text-surface-400">{t.startTime}–{t.endTime}</span>
+                      <span className="text-surface-400">({t.requiredWorkers}w)</span>
+                    </div>
+                    <span className={cn('flex-shrink-0 font-medium', days.length > 5 ? 'text-amber-600' : 'text-surface-500')}>{dayStr}</span>
+                  </div>
+                );
+              })}
+            </div>
+
             {!preview && (
               <div className="flex justify-end gap-3">
                 <button onClick={() => setShowAutoSchedule(false)} className="btn-secondary">Cancel</button>
