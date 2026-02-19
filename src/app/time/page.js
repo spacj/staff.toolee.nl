@@ -56,15 +56,11 @@ export default function TimePage() {
     getPermits({ workerId: resolvedWorkerId, limit: 20 }).then(setPermits).catch(() => setPermits([]));
     getShops(orgId).then(setShops);
     getWorker(resolvedWorkerId).then(setWorkerData).catch(() => {});
-    getCorrectionRequests({ workerId: resolvedWorkerId, limit: 20 }).then(setCorrections).catch(() => setCorrections([]));
-    // Get messages sent by this worker + messages sent to this worker
-    getMessages({ senderId: resolvedWorkerId, limit: 30 }).then(sent => {
-      getMessages({ recipientId: resolvedWorkerId, limit: 30 }).then(received => {
-        const all = [...sent, ...received].sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
-        // Deduplicate by id
-        const unique = all.filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i);
-        setMessages(unique);
-      }).catch(() => setMessages(sent));
+    getCorrectionRequests({ orgId, workerId: resolvedWorkerId, limit: 50 }).then(setCorrections).catch(() => setCorrections([]));
+    // Get all org messages, then filter to those relevant to this worker
+    getMessages({ orgId, limit: 100 }).then(all => {
+      const mine = all.filter(m => m.senderId === resolvedWorkerId || m.recipientId === resolvedWorkerId);
+      setMessages(mine);
     }).catch(() => setMessages([]));
   }, [resolvedWorkerId, orgId, today, monthStart]);
 

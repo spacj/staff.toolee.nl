@@ -336,11 +336,13 @@ export async function getActivityLog(lim = 20) { return getAll(C.ACTIVITY_LOG, o
 export async function getCorrectionRequests(filters = {}) {
   const c = [];
   if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
-  if (filters.workerId) c.push(where('workerId', '==', filters.workerId));
-  if (filters.status) c.push(where('status', '==', filters.status));
   c.push(orderBy('createdAt', 'desc'));
   if (filters.limit) c.push(limit(filters.limit));
-  return getAll(C.CORRECTION_REQUESTS, ...c);
+  let results = await getAll(C.CORRECTION_REQUESTS, ...c);
+  // Client-side filtering to avoid needing composite indexes
+  if (filters.workerId) results = results.filter(r => r.workerId === filters.workerId);
+  if (filters.status) results = results.filter(r => r.status === filters.status);
+  return results;
 }
 export const createCorrectionRequest = (data) => add(C.CORRECTION_REQUESTS, { ...data, status: 'pending' });
 export async function reviewCorrectionRequest(id, approved, reviewedBy, adminNotes = '') {
@@ -359,12 +361,14 @@ export async function reviewCorrectionRequest(id, approved, reviewedBy, adminNot
 export async function getMessages(filters = {}) {
   const c = [];
   if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
-  if (filters.recipientType) c.push(where('recipientType', '==', filters.recipientType));
-  if (filters.recipientId) c.push(where('recipientId', '==', filters.recipientId));
-  if (filters.senderId) c.push(where('senderId', '==', filters.senderId));
   c.push(orderBy('createdAt', 'desc'));
   if (filters.limit) c.push(limit(filters.limit));
-  return getAll(C.MESSAGES, ...c);
+  let results = await getAll(C.MESSAGES, ...c);
+  // Client-side filtering to avoid needing composite indexes
+  if (filters.recipientType) results = results.filter(r => r.recipientType === filters.recipientType);
+  if (filters.recipientId) results = results.filter(r => r.recipientId === filters.recipientId);
+  if (filters.senderId) results = results.filter(r => r.senderId === filters.senderId);
+  return results;
 }
 export const createMessage = (data) => add(C.MESSAGES, { ...data, read: false });
 export const markMessageRead = (id) => upd(C.MESSAGES, id, { read: true });

@@ -105,5 +105,25 @@ service cloud.firestore {
       allow read: if isAuth();
       allow create: if isAuth();
     }
+
+    // Referrals: all auth read, auth create
+    match /referrals/{id} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+    }
+
+    // Correction Requests: all auth read/create (workers submit), managers update (approve/reject)
+    match /correctionRequests/{id} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isManager();
+    }
+
+    // Messages: all auth read/create (workers send, managers reply), auth update (mark read)
+    match /messages/{id} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+    }
   }
 }
