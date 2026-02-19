@@ -45,7 +45,7 @@ export default function ChatPage() {
         (m.senderId === workerId && m.recipientId === partnerId) ||
         (m.senderId === partnerId && m.recipientId === workerId)
       )
-      .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     setMessages(between);
     
     // Mark unread as read

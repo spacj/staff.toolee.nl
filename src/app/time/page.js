@@ -352,7 +352,7 @@ export default function TimePage() {
           <p className="text-xs text-surface-400 mb-3">Send a message to management about schedule changes, shift swaps, or any work-related questions.</p>
           <div className="divide-y divide-surface-100">
             {messages.length === 0 && <p className="py-4 text-sm text-surface-400 text-center">No messages yet.</p>}
-            {messages.filter(m => !m.parentId).sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0)).map(m => (
+            {messages.filter(m => !m.parentId).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).map(m => (
               <div key={m.id} className="py-3">
                 <div className="flex items-center justify-between cursor-pointer" onClick={() => { setExpandedMsg(expandedMsg === m.id ? null : m.id); if (!m.read && m.recipientId === resolvedWorkerId) markMessageRead(m.id); }}>
                   <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -371,7 +371,7 @@ export default function TimePage() {
                       <p className="whitespace-pre-wrap">{m.body}</p>
                     </div>
                     {/* Show replies */}
-                    {messages.filter(r => r.parentId === m.id).sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0)).map(r => (
+                    {messages.filter(r => r.parentId === m.id).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).map(r => (
                       <div key={r.id} className={cn('p-3 rounded-xl text-sm', r.senderRole === 'worker' ? 'bg-brand-50 text-surface-700 ml-4' : 'bg-emerald-50 text-surface-700 ml-4')}>
                         <p className="text-[10px] text-surface-400 mb-1">{r.senderRole === 'worker' ? 'You' : r.senderName} · {r.createdAt?.slice(0, 16).replace('T', ' ')}</p>
                         <p className="whitespace-pre-wrap">{r.body}</p>
