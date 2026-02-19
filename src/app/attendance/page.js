@@ -319,7 +319,7 @@ export default function AttendancePage() {
         {tab === 'messages' && (
           <div className="space-y-3">
             {messages.filter(m => !m.parentId).length === 0 && <div className="card p-8 text-center"><MessageSquare className="w-8 h-8 text-surface-300 mx-auto mb-2" /><p className="text-surface-400 text-sm">No messages from workers.</p></div>}
-            {messages.filter(m => !m.parentId).map(m => (
+            {messages.filter(m => !m.parentId).sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0)).map(m => (
               <div key={m.id} className={cn('card overflow-hidden', !m.read ? 'border-brand-200' : '')}>
                 {!m.read && <div className="h-0.5 bg-brand-500" />}
                 <div className="p-5">
@@ -339,7 +339,7 @@ export default function AttendancePage() {
                         <p className="whitespace-pre-wrap text-surface-700">{m.body}</p>
                       </div>
                       {/* Replies */}
-                      {messages.filter(r => r.parentId === m.id).map(r => (
+                      {messages.filter(r => r.parentId === m.id).sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0)).map(r => (
                         <div key={r.id} className={cn('p-3 rounded-xl text-sm ml-4', r.senderRole === 'worker' ? 'bg-surface-50' : 'bg-brand-50')}>
                           <p className="text-[10px] text-surface-400 mb-1">{r.senderRole === 'worker' ? r.senderName : 'You (Management)'} · {r.createdAt?.slice(0, 16).replace('T', ' ')}</p>
                           <p className="whitespace-pre-wrap text-surface-700">{r.body}</p>
