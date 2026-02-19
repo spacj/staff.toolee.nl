@@ -366,7 +366,7 @@ export async function getMessages(filters = {}) {
   if (filters.recipientType) results = results.filter(r => r.recipientType === filters.recipientType);
   if (filters.recipientId) results = results.filter(r => r.recipientId === filters.recipientId);
   if (filters.senderId) results = results.filter(r => r.senderId === filters.senderId);
-  results.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+  results.sort((a, b) => (a.createdAt || '') > (b.createdAt || '') ? 1 : -1);
   if (filters.limit) results = results.slice(0, filters.limit);
   return results;
 }

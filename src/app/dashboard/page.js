@@ -2,10 +2,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
-import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog, getCorrectionRequests, getMessages, updatePermit, reviewCorrectionRequest, notifyWorker } from '@/lib/firestore';
+import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog, getCorrectionRequests, getMessages, createMessage, updatePermit, reviewCorrectionRequest, notifyWorker, markMessageRead } from '@/lib/firestore';
 import { calculateMonthlyCost, formatCurrency } from '@/lib/pricing';
 import { cn } from '@/utils/helpers';
-import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3, MessageCircle, AlertTriangle, XCircle } from 'lucide-react';
+import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3, MessageCircle, AlertTriangle, XCircle, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
@@ -25,8 +25,11 @@ export default function DashboardPage() {
   const [permits, setPermits] = useState([]);
   const [activity, setActivity] = useState([]);
   const [corrections, setCorrections] = useState([]);
-  const [messages, setMessages] = useState([]);
+const [messages, setMessages] = useState([]);
   const [loadingAction, setLoadingAction] = useState(null);
+  const [expandedMsg, setExpandedMsg] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(null);
 
   // Quick approve/deny handlers
   const handlePermitAction = async (id, status) => {
@@ -57,6 +60,32 @@ export default function DashboardPage() {
       getCorrectionRequests({ orgId, status: 'pending', limit: 20 }).then(setCorrections).catch(() => setCorrections([]));
     } catch (err) { toast.error(err.message); }
     setLoadingAction(null);
+  };
+
+  const handleReply = async (parentId, senderId) => {
+    if (!replyText.trim()) return;
+    setSendingReply(parentId);
+    try {
+      await createMessage({
+        senderId: user.uid,
+        senderName: userProfile?.displayName || 'Management',
+        senderRole: 'manager',
+        recipientType: 'worker',
+        recipientId: senderId,
+        orgId,
+        subject: 'Re: reply',
+        body: replyText,
+        parentId,
+      });
+      toast.success('Reply sent!');
+      setReplyText('');
+      setExpandedMsg(null);
+      getMessages({ orgId, limit: 50 }).then(all => {
+        const unread = all.filter(m => !m.read && m.recipientType === 'management');
+        setMessages(unread);
+      }).catch(() => setMessages([]));
+    } catch (err) { toast.error(err.message); }
+    setSendingReply(null);
   };
 
   // Resolve worker ID for worker-specific queries
@@ -263,14 +292,31 @@ export default function DashboardPage() {
                 </h3>
                 <Link href="/attendance?tab=messages" className="text-xs text-red-600 font-semibold hover:underline flex items-center gap-1">View all <ArrowRight className="w-3 h-3" /></Link>
               </div>
-              <div className="divide-y divide-surface-100 max-h-64 overflow-y-auto">
+              <div className="divide-y divide-surface-100 max-h-80 overflow-y-auto">
                 {messages.slice(0, 5).map(m => (
-                  <div key={m.id} className="px-5 py-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-surface-800">{m.subject}</p>
-                      <p className="text-xs text-surface-400">From: {m.senderName}</p>
+                  <div key={m.id} className="px-5 py-3">
+                    <div className="flex items-center justify-between cursor-pointer" onClick={() => { setExpandedMsg(expandedMsg === m.id ? null : m.id); if (!m.read) markMessageRead(m.id).then(() => getMessages({ orgId, limit: 50 }).then(all => { const unread = all.filter(msg => !msg.read && msg.recipientType === 'management'); setMessages(unread); }).catch(() => {})); }}>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          {!m.read && <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0" />}
+                          <p className="text-sm font-medium text-surface-800 truncate">{m.subject}</p>
+                        </div>
+                        <p className="text-xs text-surface-400">From: {m.senderName}</p>
+                      </div>
+                      {expandedMsg === m.id ? <ChevronUp className="w-4 h-4 text-surface-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-surface-400 flex-shrink-0" />}
                     </div>
-                    <div className="w-2 h-2 bg-red-500 rounded-full" />
+                    {expandedMsg === m.id && (
+                      <div className="mt-2 space-y-2">
+                        <div className="p-3 bg-surface-50 rounded-xl text-sm">
+                          <p className="text-[10px] text-surface-400 mb-1">{m.senderName} · {m.createdAt?.slice(0, 16).replace('T', ' ')}</p>
+                          <p className="whitespace-pre-wrap text-surface-700">{m.body}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <input value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Type a reply..." className="input-field flex-1 !py-2 text-sm" onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply(m.id, m.senderId); } }} />
+                          <button onClick={() => handleReply(m.id, m.senderId)} disabled={sendingReply === m.id || !replyText.trim()} className="btn-primary !py-2 !px-3"><Send className="w-4 h-4" /></button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
