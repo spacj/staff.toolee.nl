@@ -12,6 +12,12 @@ import toast from 'react-hot-toast';
 const SHIFT_TYPES = ['morning', 'afternoon', 'evening', 'night', 'split', 'custom'];
 const TYPE_COLORS = { morning: 'bg-amber-100 text-amber-700', afternoon: 'bg-orange-100 text-orange-700', evening: 'bg-purple-100 text-purple-700', night: 'bg-indigo-100 text-indigo-700', split: 'bg-teal-100 text-teal-700', custom: 'bg-surface-100 text-surface-600' };
 const DAY_BUTTONS = [{d:1,l:'Mon'},{d:2,l:'Tue'},{d:3,l:'Wed'},{d:4,l:'Thu'},{d:5,l:'Fri'},{d:6,l:'Sat'},{d:0,l:'Sun'}];
+const RULE_TYPES = [
+  { value: 'unpaid_break', label: 'Unpaid Break', description: 'Deduct break time from paid hours' },
+  { value: 'incompatible_workers', label: 'Incompatible Workers', description: 'Two workers who cannot work this shift together' },
+  { value: 'min_rest_hours', label: 'Minimum Rest Between Shifts', description: 'Hours of rest required before next shift' },
+  { value: 'max_consecutive_days', label: 'Max Consecutive Days', description: 'Limit how many days in a row a worker can do this shift' },
+];
 
 export default function ShiftTemplatesPage() {
   const { orgId } = useAuth();
@@ -55,7 +61,7 @@ export default function ShiftTemplatesPage() {
       daysOfWeek: t.daysOfWeek || [0,1,2,3,4,5,6],
       usePerDayRequirements: hasPerDay,
       requiredByDay: t.requiredByDay || {},
-      rules: t.rules || [],
+      rules: (t.rules || []).map(migrateRule),
     });
     setShowForm(true);
   };
@@ -83,11 +89,26 @@ export default function ShiftTemplatesPage() {
     if (form.daysOfWeek.length === 0) { toast.error('Select at least one day'); return; }
     setSaving(true);
     try {
+      // Normalize rules before saving
+      const normalizedRules = form.rules.map(r => {
+        if (r.type === 'incompatible_workers') {
+          // Store as workers[] array for scheduling algorithm compatibility
+          const w = [r.workerA, r.workerB].filter(Boolean);
+          return { type: 'incompatible_workers', workers: w, workerA: r.workerA || '', workerB: r.workerB || '' };
+        }
+        return r;
+      }).filter(r => {
+        // Remove incomplete rules
+        if (r.type === 'incompatible_workers' && (!r.workers || r.workers.length < 2)) return false;
+        if (r.type === 'unpaid_break' && (!r.minutes || r.minutes <= 0)) return false;
+        return true;
+      });
       const data = {
         ...form, orgId,
         requiredWorkers: parseInt(form.requiredWorkers) || 1,
         breakMinutes: parseInt(form.breakMinutes) || 0,
         requiredByDay: form.usePerDayRequirements ? form.requiredByDay : {},
+        rules: normalizedRules,
       };
       delete data.usePerDayRequirements;
       if (edit) { await updateShiftTemplate(edit.id, data); toast.success('Template updated'); }
@@ -97,8 +118,14 @@ export default function ShiftTemplatesPage() {
     setSaving(false);
   };
 
-  const addRule = () => {
-    setForm(f => ({ ...f, rules: [...f.rules, { type: 'incompatible_workers', workers: [] }] }));
+  const addRule = (type = 'unpaid_break') => {
+    const defaults = {
+      unpaid_break: { type: 'unpaid_break', minutes: 30 },
+      incompatible_workers: { type: 'incompatible_workers', workerA: '', workerB: '' },
+      min_rest_hours: { type: 'min_rest_hours', hours: 11 },
+      max_consecutive_days: { type: 'max_consecutive_days', days: 5 },
+    };
+    setForm(f => ({ ...f, rules: [...f.rules, defaults[type] || defaults.unpaid_break] }));
   };
 
   const removeRule = (idx) => {
@@ -107,6 +134,14 @@ export default function ShiftTemplatesPage() {
 
   const updateRule = (idx, rule) => {
     setForm(f => ({ ...f, rules: f.rules.map((r, i) => i === idx ? rule : r) }));
+  };
+
+  // Migrate old incompatible_workers rules (workers[] array → workerA/workerB)
+  const migrateRule = (rule) => {
+    if (rule.type === 'incompatible_workers' && rule.workers && !rule.workerA) {
+      return { type: 'incompatible_workers', workerA: rule.workers[0] || '', workerB: rule.workers[1] || '' };
+    }
+    return rule;
   };
 
   const handleDelete = async (id) => {
@@ -158,7 +193,13 @@ export default function ShiftTemplatesPage() {
                         <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {t.requiredWorkers} needed</span>
                          <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {dayLabelsForTemplate(t)}</span>
                          {t.breakMinutes > 0 && <span>{t.breakMinutes}min break</span>}
-                         {t.rules && t.rules.length > 0 && <span>Extra rules: {t.rules.length}</span>}
+                         {t.rules && t.rules.length > 0 && (
+                           <span className="flex items-center gap-1 text-brand-600">
+                             {t.rules.length} rule{t.rules.length > 1 ? 's' : ''}
+                             {t.rules.some(r => r.type === 'unpaid_break') && ' (unpaid break)'}
+                             {t.rules.some(r => r.type === 'incompatible_workers') && ' (incompatible)'}
+                           </span>
+                         )}
                        </div>
                       {t.requiredByDay && Object.keys(t.requiredByDay).length > 0 && (
                         <div className="flex gap-1.5 mt-1.5">
@@ -259,27 +300,105 @@ export default function ShiftTemplatesPage() {
 
             {/* Extra Rules */}
             <div>
-              <label className="label mb-2">Extra Rules</label>
-              <div className="space-y-2">
-                {form.rules.map((rule, idx) => (
-                  <div key={idx} className="flex items-center gap-2 p-2 bg-surface-50 rounded">
-                    <select value={rule.type} onChange={e => updateRule(idx, { ...rule, type: e.target.value })} className="input-field !w-40">
-                      <option value="incompatible_workers">Incompatible Workers</option>
-                      <option value="required_skills">Required Skills</option>
-                    </select>
-                    {rule.type === 'incompatible_workers' && (
-                      <select multiple value={rule.workers || []} onChange={e => updateRule(idx, { ...rule, workers: Array.from(e.target.selectedOptions, o => o.value) })} className="input-field flex-1">
-                        {workers.map(w => <option key={w.id} value={w.id}>{w.firstName} {w.lastName}</option>)}
-                      </select>
-                    )}
-                    <button type="button" onClick={() => removeRule(idx)} className="btn-icon !w-6 !h-6"><X className="w-3 h-3" /></button>
-                  </div>
-                ))}
-                <button type="button" onClick={addRule} className="text-sm text-brand-600 hover:underline">+ Add Rule</button>
+              <label className="label mb-2">Shift Rules</label>
+              <div className="space-y-3">
+                {form.rules.map((rule, idx) => {
+                  const ruleDef = RULE_TYPES.find(r => r.value === rule.type);
+                  return (
+                    <div key={idx} className="p-3 bg-surface-50 rounded-xl border border-surface-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-surface-700 bg-white border border-surface-200 rounded-lg px-2 py-1">{ruleDef?.label || rule.type}</span>
+                          <span className="text-[11px] text-surface-400">{ruleDef?.description}</span>
+                        </div>
+                        <button type="button" onClick={() => removeRule(idx)} className="btn-icon !w-6 !h-6 hover:!text-red-600 hover:!bg-red-50"><X className="w-3 h-3" /></button>
+                      </div>
+
+                      {/* Unpaid Break */}
+                      {rule.type === 'unpaid_break' && (
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-surface-500">Break duration:</label>
+                          <input type="number" min="0" max="120" value={rule.minutes || 0}
+                            onChange={e => updateRule(idx, { ...rule, minutes: parseInt(e.target.value) || 0 })}
+                            className="input-field !w-20 !py-1 text-sm text-center" />
+                          <span className="text-xs text-surface-400">minutes (deducted from paid hours)</span>
+                        </div>
+                      )}
+
+                      {/* Incompatible Workers — two dropdowns side by side */}
+                      {rule.type === 'incompatible_workers' && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <select value={rule.workerA || ''}
+                            onChange={e => updateRule(idx, { ...rule, workerA: e.target.value })}
+                            className="input-field !py-1.5 text-sm flex-1 min-w-[140px]">
+                            <option value="">Select worker 1...</option>
+                            {workers.filter(w => w.id !== rule.workerB).map(w => (
+                              <option key={w.id} value={w.id}>{w.firstName} {w.lastName}</option>
+                            ))}
+                          </select>
+                          <span className="text-xs text-surface-400 font-medium">can't work with</span>
+                          <select value={rule.workerB || ''}
+                            onChange={e => updateRule(idx, { ...rule, workerB: e.target.value })}
+                            className="input-field !py-1.5 text-sm flex-1 min-w-[140px]">
+                            <option value="">Select worker 2...</option>
+                            {workers.filter(w => w.id !== rule.workerA).map(w => (
+                              <option key={w.id} value={w.id}>{w.firstName} {w.lastName}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Min Rest Hours */}
+                      {rule.type === 'min_rest_hours' && (
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-surface-500">Minimum rest:</label>
+                          <input type="number" min="1" max="48" value={rule.hours || 11}
+                            onChange={e => updateRule(idx, { ...rule, hours: parseInt(e.target.value) || 11 })}
+                            className="input-field !w-20 !py-1 text-sm text-center" />
+                          <span className="text-xs text-surface-400">hours between end of this shift and next shift</span>
+                        </div>
+                      )}
+
+                      {/* Max Consecutive Days */}
+                      {rule.type === 'max_consecutive_days' && (
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-surface-500">Max consecutive:</label>
+                          <input type="number" min="1" max="7" value={rule.days || 5}
+                            onChange={e => updateRule(idx, { ...rule, days: parseInt(e.target.value) || 5 })}
+                            className="input-field !w-20 !py-1 text-sm text-center" />
+                          <span className="text-xs text-surface-400">days in a row a worker can be assigned this shift</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Add rule dropdown */}
+                <div className="flex items-center gap-2">
+                  <select id="newRuleType" className="input-field !py-1.5 text-sm !w-auto" defaultValue="">
+                    <option value="" disabled>Add a rule...</option>
+                    {RULE_TYPES.filter(rt => {
+                      // Only allow one unpaid_break rule
+                      if (rt.value === 'unpaid_break' && form.rules.some(r => r.type === 'unpaid_break')) return false;
+                      return true;
+                    }).map(rt => (
+                      <option key={rt.value} value={rt.value}>{rt.label}</option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={() => {
+                    const sel = document.getElementById('newRuleType');
+                    if (sel.value) { addRule(sel.value); sel.value = ''; }
+                  }} className="text-sm text-brand-600 hover:text-brand-700 font-medium">+ Add</button>
+                </div>
               </div>
             </div>
             <div><label className="label">Notes</label><textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} className="input-field resize-none" /></div>
-            <p className="text-xs text-surface-400 bg-surface-50 p-3 rounded-xl">Duration: <strong>{calcHours(form.startTime, form.endTime)}h</strong> (net: {(parseFloat(calcHours(form.startTime, form.endTime)) - (parseInt(form.breakMinutes) || 0) / 60).toFixed(1)}h after break) · Runs {form.daysOfWeek.length} day{form.daysOfWeek.length !== 1 ? 's' : ''}/week</p>
+            <p className="text-xs text-surface-400 bg-surface-50 p-3 rounded-xl">Duration: <strong>{calcHours(form.startTime, form.endTime)}h</strong>{(() => {
+              const unpaidRule = form.rules.find(r => r.type === 'unpaid_break');
+              const breakMins = unpaidRule ? (unpaidRule.minutes || 0) : (parseInt(form.breakMinutes) || 0);
+              const net = (parseFloat(calcHours(form.startTime, form.endTime)) - breakMins / 60).toFixed(1);
+              return breakMins > 0 ? ` (paid: ${net}h after ${breakMins}min unpaid break)` : '';
+            })()} · Runs {form.daysOfWeek.length} day{form.daysOfWeek.length !== 1 ? 's' : ''}/week</p>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
               <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Saving...' : edit ? 'Update' : 'Create Template'}</button>

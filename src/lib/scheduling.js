@@ -114,7 +114,7 @@ function scoreWorker(worker, template, workerHours, dayOfWeek) {
   let score = 0;
   const period = getShiftPeriod(template.startTime);
   const pref = worker.shiftPreference || 'any';
-  const tplHours = calcHours(template.startTime, template.endTime);
+  const tplHours = calcPaidHours(template); // use paid hours (after unpaid break)
 
   // 1. Shift preference match (0–25 points)
   if (pref === period) score += 25;
@@ -150,6 +150,42 @@ function scoreWorker(worker, template, workerHours, dayOfWeek) {
   return score;
 }
 
+/**
+ * Calculate paid hours for a template, accounting for unpaid break rules.
+ */
+function calcPaidHours(template) {
+  const totalHours = calcHours(template.startTime, template.endTime);
+  const unpaidBreakRule = (template.rules || []).find(r => r.type === 'unpaid_break');
+  if (unpaidBreakRule && unpaidBreakRule.minutes > 0) {
+    return Math.max(0, totalHours - unpaidBreakRule.minutes / 60);
+  }
+  // Fall back to legacy breakMinutes field if no unpaid_break rule
+  if (template.breakMinutes > 0) {
+    return Math.max(0, totalHours - template.breakMinutes / 60);
+  }
+  return totalHours;
+}
+
+/**
+ * Get the end time as a Date object for rest-hour calculations.
+ */
+function shiftEndDateTime(dateStr, endTime, startTime) {
+  const d = new Date(dateStr);
+  const [eh, em] = endTime.split(':').map(Number);
+  const [sh] = startTime.split(':').map(Number);
+  d.setHours(eh, em, 0, 0);
+  // If end is before start, it's an overnight shift — end is next day
+  if (eh < sh) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+function shiftStartDateTime(dateStr, startTime) {
+  const d = new Date(dateStr);
+  const [sh, sm] = startTime.split(':').map(Number);
+  d.setHours(sh, sm, 0, 0);
+  return d;
+}
+
 // ─── Main Algorithm ───────────────────────────────────
 
 /**
@@ -168,7 +204,7 @@ export function generateWeeklySchedule({ workers, templates, weekStart, leaves =
   const warnings = [];
   const workerHours = {};
   const workerDayShifts = {}; // workerId -> { dateStr: [{ startTime, endTime }] }
-  const workerLastShift = {}; // workerId -> { date, startTime }
+  const workerLastShift = {}; // workerId -> { date, startTime, endTime }
 
   const activeWorkers = workers.filter(w => w.status === 'active');
   activeWorkers.forEach(w => { workerHours[w.id] = 0; workerDayShifts[w.id] = {}; });
@@ -197,10 +233,17 @@ export function generateWeeklySchedule({ workers, templates, weekStart, leaves =
 
     for (const tpl of dayTemplates) {
       const needed = getRequiredWorkers(tpl, dayOfWeek);
-      const tplHours = calcHours(tpl.startTime, tpl.endTime);
-      let filled = 0;
+      const tplTotalHours = calcHours(tpl.startTime, tpl.endTime);
+      const tplPaidHours = calcPaidHours(tpl); // after unpaid break deduction
 
-      // Score and rank eligible workers
+      // Count already-filled slots from existing shifts (avoid duplicates on re-run)
+      const alreadyFilled = existingShifts.filter(s =>
+        s.date === dateStr && s.templateId === tpl.id
+      );
+      const alreadyFilledWorkerIds = new Set(alreadyFilled.map(s => s.workerId));
+      let filled = alreadyFilled.length;
+
+      // Score and rank eligible workers (scoring uses paid hours for fairness)
       const ranked = activeWorkers
         .filter(w => isWorkerAvailable(w, dateStr, dayOfWeek, leaves))
         .map(w => ({ worker: w, score: scoreWorker(w, tpl, workerHours, dayOfWeek) }))
@@ -209,6 +252,9 @@ export function generateWeeklySchedule({ workers, templates, weekStart, leaves =
 
       for (const { worker } of ranked) {
         if (filled >= needed) break;
+
+        // Skip workers already assigned to this template+date from existing shifts
+        if (alreadyFilledWorkerIds.has(worker.id)) continue;
 
         // Check: no overlapping shifts this day
         const dayAssigns = workerDayShifts[worker.id]?.[dateStr] || [];
@@ -219,13 +265,47 @@ export function generateWeeklySchedule({ workers, templates, weekStart, leaves =
         const last = workerLastShift[worker.id];
         if (last?.date === dateStr && isNightShift(last.startTime) && isMorningShift(tpl.startTime)) continue;
 
-        // Check rules
+        // Check all template rules
         let violatesRule = false;
         for (const rule of tpl.rules || []) {
           if (rule.type === 'incompatible_workers') {
-            const assignedForThisShift = assignments.filter(a => a.date === dateStr && a.templateId === tpl.id);
-            const assignedWorkerIds = assignedForThisShift.map(a => a.workerId);
-            if (rule.workers.includes(worker.id) && assignedWorkerIds.some(id => rule.workers.includes(id))) {
+            // Support both formats: workers[] array and workerA/workerB
+            const incompatible = rule.workers || [rule.workerA, rule.workerB].filter(Boolean);
+            if (incompatible.length >= 2 && incompatible.includes(worker.id)) {
+              const assignedForThisShift = assignments.filter(a => a.date === dateStr && a.templateId === tpl.id);
+              const assignedWorkerIds = assignedForThisShift.map(a => a.workerId);
+              if (assignedWorkerIds.some(id => incompatible.includes(id))) {
+                violatesRule = true;
+                break;
+              }
+            }
+          }
+          if (rule.type === 'min_rest_hours' && rule.hours > 0) {
+            // Check if worker had a shift ending too recently
+            const thisStart = shiftStartDateTime(dateStr, tpl.startTime);
+            const lastShift = workerLastShift[worker.id];
+            if (lastShift) {
+              const lastEnd = shiftEndDateTime(lastShift.date, lastShift.endTime, lastShift.startTime);
+              const restMs = thisStart.getTime() - lastEnd.getTime();
+              const restHours = restMs / (1000 * 60 * 60);
+              if (restHours < rule.hours) {
+                violatesRule = true;
+                break;
+              }
+            }
+          }
+          if (rule.type === 'max_consecutive_days' && rule.days > 0) {
+            // Count consecutive days this worker was assigned this template
+            let consecutive = 0;
+            for (let d = dayOffset - 1; d >= 0; d--) {
+              const prevDate = new Date(weekStart);
+              prevDate.setDate(prevDate.getDate() + d);
+              const prevDateStr = prevDate.toISOString().split('T')[0];
+              const hadShift = assignments.some(a => a.workerId === worker.id && a.templateId === tpl.id && a.date === prevDateStr);
+              if (hadShift) consecutive++;
+              else break;
+            }
+            if (consecutive >= rule.days) {
               violatesRule = true;
               break;
             }
@@ -236,10 +316,11 @@ export function generateWeeklySchedule({ workers, templates, weekStart, leaves =
         // Check: salaried workers should not exceed their contracted weekly hours
         if (worker.payType === 'salaried' && worker.fixedHoursWeek) {
           const currentH = workerHours[worker.id] || 0;
-          if (currentH + tplHours > worker.fixedHoursWeek) continue;
+          if (currentH + tplPaidHours > worker.fixedHoursWeek) continue;
         }
 
-        // Assign!
+        // Assign! Use paid hours (after unpaid break) for tracking
+        const unpaidBreak = (tpl.rules || []).find(r => r.type === 'unpaid_break');
         assignments.push({
           workerId: worker.id,
           workerName: `${worker.firstName} ${worker.lastName}`,
@@ -251,15 +332,17 @@ export function generateWeeklySchedule({ workers, templates, weekStart, leaves =
           dayName: DAY_NAMES[dayOfWeek],
           startTime: tpl.startTime,
           endTime: tpl.endTime,
-          hours: tplHours,
+          hours: tplPaidHours,
+          totalHours: tplTotalHours,
+          unpaidBreakMinutes: unpaidBreak?.minutes || 0,
           type: tpl.type || 'regular',
           autoScheduled: true,
         });
 
-        workerHours[worker.id] = (workerHours[worker.id] || 0) + tplHours;
+        workerHours[worker.id] = (workerHours[worker.id] || 0) + tplPaidHours;
         if (!workerDayShifts[worker.id][dateStr]) workerDayShifts[worker.id][dateStr] = [];
         workerDayShifts[worker.id][dateStr].push({ startTime: tpl.startTime, endTime: tpl.endTime });
-        workerLastShift[worker.id] = { date: dateStr, startTime: tpl.startTime };
+        workerLastShift[worker.id] = { date: dateStr, startTime: tpl.startTime, endTime: tpl.endTime };
         filled++;
       }
 
@@ -337,4 +420,4 @@ export function calculateWorkerCost(worker, hoursWorked) {
   };
 }
 
-export { getShiftPeriod, calcHours, DAY_NAMES, DAY_LABELS, DAY_LABELS_FULL };
+export { getShiftPeriod, calcHours, calcPaidHours, DAY_NAMES, DAY_LABELS, DAY_LABELS_FULL };
