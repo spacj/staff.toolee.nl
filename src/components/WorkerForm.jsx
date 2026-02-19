@@ -93,14 +93,20 @@ export default function WorkerForm({ worker, onSuccess, onCancel }) {
   const sendWhatsApp = () => {
     const orgName = organization?.name || 'StaffHub';
     const message = `Hi ${form.firstName}! You've been added to *${orgName}* on StaffHub.\n\nYour invite code: *${inviteResult.code}*\n\nJoin here: ${joinUrl}\n\nEnter the code above to create your account.`;
-    // Clean phone: remove spaces, dashes, ensure + prefix for international
-    let phone = (form.phone || '').replace(/[\s\-()]/g, '');
-    if (phone && !phone.startsWith('+')) {
-      // Default to NL country code if no prefix
-      phone = phone.startsWith('0') ? '+31' + phone.slice(1) : '+31' + phone;
+    // Clean phone: remove spaces, dashes, dots, parens
+    let phone = (form.phone || '').replace(/[\s\-().]/g, '');
+    if (phone) {
+      // Handle international prefix "00" (e.g. 0031612345678)
+      if (phone.startsWith('00')) phone = '+' + phone.slice(2);
+      // If still no + prefix, assume NL country code
+      if (!phone.startsWith('+')) {
+        phone = phone.startsWith('0') ? '+31' + phone.slice(1) : '+31' + phone;
+      }
     }
-    const url = phone
-      ? `https://wa.me/${phone.replace('+', '')}?text=${encodeURIComponent(message)}`
+    // wa.me expects digits only (no + sign)
+    const cleanDigits = phone ? phone.replace(/\D/g, '') : '';
+    const url = cleanDigits
+      ? `https://wa.me/${cleanDigits}?text=${encodeURIComponent(message)}`
       : `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -159,7 +165,7 @@ export default function WorkerForm({ worker, onSuccess, onCancel }) {
         <div><label className="label">First Name *</label><input name="firstName" value={form.firstName} onChange={handleChange} className="input-field" required /></div>
         <div><label className="label">Last Name *</label><input name="lastName" value={form.lastName} onChange={handleChange} className="input-field" required /></div>
         <div><label className="label">Email *</label><input name="email" type="email" value={form.email} onChange={handleChange} className="input-field" required /></div>
-        <div><label className="label">Phone</label><input name="phone" value={form.phone} onChange={handleChange} className="input-field" /></div>
+        <div><label className="label">Phone</label><input name="phone" value={form.phone} onChange={handleChange} placeholder="+31 6 12345678" className="input-field" /></div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div><label className="label">Position</label><select name="position" value={form.position} onChange={handleChange} className="select-field"><option value="">Select...</option>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>

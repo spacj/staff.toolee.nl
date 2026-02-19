@@ -21,18 +21,27 @@ export default function StaffDetailPage() {
   const [attendance, setAttendance] = useState([]);
   const [permits, setPermits] = useState([]);
   const [showEdit, setShowEdit] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!id) return;
-    getWorker(id).then(setWorker);
+    setLoading(true);
+    setError(null);
+    getWorker(id).then(w => {
+      setWorker(w);
+      if (!w) setError('Worker not found');
+      setLoading(false);
+    }).catch(err => { setError(err.message); setLoading(false); });
     const now = new Date();
     const month = now.toISOString().slice(0, 7);
-    getShifts({ workerId: id, startDate: `${month}-01`, endDate: `${month}-31` }).then(setShifts);
-    getAttendance({ workerId: id, limit: 20 }).then(setAttendance);
-    getPermits({ workerId: id, limit: 10 }).then(setPermits);
+    getShifts({ workerId: id, startDate: `${month}-01`, endDate: `${month}-31` }).then(setShifts).catch(() => {});
+    getAttendance({ workerId: id, limit: 20 }).then(setAttendance).catch(() => {});
+    getPermits({ workerId: id, limit: 10 }).then(setPermits).catch(() => {});
   }, [id]);
 
-  if (!worker) return <Layout><div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-3 border-brand-600 border-t-transparent rounded-full animate-spin" /></div></Layout>;
+  if (loading) return <Layout><div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-3 border-brand-600 border-t-transparent rounded-full animate-spin" /></div></Layout>;
+  if (error || !worker) return <Layout><div className="flex flex-col items-center justify-center py-20 gap-4"><p className="text-surface-500">{error || 'Worker not found'}</p><Link href="/staff" className="btn-secondary"><ArrowLeft className="w-4 h-4" /> Back to Staff</Link></div></Layout>;
 
   const color = generateAvatarColor(worker.firstName + worker.lastName);
   const totalHours = shifts.reduce((s, sh) => s + (sh.hours || 0), 0);
