@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,7 +18,6 @@ export default function ChatPage() {
   const [showNewChat, setShowNewChat] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sending, setSending] = useState(false);
-  const messagesEndRef = useRef(null);
 
   const resolveWorkerId = async () => {
     if (userProfile?.workerId) return userProfile.workerId;
@@ -41,10 +40,12 @@ export default function ChatPage() {
     const workerId = await resolveWorkerId();
     const all = await getMessages({ orgId, limit: 100 });
     // Filter to messages between current user and partner
-    const between = all.filter(m => 
-      (m.senderId === workerId && m.recipientId === partnerId) ||
-      (m.senderId === partnerId && m.recipientId === workerId)
-    );
+    const between = all
+      .filter(m => 
+        (m.senderId === workerId && m.recipientId === partnerId) ||
+        (m.senderId === partnerId && m.recipientId === workerId)
+      )
+      .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
     setMessages(between);
     
     // Mark unread as read
@@ -62,7 +63,8 @@ export default function ChatPage() {
   }, [selectedConv]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = document.getElementById('messages-container');
+    if (container) container.scrollTop = 0;
   }, [messages]);
 
   const handleSend = async (e) => {
@@ -180,7 +182,7 @@ export default function ChatPage() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div id="messages-container" className="flex-1 overflow-y-auto p-4 space-y-3">
               {messages.map(m => {
                 const isMe = m.senderId === currentWorkerId || m.senderId === userProfile?.workerId;
                 return (
@@ -196,7 +198,6 @@ export default function ChatPage() {
                   </div>
                 );
               })}
-              <div ref={messagesEndRef} />
             </div>
 
             {/* Input */}
