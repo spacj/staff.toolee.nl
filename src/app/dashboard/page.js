@@ -2,11 +2,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
-import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog, getCorrectionRequests, getMessages } from '@/lib/firestore';
+import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog, getCorrectionRequests, getMessages, updatePermit, reviewCorrectionRequest, notifyWorker } from '@/lib/firestore';
 import { calculateMonthlyCost, formatCurrency } from '@/lib/pricing';
 import { cn } from '@/utils/helpers';
-import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3, MessageCircle, AlertTriangle } from 'lucide-react';
+import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3, MessageCircle, AlertTriangle, XCircle } from 'lucide-react';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 
 const STAT_STYLES = [
   { bg: 'bg-gradient-to-br from-brand-500 to-brand-700', icon: 'text-white/80', text: 'text-white', sub: 'text-white/60' },
@@ -25,6 +26,38 @@ export default function DashboardPage() {
   const [activity, setActivity] = useState([]);
   const [corrections, setCorrections] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [loadingAction, setLoadingAction] = useState(null);
+
+  // Quick approve/deny handlers
+  const handlePermitAction = async (id, status) => {
+    setLoadingAction(`permit-${id}`);
+    try {
+      await updatePermit(id, { status, reviewedBy: user?.uid, reviewedAt: new Date().toISOString() });
+      const permit = permits.find(p => p.id === id);
+      if (permit?.workerId) {
+        await notifyWorker(permit.workerId, orgId, { type: 'permit_response', title: `Leave ${status}`, message: `Your ${permit.type} request for ${permit.startDate} has been ${status}.`, link: '/time' }).catch(() => {});
+      }
+      toast.success(`Leave ${status}`);
+      // Refresh data
+      getPermits({ orgId, status: 'pending', limit: 10 }).then(setPermits).catch(() => {});
+    } catch (err) { toast.error(err.message); }
+    setLoadingAction(null);
+  };
+
+  const handleCorrectionAction = async (id, approved) => {
+    setLoadingAction(`correction-${id}`);
+    try {
+      await reviewCorrectionRequest(id, approved, user?.uid, '');
+      const correction = corrections.find(c => c.id === id);
+      if (correction?.workerId) {
+        await notifyWorker(correction.workerId, orgId, { type: 'correction_response', title: `Correction ${approved ? 'approved' : 'rejected'}`, message: `Your time correction for ${correction.date} has been ${approved ? 'approved' : 'rejected'}.`, link: '/time' }).catch(() => {});
+      }
+      toast.success(`Correction ${approved ? 'approved' : 'rejected'}`);
+      // Refresh data
+      getCorrectionRequests({ orgId, status: 'pending', limit: 20 }).then(setCorrections).catch(() => setCorrections([]));
+    } catch (err) { toast.error(err.message); }
+    setLoadingAction(null);
+  };
 
   // Resolve worker ID for worker-specific queries
   const resolveWorkerId = useMemo(async () => {
@@ -179,20 +212,26 @@ export default function DashboardPage() {
               {permits.length === 0 && corrections.length === 0 && <p className="p-5 text-sm text-surface-400 text-center">No pending requests</p>}
               {permits.slice(0, 3).map(p => (
                 <div key={p.id} className="px-5 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-surface-800">{p.workerName}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-surface-800 truncate">{p.workerName}</p>
                     <p className="text-xs text-surface-400 capitalize">{p.type} · {p.startDate}{p.endDate !== p.startDate ? ` → ${p.endDate}` : ''}</p>
                   </div>
-                  <span className="badge bg-amber-100 text-amber-700">Leave</span>
+                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                    <button onClick={() => handlePermitAction(p.id, 'approved')} disabled={loadingAction === `permit-${p.id}`} className="p-1.5 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 disabled:opacity-50"><CheckCircle className="w-4 h-4" /></button>
+                    <button onClick={() => handlePermitAction(p.id, 'denied')} disabled={loadingAction === `permit-${p.id}`} className="p-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50"><XCircle className="w-4 h-4" /></button>
+                  </div>
                 </div>
               ))}
               {corrections.slice(0, 3).map(c => (
                 <div key={c.id} className="px-5 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-surface-800">{c.workerName}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-surface-800 truncate">{c.workerName}</p>
                     <p className="text-xs text-surface-400 capitalize">{c.type?.replace(/_/g, ' ')} · {c.date}</p>
                   </div>
-                  <span className="badge bg-orange-100 text-orange-700">Correction</span>
+                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                    <button onClick={() => handleCorrectionAction(c.id, true)} disabled={loadingAction === `correction-${c.id}`} className="p-1.5 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 disabled:opacity-50"><CheckCircle className="w-4 h-4" /></button>
+                    <button onClick={() => handleCorrectionAction(c.id, false)} disabled={loadingAction === `correction-${c.id}`} className="p-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50"><XCircle className="w-4 h-4" /></button>
+                  </div>
                 </div>
               ))}
             </div>
