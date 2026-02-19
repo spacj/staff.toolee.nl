@@ -26,6 +26,7 @@ export default function CalendarPage() {
   const [scheduling, setScheduling] = useState(false);
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState(null); // { assignments, stats, warnings }
+  const [selectedTemplates, setSelectedTemplates] = useState([]);
   const [shiftForm, setShiftForm] = useState({ workerId: '', shopId: '', date: '', startTime: '09:00', endTime: '17:00', templateName: '', notes: '' });
 
   const year = currentDate.getFullYear();
@@ -116,12 +117,32 @@ export default function CalendarPage() {
   const listDates = useMemo(() => [...new Set(shifts.map(s => s.date))].sort(), [shifts]);
 
   // ─── Auto-Schedule ──────────────────
+  const openAutoSchedule = () => {
+    setSelectedTemplates(templates.map(t => t.id));
+    setShowAutoSchedule(true);
+    setPreview(null);
+  };
+
+  const toggleAllTemplates = (checked) => {
+    if (checked) setSelectedTemplates(templates.map(t => t.id));
+    else setSelectedTemplates([]);
+  };
+
+  const toggleTemplate = (templateId) => {
+    setSelectedTemplates(prev => 
+      prev.includes(templateId) 
+        ? prev.filter(id => id !== templateId)
+        : [...prev, templateId]
+    );
+  };
+
   const handlePreview = () => {
-    if (templates.length === 0) { toast.error('Create shift templates first (Shift Templates page)'); return; }
+    const selected = templates.filter(t => selectedTemplates.includes(t.id));
+    if (selected.length === 0) { toast.error('Select at least one template'); return; }
     const weekStart = getWeekMonday(selectedDate);
     const result = generateWeeklySchedule({
       workers: activeWorkers,
-      templates,
+      templates: selected,
       weekStart,
       leaves: permits,
       existingShifts: shifts.filter(s => s.date >= weekStart),
@@ -247,6 +268,7 @@ export default function CalendarPage() {
             ))}
           </div>
           <div className="flex items-center gap-3">
+            <button onClick={() => { setSelectedDate(getWeekMonday(new Date().toISOString().split('T')[0])); openAutoSchedule(); }} className="btn-secondary !py-1.5 !text-xs"><Wand2 className="w-3.5 h-3.5" /> Auto Schedule</button>
             <button onClick={() => nav(-1)} className="btn-icon"><ChevronLeft className="w-5 h-5" /></button>
             <h2 className="text-base font-display font-semibold text-surface-900 min-w-[180px] text-center">{navTitle}</h2>
             <button onClick={() => nav(1)} className="btn-icon"><ChevronRight className="w-5 h-5" /></button>
@@ -364,22 +386,53 @@ export default function CalendarPage() {
             </div>
 
             {/* Template breakdown — shows which days each template runs */}
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold text-surface-500 uppercase tracking-wider">Templates in use</p>
-              {templates.map(t => {
-                const days = t.daysOfWeek && t.daysOfWeek.length > 0 ? t.daysOfWeek : [0,1,2,3,4,5,6];
-                const dayStr = days.length === 7 ? 'Every day' : JSON.stringify([...days].sort()) === JSON.stringify([1,2,3,4,5]) ? 'Mon–Fri' : JSON.stringify([...days].sort()) === JSON.stringify([0,6]) ? 'Weekends' : days.sort((a,b)=>a-b).map(d => DAY_LABELS[d]).join(', ');
-                return (
-                  <div key={t.id} className="flex items-center justify-between p-2 bg-white border border-surface-100 rounded-lg text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-semibold text-surface-800 truncate">{t.name}</span>
-                      <span className="text-surface-400">{t.startTime}–{t.endTime}</span>
-                      <span className="text-surface-400">({t.requiredWorkers}w)</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-surface-500 uppercase tracking-wider">Select templates to use</p>
+                <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedTemplates.length === templates.length && templates.length > 0}
+                    onChange={e => toggleAllTemplates(e.target.checked)}
+                    className="w-4 h-4 rounded border-surface-300 text-brand-600 focus:ring-brand-500" 
+                  />
+                  <span className="text-surface-600 font-medium">Select all</span>
+                </label>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1.5 border border-surface-100 rounded-lg p-2 bg-surface-50">
+                {templates.map(t => {
+                  const days = t.daysOfWeek && t.daysOfWeek.length > 0 ? t.daysOfWeek : [0,1,2,3,4,5,6];
+                  const dayStr = days.length === 7 ? 'Every day' : JSON.stringify([...days].sort()) === JSON.stringify([1,2,3,4,5]) ? 'Mon–Fri' : JSON.stringify([...days].sort()) === JSON.stringify([0,6]) ? 'Weekends' : days.sort((a,b)=>a-b).map(d => DAY_LABELS[d]).join(', ');
+                  const isSelected = selectedTemplates.includes(t.id);
+                  return (
+                    <div 
+                      key={t.id} 
+                      onClick={() => toggleTemplate(t.id)}
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all",
+                        isSelected 
+                          ? 'border-brand-400 bg-white shadow-sm' 
+                          : 'border-surface-200 bg-white hover:border-surface-300'
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-5 h-5 rounded-md flex items-center justify-center transition-colors",
+                          isSelected ? 'bg-brand-500' : 'bg-surface-100 border border-surface-300'
+                        )}>
+                          {isSelected && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-surface-800">{t.name}</p>
+                          <p className="text-xs text-surface-400">{t.startTime}–{t.endTime} · {t.requiredWorkers} workers</p>
+                        </div>
+                      </div>
+                      <span className={cn('text-xs font-medium', days.length > 5 ? 'text-amber-600' : 'text-surface-500')}>{dayStr}</span>
                     </div>
-                    <span className={cn('flex-shrink-0 font-medium', days.length > 5 ? 'text-amber-600' : 'text-surface-500')}>{dayStr}</span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+              <p className="text-xs text-surface-400 text-right">{selectedTemplates.length} of {templates.length} templates selected</p>
             </div>
 
             {!preview && (

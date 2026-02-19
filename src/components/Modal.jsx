@@ -24,9 +24,9 @@ export default function Modal({ open, onClose, title, children, size = 'md', cla
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-surface-900/40 backdrop-blur-sm" onClick={onClose}
+      <div className="fixed inset-0 z-[60] bg-surface-900/40 backdrop-blur-sm" onClick={onClose}
         style={{ animation: 'fadeIn 0.2s ease-out' }} />
-      <div className="fixed inset-0 z-[51] flex items-center justify-center p-4 pointer-events-none">
+      <div className="fixed inset-0 z-[61] flex items-center justify-center p-4 pointer-events-none">
         <div ref={panelRef}
           className={cn(
             'relative bg-white rounded-2xl shadow-2xl w-full max-h-[90vh] flex flex-col pointer-events-auto',
