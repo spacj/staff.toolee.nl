@@ -41,7 +41,8 @@ export default function AttendancePage() {
     getWorkers({ orgId }).then(setWorkers);
     getShops(orgId).then(setShops);
     getCorrectionRequests({ orgId, limit: 50 }).then(setCorrections).catch(() => setCorrections([]));
-    getMessages({ orgId, recipientType: 'management', limit: 50 }).then(setMessages).catch(() => setMessages([]));
+    // Get ALL messages in the org (both to management and from management)
+    getMessages({ orgId, limit: 100 }).then(setMessages).catch(() => setMessages([]));
   };
   useEffect(() => { load(); }, [orgId, dateFilter, statusFilter]);
 
