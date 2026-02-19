@@ -378,7 +378,5 @@ export async function getMessageThread(parentId) {
   const parent = await get1(C.MESSAGES, parentId);
   return parent ? [parent, ...replies] : replies;
 }
-  return parent ? [parent, ...replies] : replies;
-}
 
 export { C as COLLECTIONS };
