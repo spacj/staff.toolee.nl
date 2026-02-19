@@ -336,12 +336,12 @@ export async function getActivityLog(lim = 20) { return getAll(C.ACTIVITY_LOG, o
 export async function getCorrectionRequests(filters = {}) {
   const c = [];
   if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
-  c.push(orderBy('createdAt', 'desc'));
-  if (filters.limit) c.push(limit(filters.limit));
   let results = await getAll(C.CORRECTION_REQUESTS, ...c);
-  // Client-side filtering to avoid needing composite indexes
+  // Client-side filtering and sorting to avoid composite index requirement
   if (filters.workerId) results = results.filter(r => r.workerId === filters.workerId);
   if (filters.status) results = results.filter(r => r.status === filters.status);
+  results.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+  if (filters.limit) results = results.slice(0, filters.limit);
   return results;
 }
 export const createCorrectionRequest = (data) => add(C.CORRECTION_REQUESTS, { ...data, status: 'pending' });
@@ -361,20 +361,23 @@ export async function reviewCorrectionRequest(id, approved, reviewedBy, adminNot
 export async function getMessages(filters = {}) {
   const c = [];
   if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
-  c.push(orderBy('createdAt', 'desc'));
-  if (filters.limit) c.push(limit(filters.limit));
   let results = await getAll(C.MESSAGES, ...c);
-  // Client-side filtering to avoid needing composite indexes
+  // Client-side filtering and sorting to avoid composite index requirement
   if (filters.recipientType) results = results.filter(r => r.recipientType === filters.recipientType);
   if (filters.recipientId) results = results.filter(r => r.recipientId === filters.recipientId);
   if (filters.senderId) results = results.filter(r => r.senderId === filters.senderId);
+  results.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+  if (filters.limit) results = results.slice(0, filters.limit);
   return results;
 }
 export const createMessage = (data) => add(C.MESSAGES, { ...data, read: false });
 export const markMessageRead = (id) => upd(C.MESSAGES, id, { read: true });
 export async function getMessageThread(parentId) {
-  const replies = await getAll(C.MESSAGES, where('parentId', '==', parentId), orderBy('createdAt', 'asc'));
+  const replies = await getAll(C.MESSAGES, where('parentId', '==', parentId));
+  replies.sort((a, b) => (a.createdAt || '') > (b.createdAt || '') ? 1 : -1);
   const parent = await get1(C.MESSAGES, parentId);
+  return parent ? [parent, ...replies] : replies;
+}
   return parent ? [parent, ...replies] : replies;
 }
 
