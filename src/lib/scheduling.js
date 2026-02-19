@@ -219,141 +219,178 @@ export function generateWeeklySchedule({ workers, templates, weekStart, leaves =
     }
   });
 
-  // Process each day of the week
+  // ─── Process each day of the week ────────────────────
+  // Uses optimal matching: each worker can only work ONE shift per day.
+  // For each day, we build all possible (worker, template) pairs with scores,
+  // then greedily assign the best pair first, removing the worker from further
+  // consideration and decrementing the template's remaining slots.
+
   for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
     const date = new Date(weekStart);
     date.setDate(date.getDate() + dayOffset);
     const dateStr = date.toISOString().split('T')[0];
     const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
 
-    // Get templates that apply on this day, sorted by start time
+    // Get templates that apply on this day
     const dayTemplates = templates
-      .filter(t => getTemplateDays(t).includes(dayOfWeek))
-      .sort((a, b) => toMinutes(a.startTime) - toMinutes(b.startTime));
+      .filter(t => getTemplateDays(t).includes(dayOfWeek));
 
+    if (dayTemplates.length === 0) continue;
+
+    // Track remaining slots per template and which workers are already assigned
+    const tplSlots = {}; // templateId -> remaining slots needed
+    const tplExistingWorkers = {}; // templateId -> Set of already-assigned worker IDs
+    const workersAssignedToday = new Set(); // workers who already have a shift today
+
+    // Account for existing shifts (from previous schedule runs)
     for (const tpl of dayTemplates) {
       const needed = getRequiredWorkers(tpl, dayOfWeek);
-      const tplTotalHours = calcHours(tpl.startTime, tpl.endTime);
-      const tplPaidHours = calcPaidHours(tpl); // after unpaid break deduction
+      const existing = existingShifts.filter(s => s.date === dateStr && s.templateId === tpl.id);
+      tplSlots[tpl.id] = Math.max(0, needed - existing.length);
+      tplExistingWorkers[tpl.id] = new Set(existing.map(s => s.workerId));
+      // Mark workers from existing shifts as already assigned for the day
+      existing.forEach(s => workersAssignedToday.add(s.workerId));
+    }
 
-      // Count already-filled slots from existing shifts (avoid duplicates on re-run)
-      const alreadyFilled = existingShifts.filter(s =>
-        s.date === dateStr && s.templateId === tpl.id
-      );
-      const alreadyFilledWorkerIds = new Set(alreadyFilled.map(s => s.workerId));
-      let filled = alreadyFilled.length;
+    // Also mark workers who have existing shifts on this day (from ANY template)
+    existingShifts.filter(s => s.date === dateStr).forEach(s => workersAssignedToday.add(s.workerId));
 
-      // Score and rank eligible workers (scoring uses paid hours for fairness)
-      const ranked = activeWorkers
-        .filter(w => isWorkerAvailable(w, dateStr, dayOfWeek, leaves))
-        .map(w => ({ worker: w, score: scoreWorker(w, tpl, workerHours, dayOfWeek) }))
-        .filter(({ score }) => score >= 0) // -1 means ineligible (would exceed max hours)
-        .sort((a, b) => b.score - a.score);
+    // Build all eligible (worker, template) pairs with scores
+    const candidates = [];
+    const availableWorkers = activeWorkers.filter(w =>
+      isWorkerAvailable(w, dateStr, dayOfWeek, leaves) && !workersAssignedToday.has(w.id)
+    );
 
-      for (const { worker } of ranked) {
-        if (filled >= needed) break;
+    for (const tpl of dayTemplates) {
+      if (tplSlots[tpl.id] <= 0) continue; // template fully filled by existing shifts
+      const tplPaidHours = calcPaidHours(tpl);
 
-        // Skip workers already assigned to this template+date from existing shifts
-        if (alreadyFilledWorkerIds.has(worker.id)) continue;
+      for (const worker of availableWorkers) {
+        // Skip if already assigned to this template from existing shifts
+        if (tplExistingWorkers[tpl.id]?.has(worker.id)) continue;
 
-        // Check: no overlapping shifts this day
-        const dayAssigns = workerDayShifts[worker.id]?.[dateStr] || [];
-        const overlaps = dayAssigns.some(a => timesOverlap(a.startTime, a.endTime, tpl.startTime, tpl.endTime));
-        if (overlaps) continue;
+        // Score check (returns -1 if would exceed max hours)
+        const score = scoreWorker(worker, tpl, workerHours, dayOfWeek);
+        if (score < 0) continue;
 
-        // Check: no night → morning back-to-back
+        // Salaried weekly hour cap
+        if (worker.payType === 'salaried' && worker.fixedHoursWeek) {
+          if ((workerHours[worker.id] || 0) + tplPaidHours > worker.fixedHoursWeek) continue;
+        }
+
+        // Check: no night → morning back-to-back from previous day
         const last = workerLastShift[worker.id];
-        if (last?.date === dateStr && isNightShift(last.startTime) && isMorningShift(tpl.startTime)) continue;
+        if (last && last.date !== dateStr && isNightShift(last.startTime) && isMorningShift(tpl.startTime)) {
+          // Check it was actually yesterday
+          const prevDate = new Date(weekStart);
+          prevDate.setDate(prevDate.getDate() + dayOffset - 1);
+          if (last.date === prevDate.toISOString().split('T')[0]) continue;
+        }
 
-        // Check all template rules
+        // Check template-specific rules
         let violatesRule = false;
         for (const rule of tpl.rules || []) {
-          if (rule.type === 'incompatible_workers') {
-            // Support both formats: workers[] array and workerA/workerB
-            const incompatible = rule.workers || [rule.workerA, rule.workerB].filter(Boolean);
-            if (incompatible.length >= 2 && incompatible.includes(worker.id)) {
-              const assignedForThisShift = assignments.filter(a => a.date === dateStr && a.templateId === tpl.id);
-              const assignedWorkerIds = assignedForThisShift.map(a => a.workerId);
-              if (assignedWorkerIds.some(id => incompatible.includes(id))) {
-                violatesRule = true;
-                break;
-              }
-            }
-          }
-          if (rule.type === 'min_rest_hours' && rule.hours > 0) {
-            // Check if worker had a shift ending too recently
+          if (rule.type === 'min_rest_hours' && rule.hours > 0 && last) {
             const thisStart = shiftStartDateTime(dateStr, tpl.startTime);
-            const lastShift = workerLastShift[worker.id];
-            if (lastShift) {
-              const lastEnd = shiftEndDateTime(lastShift.date, lastShift.endTime, lastShift.startTime);
-              const restMs = thisStart.getTime() - lastEnd.getTime();
-              const restHours = restMs / (1000 * 60 * 60);
-              if (restHours < rule.hours) {
-                violatesRule = true;
-                break;
-              }
-            }
+            const lastEnd = shiftEndDateTime(last.date, last.endTime, last.startTime);
+            const restHours = (thisStart.getTime() - lastEnd.getTime()) / (1000 * 60 * 60);
+            if (restHours < rule.hours) { violatesRule = true; break; }
           }
           if (rule.type === 'max_consecutive_days' && rule.days > 0) {
-            // Count consecutive days this worker was assigned this template
             let consecutive = 0;
             for (let d = dayOffset - 1; d >= 0; d--) {
-              const prevDate = new Date(weekStart);
-              prevDate.setDate(prevDate.getDate() + d);
-              const prevDateStr = prevDate.toISOString().split('T')[0];
-              const hadShift = assignments.some(a => a.workerId === worker.id && a.templateId === tpl.id && a.date === prevDateStr);
-              if (hadShift) consecutive++;
+              const prevD = new Date(weekStart);
+              prevD.setDate(prevD.getDate() + d);
+              const prevDS = prevD.toISOString().split('T')[0];
+              if (assignments.some(a => a.workerId === worker.id && a.templateId === tpl.id && a.date === prevDS)) consecutive++;
               else break;
             }
-            if (consecutive >= rule.days) {
-              violatesRule = true;
-              break;
-            }
+            if (consecutive >= rule.days) { violatesRule = true; break; }
           }
         }
         if (violatesRule) continue;
 
-        // Check: salaried workers should not exceed their contracted weekly hours
-        if (worker.payType === 'salaried' && worker.fixedHoursWeek) {
-          const currentH = workerHours[worker.id] || 0;
-          if (currentH + tplPaidHours > worker.fixedHoursWeek) continue;
+        candidates.push({ worker, tpl, score, tplPaidHours });
+      }
+    }
+
+    // Sort all candidates by score (highest first) — greedy optimal matching
+    candidates.sort((a, b) => b.score - a.score);
+
+    // Greedy assignment: pick best pair, assign, remove worker from pool
+    const assignedToday = new Set(); // worker IDs assigned in this round
+    const tplFilled = {}; // templateId -> count of new assignments this round
+    dayTemplates.forEach(t => { tplFilled[t.id] = 0; });
+
+    for (const { worker, tpl, tplPaidHours } of candidates) {
+      // Worker already assigned today?
+      if (assignedToday.has(worker.id)) continue;
+      // Template full?
+      if (tplFilled[tpl.id] >= tplSlots[tpl.id]) continue;
+
+      // Check incompatible workers rule against already-assigned workers for this template
+      let incompatibleViolation = false;
+      for (const rule of tpl.rules || []) {
+        if (rule.type === 'incompatible_workers') {
+          const incompatible = rule.workers || [rule.workerA, rule.workerB].filter(Boolean);
+          if (incompatible.length >= 2 && incompatible.includes(worker.id)) {
+            const assignedForTpl = assignments.filter(a => a.date === dateStr && a.templateId === tpl.id);
+            if (assignedForTpl.some(a => incompatible.includes(a.workerId))) {
+              incompatibleViolation = true;
+              break;
+            }
+          }
         }
+      }
+      if (incompatibleViolation) continue;
 
-        // Assign! Use paid hours (after unpaid break) for tracking
-        const unpaidBreak = (tpl.rules || []).find(r => r.type === 'unpaid_break');
-        assignments.push({
-          workerId: worker.id,
-          workerName: `${worker.firstName} ${worker.lastName}`,
-          shopId: tpl.shopId,
-          templateId: tpl.id,
-          templateName: tpl.name,
-          date: dateStr,
-          dayOfWeek,
-          dayName: DAY_NAMES[dayOfWeek],
-          startTime: tpl.startTime,
-          endTime: tpl.endTime,
-          hours: tplPaidHours,
-          totalHours: tplTotalHours,
-          unpaidBreakMinutes: unpaidBreak?.minutes || 0,
-          type: tpl.type || 'regular',
-          autoScheduled: true,
-        });
-
-        workerHours[worker.id] = (workerHours[worker.id] || 0) + tplPaidHours;
-        if (!workerDayShifts[worker.id][dateStr]) workerDayShifts[worker.id][dateStr] = [];
-        workerDayShifts[worker.id][dateStr].push({ startTime: tpl.startTime, endTime: tpl.endTime });
-        workerLastShift[worker.id] = { date: dateStr, startTime: tpl.startTime, endTime: tpl.endTime };
-        filled++;
+      // Re-check salaried cap (hours may have changed from earlier assignments this day)
+      if (worker.payType === 'salaried' && worker.fixedHoursWeek) {
+        if ((workerHours[worker.id] || 0) + tplPaidHours > worker.fixedHoursWeek) continue;
       }
 
-      if (filled < needed) {
+      // Assign!
+      const tplTotalHours = calcHours(tpl.startTime, tpl.endTime);
+      const unpaidBreak = (tpl.rules || []).find(r => r.type === 'unpaid_break');
+      assignments.push({
+        workerId: worker.id,
+        workerName: `${worker.firstName} ${worker.lastName}`,
+        shopId: tpl.shopId,
+        templateId: tpl.id,
+        templateName: tpl.name,
+        date: dateStr,
+        dayOfWeek,
+        dayName: DAY_NAMES[dayOfWeek],
+        startTime: tpl.startTime,
+        endTime: tpl.endTime,
+        hours: tplPaidHours,
+        totalHours: tplTotalHours,
+        unpaidBreakMinutes: unpaidBreak?.minutes || 0,
+        type: tpl.type || 'regular',
+        autoScheduled: true,
+      });
+
+      workerHours[worker.id] = (workerHours[worker.id] || 0) + tplPaidHours;
+      if (!workerDayShifts[worker.id][dateStr]) workerDayShifts[worker.id][dateStr] = [];
+      workerDayShifts[worker.id][dateStr].push({ startTime: tpl.startTime, endTime: tpl.endTime });
+      workerLastShift[worker.id] = { date: dateStr, startTime: tpl.startTime, endTime: tpl.endTime };
+      assignedToday.add(worker.id);
+      tplFilled[tpl.id]++;
+    }
+
+    // Generate warnings for unfilled templates
+    for (const tpl of dayTemplates) {
+      const needed = getRequiredWorkers(tpl, dayOfWeek);
+      const existingCount = existingShifts.filter(s => s.date === dateStr && s.templateId === tpl.id).length;
+      const totalFilled = existingCount + (tplFilled[tpl.id] || 0);
+      if (totalFilled < needed) {
         warnings.push({
           date: dateStr,
           day: DAY_LABELS[dayOfWeek],
           template: tpl.name,
           needed,
-          filled,
-          shortBy: needed - filled,
+          filled: totalFilled,
+          shortBy: needed - totalFilled,
         });
       }
     }
