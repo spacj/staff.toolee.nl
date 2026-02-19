@@ -12,6 +12,7 @@ const C = {
   SHIFT_PREFERENCES: 'shiftPreferences', ATTENDANCE: 'attendance',
   PERMITS: 'permits', PAYMENTS: 'payments', NOTIFICATIONS: 'notifications',
   ACTIVITY_LOG: 'activityLog', INVITES: 'invites', REFERRALS: 'referrals',
+  CORRECTION_REQUESTS: 'correctionRequests', MESSAGES: 'messages',
 };
 
 // ─── Helpers ──────────────────────────────────────────
@@ -326,5 +327,51 @@ export function onNotifications(uid, callback) {
 // ─── Activity Log ─────────────────────────────────────
 export async function logActivity(data) { await add(C.ACTIVITY_LOG, data); }
 export async function getActivityLog(lim = 20) { return getAll(C.ACTIVITY_LOG, orderBy('createdAt', 'desc'), limit(lim)); }
+
+// ─── Correction Requests ──────────────────────────────
+// Workers submit these when they forgot to clock in/out or have wrong hours
+// Schema: { orgId, workerId, workerName, date, type: 'missed_clockin'|'missed_clockout'|'wrong_hours'|'other',
+//           requestedClockIn, requestedClockOut, message, status: 'pending'|'approved'|'rejected',
+//           attendanceId?, reviewedBy, reviewedAt, adminNotes }
+export async function getCorrectionRequests(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  if (filters.workerId) c.push(where('workerId', '==', filters.workerId));
+  if (filters.status) c.push(where('status', '==', filters.status));
+  c.push(orderBy('createdAt', 'desc'));
+  if (filters.limit) c.push(limit(filters.limit));
+  return getAll(C.CORRECTION_REQUESTS, ...c);
+}
+export const createCorrectionRequest = (data) => add(C.CORRECTION_REQUESTS, { ...data, status: 'pending' });
+export async function reviewCorrectionRequest(id, approved, reviewedBy, adminNotes = '') {
+  await upd(C.CORRECTION_REQUESTS, id, {
+    status: approved ? 'approved' : 'rejected',
+    reviewedBy,
+    reviewedAt: new Date().toISOString(),
+    adminNotes,
+  });
+}
+
+// ─── Messages (Worker ↔ Management) ──────────────────
+// Schema: { orgId, senderId, senderName, senderRole: 'worker'|'manager'|'admin',
+//           recipientType: 'management'|'worker', recipientId?,
+//           subject, body, read: false, parentId? (for replies) }
+export async function getMessages(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  if (filters.recipientType) c.push(where('recipientType', '==', filters.recipientType));
+  if (filters.recipientId) c.push(where('recipientId', '==', filters.recipientId));
+  if (filters.senderId) c.push(where('senderId', '==', filters.senderId));
+  c.push(orderBy('createdAt', 'desc'));
+  if (filters.limit) c.push(limit(filters.limit));
+  return getAll(C.MESSAGES, ...c);
+}
+export const createMessage = (data) => add(C.MESSAGES, { ...data, read: false });
+export const markMessageRead = (id) => upd(C.MESSAGES, id, { read: true });
+export async function getMessageThread(parentId) {
+  const replies = await getAll(C.MESSAGES, where('parentId', '==', parentId), orderBy('createdAt', 'asc'));
+  const parent = await get1(C.MESSAGES, parentId);
+  return parent ? [parent, ...replies] : replies;
+}
 
 export { C as COLLECTIONS };

@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog } from '@/lib/firestore';
 import { calculateMonthlyCost, formatCurrency } from '@/lib/pricing';
 import { cn } from '@/utils/helpers';
-import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3 } from 'lucide-react';
+import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3, MessageCircle, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
 const STAT_STYLES = [
@@ -62,6 +62,16 @@ export default function DashboardPage() {
               <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center"><Calendar className="w-6 h-6 text-emerald-600" /></div>
               <p className="text-sm font-semibold text-surface-800">My Schedule</p>
               <p className="text-xs text-surface-400">View your shifts</p>
+            </Link>
+            <Link href="/time#corrections" className="card-hover p-5 flex flex-col items-center text-center gap-2">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center"><AlertTriangle className="w-6 h-6 text-amber-600" /></div>
+              <p className="text-sm font-semibold text-surface-800">Report Issue</p>
+              <p className="text-xs text-surface-400">Missed clock-in/out</p>
+            </Link>
+            <Link href="/time#messages" className="card-hover p-5 flex flex-col items-center text-center gap-2">
+              <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center"><MessageCircle className="w-6 h-6 text-purple-600" /></div>
+              <p className="text-sm font-semibold text-surface-800">Messages</p>
+              <p className="text-xs text-surface-400">Contact management</p>
             </Link>
           </div>
         </div>
