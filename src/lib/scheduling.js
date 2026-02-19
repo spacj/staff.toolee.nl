@@ -121,8 +121,9 @@ function scoreWorker(worker, template, workerHours, dayOfWeek) {
   else if (pref === 'any') score += 10;
   else score += 0; // mismatch — still eligible but low priority
 
-  // 2. Salaried priority (+15)
-  if (worker.payType === 'salaried') score += 15;
+  // 2. Salaried priority (+50) — salaried workers should be scheduled first
+  //    to ensure their contracted hours are filled before hourly workers
+  if (worker.payType === 'salaried') score += 50;
 
   // 3. Hours balancing — prefer workers who are under their target (0–20 points)
   const currentHours = workerHours[worker.id] || 0;
@@ -231,6 +232,12 @@ export function generateWeeklySchedule({ workers, templates, weekStart, leaves =
           }
         }
         if (violatesRule) continue;
+
+        // Check: salaried workers should not exceed their contracted weekly hours
+        if (worker.payType === 'salaried' && worker.fixedHoursWeek) {
+          const currentH = workerHours[worker.id] || 0;
+          if (currentH + tplHours > worker.fixedHoursWeek) continue;
+        }
 
         // Assign!
         assignments.push({

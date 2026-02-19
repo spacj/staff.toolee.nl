@@ -177,9 +177,8 @@ export default function RegisterPage() {
                     <label className="label">Referral Code (optional)</label>
                     <input
                       name="referralCode" value={form.referralCode} onChange={handleChange}
-                      placeholder="Enter referral code if you have one" className="input-field py-3.5"
+                      placeholder="Enter referral or promo code" className="input-field py-3.5"
                     />
-                    <p className="text-xs text-slate-500 mt-1.5">Use promo code TOOLEE10 for 10 free workers!</p>
                   </div>
                   <button type="submit" className="btn-primary w-full !py-4 !text-base !shadow-lg !shadow-brand-500/30">
                     Continue <ArrowRight className="w-5 h-5" />

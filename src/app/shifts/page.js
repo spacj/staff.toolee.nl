@@ -22,7 +22,7 @@ export default function ShiftTemplatesPage() {
   const [form, setForm] = useState({
     name: '', shopId: '', type: 'morning', startTime: '06:00', endTime: '14:00',
     requiredWorkers: 1, breakMinutes: 30, notes: '',
-    daysOfWeek: [1, 2, 3, 4, 5], // Mon-Fri default
+    daysOfWeek: [], // empty — user must explicitly select days
     usePerDayRequirements: false,
     requiredByDay: {}, // { "1": 2, "6": 3 } — day-specific overrides
     rules: [], // extra rules: [{ type: 'incompatible_workers', workers: ['id1', 'id2'] }]
@@ -40,7 +40,7 @@ export default function ShiftTemplatesPage() {
 
   const openAdd = () => {
     setEdit(null);
-    setForm({ name: '', shopId: shops[0]?.id || '', type: 'morning', startTime: '06:00', endTime: '14:00', requiredWorkers: 1, breakMinutes: 30, notes: '', daysOfWeek: [1, 2, 3, 4, 5], usePerDayRequirements: false, requiredByDay: {}, rules: [] });
+    setForm({ name: '', shopId: shops[0]?.id || '', type: 'morning', startTime: '06:00', endTime: '14:00', requiredWorkers: 1, breakMinutes: 30, notes: '', daysOfWeek: [], usePerDayRequirements: false, requiredByDay: {}, rules: [] });
     setShowForm(true);
   };
 
@@ -107,6 +107,11 @@ export default function ShiftTemplatesPage() {
 
   const updateRule = (idx, rule) => {
     setForm(f => ({ ...f, rules: f.rules.map((r, i) => i === idx ? rule : r) }));
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this shift template?')) return;
+    await deleteShiftTemplate(id); toast.success('Deleted'); load();
   };
 
   const grouped = shops.map(s => ({ shop: s, templates: templates.filter(t => t.shopId === s.id) }));
@@ -273,6 +278,7 @@ export default function ShiftTemplatesPage() {
                 <button type="button" onClick={addRule} className="text-sm text-brand-600 hover:underline">+ Add Rule</button>
               </div>
             </div>
+            <div><label className="label">Notes</label><textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} className="input-field resize-none" /></div>
             <p className="text-xs text-surface-400 bg-surface-50 p-3 rounded-xl">Duration: <strong>{calcHours(form.startTime, form.endTime)}h</strong> (net: {(parseFloat(calcHours(form.startTime, form.endTime)) - (parseInt(form.breakMinutes) || 0) / 60).toFixed(1)}h after break) · Runs {form.daysOfWeek.length} day{form.daysOfWeek.length !== 1 ? 's' : ''}/week</p>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
