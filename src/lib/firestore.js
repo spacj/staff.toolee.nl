@@ -356,8 +356,8 @@ export async function reviewCorrectionRequest(id, approved, reviewedBy, adminNot
 
 // ─── Messages (Worker ↔ Management) ──────────────────
 // Schema: { orgId, senderId, senderName, senderRole: 'worker'|'manager'|'admin',
-//           recipientType: 'management'|'worker', recipientId?,
-//           subject, body, read: false, parentId? (for replies) }
+//           recipientId?, recipientName?, recipientRole?,
+//           conversationId?, subject, body, read: false, parentId? (for replies) }
 export async function getMessages(filters = {}) {
   const c = [];
   if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
@@ -366,10 +366,52 @@ export async function getMessages(filters = {}) {
   if (filters.recipientType) results = results.filter(r => r.recipientType === filters.recipientType);
   if (filters.recipientId) results = results.filter(r => r.recipientId === filters.recipientId);
   if (filters.senderId) results = results.filter(r => r.senderId === filters.senderId);
+  if (filters.conversationId) results = results.filter(r => r.conversationId === filters.conversationId);
   results.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
   if (filters.limit) results = results.slice(0, filters.limit);
   return results;
 }
+
+export async function getConversations(userId, orgId, userRole, workers = []) {
+  const all = await getMessages({ orgId, limit: 100 });
+  const convMap = new Map();
+  
+  for (const m of all) {
+    // Determine conversation partner
+    let partnerId, partnerName, partnerRole;
+    if (m.senderId === userId) {
+      partnerId = m.recipientId;
+      partnerName = m.recipientName;
+      partnerRole = m.recipientRole;
+    } else if (m.recipientId === userId) {
+      partnerId = m.senderId;
+      partnerName = m.senderName;
+      partnerRole = m.senderRole;
+    } else {
+      continue;
+    }
+    
+    if (!partnerId) continue;
+    
+    if (!convMap.has(partnerId)) {
+      convMap.set(partnerId, {
+        partnerId,
+        partnerName: partnerName || (workers.find(w => w.id === partnerId) ? `${workers.find(w => w.id === partnerId).firstName} ${workers.find(w => w.id === partnerId).lastName}` : 'Unknown'),
+        partnerRole: partnerRole || (workers.find(w => w.id === partnerId)?.role || 'worker'),
+        lastMessage: m,
+        unreadCount: 0,
+      });
+    }
+    // Count unread
+    if (m.recipientId === userId && !m.read) {
+      const conv = convMap.get(partnerId);
+      conv.unreadCount++;
+    }
+  }
+  
+  return Array.from(convMap.values()).sort((a, b) => (b.lastMessage.createdAt || '') > (a.lastMessage.createdAt || '') ? 1 : -1);
+}
+
 export const createMessage = (data) => add(C.MESSAGES, { ...data, read: false });
 export const markMessageRead = (id) => upd(C.MESSAGES, id, { read: true });
 export async function getMessageThread(parentId) {

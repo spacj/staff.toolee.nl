@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
-import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle } from 'lucide-react';
 
 export default function Sidebar({ mobile, onClose }) {
   const pathname = usePathname();
@@ -11,6 +11,7 @@ export default function Sidebar({ mobile, onClose }) {
 
   const adminLinks = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/chat', icon: MessageCircle, label: 'Chat' },
     { href: '/staff', icon: Users, label: 'Staff' },
     { href: '/shops', icon: Store, label: 'Shops' },
     { href: '/shifts', icon: ClipboardList, label: 'Shift Templates' },
@@ -22,6 +23,7 @@ export default function Sidebar({ mobile, onClose }) {
 
   const managerLinks = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/chat', icon: MessageCircle, label: 'Chat' },
     { href: '/staff', icon: Users, label: 'Staff' },
     { href: '/shops', icon: Store, label: 'Shops' },
     { href: '/shifts', icon: ClipboardList, label: 'Shift Templates' },
@@ -32,6 +34,7 @@ export default function Sidebar({ mobile, onClose }) {
 
   const workerLinks = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/chat', icon: MessageCircle, label: 'Chat' },
     { href: '/time', icon: Clock, label: 'My Time' },
     { href: '/calendar', icon: Calendar, label: 'My Schedule' },
     { href: '/settings', icon: Settings, label: 'Settings' },
