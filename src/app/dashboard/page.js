@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
-import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog } from '@/lib/firestore';
+import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog, getCorrectionRequests, getMessages } from '@/lib/firestore';
 import { calculateMonthlyCost, formatCurrency } from '@/lib/pricing';
 import { cn } from '@/utils/helpers';
 import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3, MessageCircle, AlertTriangle } from 'lucide-react';
@@ -16,13 +16,27 @@ const STAT_STYLES = [
 ];
 
 export default function DashboardPage() {
-  const { orgId, isManager, userProfile } = useAuth();
+  const { orgId, isManager, userProfile, user } = useAuth();
   const [workers, setWorkers] = useState([]);
   const [shops, setShops] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [permits, setPermits] = useState([]);
   const [activity, setActivity] = useState([]);
+  const [corrections, setCorrections] = useState([]);
+  const [messages, setMessages] = useState([]);
+
+  // Resolve worker ID for worker-specific queries
+  const resolveWorkerId = useMemo(async () => {
+    if (!user || !orgId) return null;
+    if (userProfile?.workerId) return userProfile.workerId;
+    try {
+      const allWorkers = await getWorkers({ orgId });
+      const match = allWorkers.find(w => w.email === userProfile?.email && w.status === 'active');
+      if (match) return match.id;
+    } catch (e) {}
+    return user.uid;
+  }, [user, userProfile, orgId]);
 
   useEffect(() => {
     if (!orgId) return;
@@ -35,6 +49,16 @@ export default function DashboardPage() {
     getActivityLog(8).then(setActivity);
   }, [orgId]);
 
+  // Fetch manager-specific notifications
+  useEffect(() => {
+    if (!orgId || !isManager) return;
+    getCorrectionRequests({ orgId, status: 'pending', limit: 20 }).then(setCorrections).catch(() => setCorrections([]));
+    getMessages({ orgId, limit: 50 }).then(all => {
+      const unread = all.filter(m => !m.read && m.recipientType === 'management');
+      setMessages(unread);
+    }).catch(() => setMessages([]));
+  }, [orgId, isManager]);
+
   const activeWorkers = workers.filter(w => w.status === 'active');
   const cost = useMemo(() => calculateMonthlyCost(activeWorkers.length, shops.length), [activeWorkers.length, shops.length]);
   const clockedIn = attendance.filter(a => a.status === 'clocked-in').length;
@@ -42,6 +66,9 @@ export default function DashboardPage() {
   const firstName = userProfile?.displayName?.split(' ')[0] || 'there';
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  const pendingCorrections = corrections.filter(c => c.status === 'pending');
+  const unreadWorkerMessages = messages.filter(m => !m.read && m.recipientId !== user?.uid);
 
   if (!isManager) {
     return (
@@ -53,22 +80,24 @@ export default function DashboardPage() {
             <p className="text-brand-200 mt-2">Ready for your shift?</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Link href="/time" className="card-hover p-5 flex flex-col items-center text-center gap-2">
+            <Link href="/time" className="card-hover p-5 flex flex-col items-center text-center gap-2 relative">
               <div className="w-12 h-12 rounded-2xl bg-brand-100 flex items-center justify-center"><Clock className="w-6 h-6 text-brand-600" /></div>
               <p className="text-sm font-semibold text-surface-800">Clock In/Out</p>
               <p className="text-xs text-surface-400">Start your shift</p>
             </Link>
-            <Link href="/calendar" className="card-hover p-5 flex flex-col items-center text-center gap-2">
+            <Link href="/calendar" className="card-hover p-5 flex flex-col items-center text-center gap-2 relative">
               <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center"><Calendar className="w-6 h-6 text-emerald-600" /></div>
               <p className="text-sm font-semibold text-surface-800">My Schedule</p>
               <p className="text-xs text-surface-400">View your shifts</p>
             </Link>
-            <Link href="/time#corrections" className="card-hover p-5 flex flex-col items-center text-center gap-2">
+            <Link href="/time#corrections" className="card-hover p-5 flex flex-col items-center text-center gap-2 relative">
+              {pendingCorrections.length > 0 && <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full" />}
               <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center"><AlertTriangle className="w-6 h-6 text-amber-600" /></div>
               <p className="text-sm font-semibold text-surface-800">Report Issue</p>
               <p className="text-xs text-surface-400">Missed clock-in/out</p>
             </Link>
-            <Link href="/time#messages" className="card-hover p-5 flex flex-col items-center text-center gap-2">
+            <Link href="/time#messages" className="card-hover p-5 flex flex-col items-center text-center gap-2 relative">
+              {unreadWorkerMessages.length > 0 && <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full" />}
               <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center"><MessageCircle className="w-6 h-6 text-purple-600" /></div>
               <p className="text-sm font-semibold text-surface-800">Messages</p>
               <p className="text-xs text-surface-400">Contact management</p>
@@ -79,6 +108,11 @@ export default function DashboardPage() {
     );
   }
 
+  const pendingCorrectionCount = corrections.length;
+  const unreadMessageCount = messages.length;
+  const pendingPermitCount = permits.length;
+
+  // Stats for manager
   const stats = [
     { label: 'Active Staff', value: activeWorkers.length, sub: `${clockedIn} clocked in`, icon: Users },
     { label: 'Shops', value: shops.length, sub: 'locations', icon: Store },
@@ -119,12 +153,13 @@ export default function DashboardPage() {
         {/* Quick actions */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { href: '/staff', icon: Users, label: 'Add Staff', color: 'bg-brand-100 text-brand-600' },
-            { href: '/calendar', icon: Calendar, label: 'Schedule', color: 'bg-emerald-100 text-emerald-600' },
-            { href: '/attendance', icon: Clock, label: 'Attendance', color: 'bg-purple-100 text-purple-600' },
-            { href: '/costs', icon: BarChart3, label: 'Analytics', color: 'bg-amber-100 text-amber-600' },
+            { href: '/staff', icon: Users, label: 'Add Staff', color: 'bg-brand-100 text-brand-600', badge: 0 },
+            { href: '/calendar', icon: Calendar, label: 'Schedule', color: 'bg-emerald-100 text-emerald-600', badge: 0 },
+            { href: '/attendance', icon: Clock, label: 'Attendance', color: 'bg-purple-100 text-purple-600', badge: pendingPermitCount + pendingCorrectionCount + unreadMessageCount },
+            { href: '/costs', icon: BarChart3, label: 'Analytics', color: 'bg-amber-100 text-amber-600', badge: 0 },
           ].map(a => (
-            <Link key={a.href} href={a.href} className="card-hover p-4 flex items-center gap-3">
+            <Link key={a.href} href={a.href} className="card-hover p-4 flex items-center gap-3 relative">
+              {a.badge > 0 && <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">{a.badge > 9 ? '9+' : a.badge}</div>}
               <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', a.color)}>
                 <a.icon className="w-5 h-5" />
               </div>
@@ -137,18 +172,27 @@ export default function DashboardPage() {
           {/* Pending */}
           <div className="card">
             <div className="px-5 py-4 border-b border-surface-100 flex items-center justify-between">
-              <h3 className="section-title">Pending Requests</h3>
+              <h3 className="section-title">Pending Requests {(pendingPermitCount + pendingCorrectionCount) > 0 && <span className="ml-2 bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">{pendingPermitCount + pendingCorrectionCount}</span>}</h3>
               <Link href="/attendance" className="text-xs text-brand-600 font-semibold hover:underline flex items-center gap-1">View all <ArrowRight className="w-3 h-3" /></Link>
             </div>
-            <div className="divide-y divide-surface-100">
-              {permits.length === 0 && <p className="p-5 text-sm text-surface-400 text-center">No pending requests</p>}
-              {permits.slice(0, 5).map(p => (
+            <div className="divide-y divide-surface-100 max-h-64 overflow-y-auto">
+              {permits.length === 0 && corrections.length === 0 && <p className="p-5 text-sm text-surface-400 text-center">No pending requests</p>}
+              {permits.slice(0, 3).map(p => (
                 <div key={p.id} className="px-5 py-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-surface-800">{p.workerName}</p>
                     <p className="text-xs text-surface-400 capitalize">{p.type} · {p.startDate}{p.endDate !== p.startDate ? ` → ${p.endDate}` : ''}</p>
                   </div>
-                  <span className="badge bg-amber-100 text-amber-700">Pending</span>
+                  <span className="badge bg-amber-100 text-amber-700">Leave</span>
+                </div>
+              ))}
+              {corrections.slice(0, 3).map(c => (
+                <div key={c.id} className="px-5 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-surface-800">{c.workerName}</p>
+                    <p className="text-xs text-surface-400 capitalize">{c.type?.replace(/_/g, ' ')} · {c.date}</p>
+                  </div>
+                  <span className="badge bg-orange-100 text-orange-700">Correction</span>
                 </div>
               ))}
             </div>
@@ -156,7 +200,7 @@ export default function DashboardPage() {
 
           {/* Activity */}
           <div className="card">
-            <div className="px-5 py-4 border-b border-surface-100">
+            <div className="px-5 py-4 border-b border-surface-100 flex items-center justify-between">
               <h3 className="section-title">Recent Activity</h3>
             </div>
             <div className="divide-y divide-surface-100">
@@ -169,6 +213,30 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
+
+          {/* Unread Messages */}
+          {unreadMessageCount > 0 && (
+            <div className="card border-red-200">
+              <div className="px-5 py-4 border-b border-surface-100 flex items-center justify-between bg-red-50 -mx-5 -mt-6 px-5 pt-4">
+                <h3 className="section-title flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-red-500" />
+                  Unread Messages <span className="ml-1 bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">{unreadMessageCount}</span>
+                </h3>
+                <Link href="/attendance?tab=messages" className="text-xs text-red-600 font-semibold hover:underline flex items-center gap-1">View all <ArrowRight className="w-3 h-3" /></Link>
+              </div>
+              <div className="divide-y divide-surface-100 max-h-64 overflow-y-auto">
+                {messages.slice(0, 5).map(m => (
+                  <div key={m.id} className="px-5 py-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-surface-800">{m.subject}</p>
+                      <p className="text-xs text-surface-400">From: {m.senderName}</p>
+                    </div>
+                    <div className="w-2 h-2 bg-red-500 rounded-full" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Layout>
