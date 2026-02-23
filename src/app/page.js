@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { PRICE_PER_WORKER, PRICE_PER_SHOP, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE, ENTERPRISE_THRESHOLD, FREE_WORKER_LIMIT } from '@/lib/pricing';
-import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, Heart, ExternalLink } from 'lucide-react';
+import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ExternalLink } from 'lucide-react';
 
 const features = [
   { icon: Store, title: 'Multi-Shop Management', desc: 'Manage multiple locations from one dashboard with separate schedules and staff.', color: 'from-brand-500 to-brand-600' },
@@ -216,10 +216,7 @@ export default function HomePage() {
                 <span className="text-[10px] text-slate-400 font-medium">by toolee.nl</span>
               </div>
             </div>
-            <div className="flex items-center gap-6 text-sm text-slate-500">
-              <span>&copy; {new Date().getFullYear()} toolee.nl</span>
-              <span className="flex items-center gap-1">Made with <Heart className="w-4 h-4 text-red-500" /> in the Netherlands</span>
-            </div>
+            <p className="text-sm text-slate-500">&copy; {new Date().getFullYear()} toolee.nl. All rights reserved.</p>
           </div>
         </div>
       </footer>
