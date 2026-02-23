@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { getInviteByCode } from '@/lib/firestore';
-import { Shield, Mail, Lock, User, Eye, EyeOff, ArrowRight, Ticket, CheckCircle, Heart, Users, Sparkles } from 'lucide-react';
+import { Shield, Mail, Lock, User, Eye, EyeOff, ArrowRight, Ticket, CheckCircle, Users, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function JoinPage() {
@@ -124,8 +124,8 @@ export default function JoinPage() {
             ))}
           </div>
           
-          <div className="flex items-center gap-2 text-emerald-200 text-sm">
-            <Heart className="w-4 h-4 text-red-400" /> Made with love by toolee.nl
+          <div className="text-emerald-200 text-sm">
+            &copy; {new Date().getFullYear()} toolee.nl. All rights reserved.
           </div>
         </div>
       </div>
@@ -261,9 +261,7 @@ export default function JoinPage() {
           
           <div className="lg:hidden mt-6 pt-6 border-t border-slate-200 flex flex-col items-center gap-3 text-sm text-slate-500">
             <Link href="/" className="text-brand-600 hover:text-brand-700 font-medium">← Back to Home</Link>
-            <div className="flex items-center gap-2">
-              <Heart className="w-4 h-4 text-red-500" /> Made by toolee.nl
-            </div>
+            <div>&copy; {new Date().getFullYear()} toolee.nl</div>
           </div>
           
           <div className="hidden lg:block mt-8 text-center">

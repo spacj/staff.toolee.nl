@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { Shield, Mail, Lock, User, Building, Eye, EyeOff, ArrowRight, Check, Heart, Sparkles } from 'lucide-react';
+import { Shield, Mail, Lock, User, Building, Eye, EyeOff, ArrowRight, Check, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function RegisterPage() {
@@ -110,8 +110,8 @@ export default function RegisterPage() {
             ))}
           </div>
           
-          <div className="flex items-center gap-2 text-purple-200 text-sm">
-            <Heart className="w-4 h-4 text-red-400" /> Made with love by toolee.nl
+          <div className="text-purple-200 text-sm">
+            &copy; {new Date().getFullYear()} toolee.nl. All rights reserved.
           </div>
         </div>
       </div>
@@ -265,9 +265,7 @@ export default function RegisterPage() {
           
           <div className="lg:hidden mt-6 pt-6 border-t border-slate-200 flex flex-col items-center gap-3 text-sm text-slate-500">
             <Link href="/" className="text-brand-600 hover:text-brand-700 font-medium">← Back to Home</Link>
-            <div className="flex items-center gap-2">
-              <Heart className="w-4 h-4 text-red-500" /> Made by toolee.nl
-            </div>
+            <div>&copy; {new Date().getFullYear()} toolee.nl</div>
           </div>
           
           <div className="hidden lg:block mt-8 text-center">

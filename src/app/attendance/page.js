@@ -177,14 +177,16 @@ export default function AttendancePage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-surface-100 rounded-xl p-1 max-w-2xl overflow-x-auto">
+        <div className="flex gap-1 bg-surface-100 rounded-xl p-1 overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-1 sm:max-w-2xl scrollbar-none">
           {[
-            { key: 'hours', label: `Hours${pendingApproval.length > 0 ? ` (${pendingApproval.length})` : ''}` },
-            { key: 'permits', label: `Leave${pendingPermits.length > 0 ? ` (${pendingPermits.length})` : ''}` },
-            { key: 'corrections', label: `Corrections${pendingCorrections.length > 0 ? ` (${pendingCorrections.length})` : ''}` },
-            { key: 'messages', label: `Messages${unreadMessages.length > 0 ? ` (${unreadMessages.length})` : ''}` },
+            { key: 'hours', label: 'Hours', count: pendingApproval.length },
+            { key: 'permits', label: 'Leave', count: pendingPermits.length },
+            { key: 'corrections', label: 'Fixes', count: pendingCorrections.length },
+            { key: 'messages', label: 'Messages', count: unreadMessages.length },
           ].map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)} className={cn('flex-1 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap px-3', tab === t.key ? 'bg-white shadow-sm text-surface-900' : 'text-surface-500 hover:text-surface-700')}>{t.label}</button>
+            <button key={t.key} onClick={() => setTab(t.key)} className={cn('flex-1 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all whitespace-nowrap px-2 sm:px-3 min-w-0', tab === t.key ? 'bg-white shadow-sm text-surface-900' : 'text-surface-500 hover:text-surface-700')}>
+              {t.label}{t.count > 0 ? ` (${t.count})` : ''}
+            </button>
           ))}
         </div>
 
@@ -212,15 +214,15 @@ export default function AttendancePage() {
                   const rate = workerRate(a.workerId);
                   const cost = rate > 0 ? (a.totalHours || 0) * rate : null;
                   return (
-                    <div key={a.id} className="px-5 py-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-surface-800">{workerName(a.workerId)}</p>
-                          <p className="text-xs text-surface-400">{shopName(a.shopId)}</p>
+                    <div key={a.id} className="px-4 sm:px-5 py-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-surface-800 truncate">{workerName(a.workerId)}</p>
+                          <p className="text-xs text-surface-400 truncate">{shopName(a.shopId)}</p>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                           <span className="text-sm font-semibold text-surface-700">{(a.totalHours || 0).toFixed(1)}h</span>
-                          {cost !== null && <span className="text-xs text-surface-400">{formatCurrency(cost)}</span>}
+                          {cost !== null && <span className="text-xs text-surface-400 hidden sm:inline">{formatCurrency(cost)}</span>}
                           <span className={cn('badge text-[10px]',
                             a.approvalStatus === 'approved' ? 'bg-emerald-100 text-emerald-700' :
                             a.approvalStatus === 'rejected' ? 'bg-red-100 text-red-700' :

@@ -397,10 +397,10 @@ export default function TimePage() {
             {records.slice(0, 20).map(r => {
               const entries = r.entries || [];
               return (
-                <div key={r.id} className="px-5 py-3">
-                  <div className="flex items-center justify-between mb-1">
+                <div key={r.id} className="px-4 sm:px-5 py-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0 mb-1">
                     <span className="text-sm font-medium text-surface-700">{r.date}</span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm text-surface-600">{(r.totalHours || 0).toFixed(1)}h</span>
                       <span className={cn('badge text-[10px]',
                         r.approvalStatus === 'approved' ? 'bg-emerald-100 text-emerald-700' :

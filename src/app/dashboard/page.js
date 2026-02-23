@@ -172,13 +172,13 @@ export default function DashboardPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-stagger">
           {stats.map((s, i) => (
-            <div key={s.label} className={cn('rounded-2xl p-5 flex flex-col gap-2 shadow-lg', STAT_STYLES[i].bg)}>
+            <div key={s.label} className={cn('rounded-2xl p-4 sm:p-5 flex flex-col gap-1.5 sm:gap-2 shadow-lg overflow-hidden', STAT_STYLES[i].bg)}>
               <div className="flex items-center justify-between">
-                <p className={cn('text-sm font-medium', STAT_STYLES[i].sub)}>{s.label}</p>
-                <s.icon className={cn('w-4.5 h-4.5', STAT_STYLES[i].icon)} />
+                <p className={cn('text-xs sm:text-sm font-medium truncate', STAT_STYLES[i].sub)}>{s.label}</p>
+                <s.icon className={cn('w-4 h-4 sm:w-4.5 sm:h-4.5 flex-shrink-0', STAT_STYLES[i].icon)} />
               </div>
-              <p className={cn('text-3xl font-display font-bold', STAT_STYLES[i].text)}>{s.value}</p>
-              <p className={cn('text-xs', STAT_STYLES[i].sub)}>{s.sub}</p>
+              <p className={cn('text-2xl sm:text-3xl font-display font-bold truncate', STAT_STYLES[i].text)}>{s.value}</p>
+              <p className={cn('text-[10px] sm:text-xs truncate', STAT_STYLES[i].sub)}>{s.sub}</p>
             </div>
           ))}
         </div>
@@ -255,8 +255,8 @@ export default function DashboardPage() {
 
           {/* Unread Messages */}
           {unreadMessageCount > 0 && (
-            <div className="card border-red-200">
-              <div className="px-5 py-4 border-b border-surface-100 flex items-center justify-between bg-red-50 -mx-5 -mt-6 px-5 pt-4">
+            <div className="card border-red-200 overflow-hidden">
+              <div className="px-5 py-4 border-b border-surface-100 flex items-center justify-between bg-red-50">
                 <h3 className="section-title flex items-center gap-2">
                   <MessageCircle className="w-4 h-4 text-red-500" />
                   Unread Messages <span className="ml-1 bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">{unreadMessageCount}</span>

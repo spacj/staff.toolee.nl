@@ -81,8 +81,8 @@ export default function StaffDetailPage() {
               <div className={cn('w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold text-white border-4 border-white shadow-lg', color)}>
                 {getInitials(worker.firstName, worker.lastName)}
               </div>
-              <div className="flex-1 pt-2">
-                <h1 className="text-2xl font-display font-bold text-surface-900">{worker.firstName} {worker.lastName}</h1>
+              <div className="flex-1 pt-2 min-w-0">
+                <h1 className="text-xl sm:text-2xl font-display font-bold text-surface-900 truncate">{worker.firstName} {worker.lastName}</h1>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <p className="text-surface-500">{worker.customRole || worker.position || 'No position'}</p>
                   <span className="text-surface-300">·</span>
@@ -148,12 +148,12 @@ export default function StaffDetailPage() {
           <div className="divide-y divide-surface-100">
             {attendance.length === 0 && <p className="p-6 text-sm text-surface-400 text-center">No attendance records</p>}
             {attendance.slice(0, 10).map(a => (
-              <div key={a.id} className="px-5 py-3.5 flex items-center justify-between text-sm">
+              <div key={a.id} className="px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0 text-sm">
                 <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-surface-300" />
+                  <div className="w-2 h-2 rounded-full bg-surface-300 flex-shrink-0" />
                   <span className="font-medium text-surface-700">{a.date}</span>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 sm:gap-4 ml-5 sm:ml-0">
                   <span className="text-surface-500 font-mono text-xs">{a.clockIn?.slice(11, 16) || '—'} → {a.clockOut?.slice(11, 16) || 'Active'}</span>
                   <span className={cn('badge text-[10px]', a.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>{a.status}</span>
                 </div>

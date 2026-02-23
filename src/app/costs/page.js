@@ -139,12 +139,12 @@ function CostsContent() {
 
         {!hasActiveSubscription && !hasSuspendedSubscription && isAdmin && (
           <div className="card p-5 border-blue-200 bg-blue-50/30">
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-blue-900">Start Your Subscription</p>
                 <p className="text-xs text-blue-700 mt-1">Unlock advanced features: attendance tracking, cost analytics, and more.</p>
               </div>
-              <button onClick={() => setShowSubscribe(true)} className="btn-primary !text-sm">
+              <button onClick={() => setShowSubscribe(true)} className="btn-primary !text-sm flex-shrink-0 w-full sm:w-auto">
                 <CreditCard className="w-4 h-4" /> Subscribe Now
               </button>
             </div>

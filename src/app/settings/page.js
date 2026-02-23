@@ -135,7 +135,8 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Tab Navigation */}
         <div className="lg:col-span-1">
-          <div className="card overflow-hidden">
+          {/* Desktop sidebar nav */}
+          <div className="hidden lg:block card overflow-hidden">
             <nav className="divide-y divide-surface-100">
               {tabs.map((tab) => (
                 <button
@@ -156,14 +157,14 @@ export default function SettingsPage() {
             </nav>
           </div>
 
-          {/* Compact mobile tab bar */}
-          <div className="flex lg:hidden gap-1 mt-4 p-1 bg-surface-100 rounded-xl overflow-x-auto">
+          {/* Mobile tab bar */}
+          <div className="flex lg:hidden gap-1 p-1 bg-surface-100 rounded-xl overflow-x-auto scrollbar-none -mx-4 sm:mx-0 px-4 sm:px-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex-1 min-w-0 py-2 px-3 text-xs font-medium rounded-lg transition-colors whitespace-nowrap',
+                  'flex-1 min-w-0 py-2 px-2 sm:px-3 text-xs font-medium rounded-lg transition-colors whitespace-nowrap',
                   activeTab === tab.id ? 'bg-white text-brand-700 shadow-sm' : 'text-surface-500'
                 )}
               >

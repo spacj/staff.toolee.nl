@@ -197,12 +197,13 @@ export default function CalendarPage() {
 
   // ─── Shift Card ─────────────────────
   const ShiftCard = ({ s, compact }) => (
-    <div className={cn('flex items-center justify-between rounded-xl', compact ? 'p-2 bg-brand-50' : 'p-3 bg-surface-50')}>
+    <div className={cn('flex items-center justify-between rounded-xl', compact ? 'p-1.5 sm:p-2 bg-brand-50' : 'p-3 bg-surface-50')}>
       <div className="min-w-0">
-        <p className={cn('font-medium text-surface-800 truncate', compact ? 'text-xs' : 'text-sm')}>{s.workerName || 'Unassigned'}</p>
-        <p className={cn('text-surface-500 truncate', compact ? 'text-[10px]' : 'text-xs')}>
-          {s.templateName ? `${s.templateName} · ` : ''}{s.startTime}–{s.endTime} ({s.hours || '—'}h)
-          {shopName(s.shopId) && ` · ${shopName(s.shopId)}`}
+        <p className={cn('font-medium text-surface-800 truncate', compact ? 'text-[10px] sm:text-xs' : 'text-sm')}>{s.workerName || 'Unassigned'}</p>
+        <p className={cn('text-surface-500 truncate', compact ? 'text-[9px] sm:text-[10px]' : 'text-xs')}>
+          {s.startTime}–{s.endTime}
+          {!compact && ` (${s.hours || '—'}h)`}
+          {!compact && shopName(s.shopId) && ` · ${shopName(s.shopId)}`}
         </p>
       </div>
       {isManager && !compact && (
@@ -220,14 +221,14 @@ export default function CalendarPage() {
     const isSel = ds === selectedDate;
     return (
       <div onClick={() => setSelectedDate(ds)} className={cn(
-        'h-20 sm:h-24 p-1.5 border-b border-r border-surface-100 cursor-pointer transition-colors',
+        'h-14 sm:h-24 p-1 sm:p-1.5 border-b border-r border-surface-100 cursor-pointer transition-colors overflow-hidden',
         isToday ? 'bg-brand-50/50' : '', isSel ? 'bg-brand-100/40 ring-2 ring-brand-500 ring-inset' : 'hover:bg-surface-50'
       )}>
         <div className="flex items-center justify-between">
-          <span className={cn('text-xs font-medium', isToday ? 'text-brand-600 font-bold' : 'text-surface-600')}>{d}</span>
-          {dayShifts.length > 0 && <span className="text-[9px] bg-brand-100 text-brand-700 rounded-full px-1.5">{dayShifts.length}</span>}
+          <span className={cn('text-[10px] sm:text-xs font-medium', isToday ? 'text-brand-600 font-bold' : 'text-surface-600')}>{d}</span>
+          {dayShifts.length > 0 && <span className="text-[8px] sm:text-[9px] bg-brand-100 text-brand-700 rounded-full px-1 sm:px-1.5">{dayShifts.length}</span>}
         </div>
-        <div className="mt-0.5 space-y-0.5 overflow-hidden">
+        <div className="mt-0.5 space-y-0.5 overflow-hidden hidden sm:block">
           {dayShifts.slice(0, 2).map(s => (
             <div key={s.id} className="text-[9px] bg-brand-100 text-brand-700 rounded px-1 py-0.5 truncate">{s.workerName?.split(' ')[0] || s.startTime}</div>
           ))}
@@ -236,6 +237,15 @@ export default function CalendarPage() {
             <div key={p.id} className={cn('text-[9px] rounded px-1 py-0.5 truncate', p.type === 'holiday' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700')}>
               {p.workerName?.split(' ')[0]} - {p.type}
             </div>
+          ))}
+        </div>
+        {/* Mobile: just show dots for shifts */}
+        <div className="flex gap-0.5 mt-1 sm:hidden flex-wrap">
+          {dayShifts.slice(0, 3).map(s => (
+            <div key={s.id} className="w-1.5 h-1.5 rounded-full bg-brand-400" />
+          ))}
+          {dayPermits.slice(0, 1).map(p => (
+            <div key={p.id} className={cn('w-1.5 h-1.5 rounded-full', p.type === 'holiday' ? 'bg-blue-400' : 'bg-red-400')} />
           ))}
         </div>
       </div>
@@ -252,26 +262,26 @@ export default function CalendarPage() {
           </div>
           {isManager && (
             <div className="flex gap-2">
-              <button onClick={() => openAddShift(selectedDate)} className="btn-secondary"><Plus className="w-4 h-4" /> Add Shift</button>
-              <button onClick={() => { setPreview(null); setShowAutoSchedule(true); }} className="btn-primary"><Wand2 className="w-4 h-4" /> Auto-Schedule</button>
+              <button onClick={() => openAddShift(selectedDate)} className="btn-secondary !px-3 sm:!px-5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Shift</span><span className="sm:hidden">Add</span></button>
+              <button onClick={() => { setPreview(null); setShowAutoSchedule(true); }} className="btn-primary !px-3 sm:!px-5"><Wand2 className="w-4 h-4" /> <span className="hidden sm:inline">Auto-Schedule</span><span className="sm:hidden">Auto</span></button>
             </div>
           )}
         </div>
 
         {/* View toggle + nav */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex gap-1 bg-surface-100 rounded-xl p-1">
             {[{ key: VIEWS.MONTH, icon: Grid3X3, label: 'Month' }, { key: VIEWS.WEEK, icon: LayoutGrid, label: 'Week' }, { key: VIEWS.LIST, icon: List, label: 'List' }].map(v => (
-              <button key={v.key} onClick={() => setView(v.key)} className={cn('flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all', view === v.key ? 'bg-white shadow-sm text-surface-900' : 'text-surface-500 hover:text-surface-700')}>
+              <button key={v.key} onClick={() => setView(v.key)} className={cn('flex items-center justify-center gap-1.5 flex-1 sm:flex-none px-3 py-1.5 text-sm font-medium rounded-lg transition-all', view === v.key ? 'bg-white shadow-sm text-surface-900' : 'text-surface-500 hover:text-surface-700')}>
                 <v.icon className="w-3.5 h-3.5" /> {v.label}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => { setSelectedDate(getWeekMonday(new Date().toISOString().split('T')[0])); openAutoSchedule(); }} className="btn-secondary !py-1.5 !text-xs"><Wand2 className="w-3.5 h-3.5" /> Auto Schedule</button>
-            <button onClick={() => nav(-1)} className="btn-icon"><ChevronLeft className="w-5 h-5" /></button>
-            <h2 className="text-base font-display font-semibold text-surface-900 min-w-[180px] text-center">{navTitle}</h2>
-            <button onClick={() => nav(1)} className="btn-icon"><ChevronRight className="w-5 h-5" /></button>
+          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
+            <button onClick={() => { setSelectedDate(getWeekMonday(new Date().toISOString().split('T')[0])); openAutoSchedule(); }} className="btn-secondary !py-1.5 !text-xs hidden sm:inline-flex"><Wand2 className="w-3.5 h-3.5" /> Auto Schedule</button>
+            <button onClick={() => nav(-1)} className="btn-icon !w-8 !h-8 sm:!w-10 sm:!h-10"><ChevronLeft className="w-5 h-5" /></button>
+            <h2 className="text-sm sm:text-base font-display font-semibold text-surface-900 min-w-0 sm:min-w-[180px] text-center truncate">{navTitle}</h2>
+            <button onClick={() => nav(1)} className="btn-icon !w-8 !h-8 sm:!w-10 sm:!h-10"><ChevronRight className="w-5 h-5" /></button>
           </div>
         </div>
 
@@ -279,11 +289,11 @@ export default function CalendarPage() {
         {view === VIEWS.MONTH && (
           <>
             <div className="card overflow-hidden">
-              <div className="grid grid-cols-7 text-center text-xs font-medium text-surface-500 border-b border-surface-100">
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => <div key={d} className="py-2">{d}</div>)}
+              <div className="grid grid-cols-7 text-center text-[10px] sm:text-xs font-medium text-surface-500 border-b border-surface-100">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => <div key={d} className="py-1.5 sm:py-2"><span className="hidden sm:inline">{d}</span><span className="sm:hidden">{d[0]}</span></div>)}
               </div>
               <div className="grid grid-cols-7">
-                {monthDays.map((d, i) => d ? <DayCell key={d} d={d} /> : <div key={`e${i}`} className="h-20 sm:h-24 bg-surface-50/50 border-b border-r border-surface-100" />)}
+                {monthDays.map((d, i) => d ? <DayCell key={d} d={d} /> : <div key={`e${i}`} className="h-14 sm:h-24 bg-surface-50/50 border-b border-r border-surface-100" />)}
               </div>
             </div>
             {selectedDate && (
@@ -451,12 +461,12 @@ export default function CalendarPage() {
                 </div>
 
                 {/* Per-day breakdown */}
-                <div className="grid grid-cols-7 gap-1.5">
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
                   {Object.entries(preview.stats.perDay).map(([ds, info]) => (
-                    <div key={ds} className="text-center p-2 bg-surface-50 rounded-lg">
-                      <p className="text-[11px] font-semibold text-surface-600">{info.day}</p>
-                      <p className="text-lg font-bold text-surface-800">{info.shifts}</p>
-                      <p className="text-[10px] text-surface-400">{info.hours.toFixed(1)}h · {info.workers}w</p>
+                    <div key={ds} className="text-center p-1.5 sm:p-2 bg-surface-50 rounded-lg">
+                      <p className="text-[10px] sm:text-[11px] font-semibold text-surface-600">{info.day}</p>
+                      <p className="text-base sm:text-lg font-bold text-surface-800">{info.shifts}</p>
+                      <p className="text-[9px] sm:text-[10px] text-surface-400">{info.hours.toFixed(1)}h</p>
                     </div>
                   ))}
                 </div>

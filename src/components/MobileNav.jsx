@@ -25,9 +25,9 @@ export default function MobileNav() {
   const items = isManager ? adminItems : workerItems;
 
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 safe-area-bottom">
-      <div className="mx-3 mb-3 bg-white/80 backdrop-blur-xl border border-surface-200/60 rounded-2xl shadow-lg">
-        <div className="flex items-center justify-around py-2 px-1">
+    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30">
+      <div className="mx-2 sm:mx-3 mb-2 sm:mb-3 bg-white/90 backdrop-blur-xl border border-surface-200/60 rounded-2xl shadow-lg safe-area-bottom">
+        <div className="flex items-center justify-around py-1.5 sm:py-2 px-1">
           {items.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + '/');
             return (

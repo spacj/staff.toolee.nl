@@ -182,15 +182,15 @@ export default function ShiftTemplatesPage() {
             ) : (
               <div className="divide-y divide-surface-100">
                 {tpls.map(t => (
-                  <div key={t.id} className="px-5 py-4 flex items-center gap-4">
+                  <div key={t.id} className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-semibold text-surface-800">{t.name}</h4>
+                        <h4 className="font-semibold text-surface-800 text-sm sm:text-base">{t.name}</h4>
                         <span className={cn('badge text-[10px]', TYPE_COLORS[t.type] || TYPE_COLORS.custom)}>{t.type}</span>
                       </div>
-                      <div className="flex items-center gap-4 mt-1 text-xs text-surface-500 flex-wrap">
-                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {t.startTime} → {t.endTime} ({calcHours(t.startTime, t.endTime)}h)</span>
-                        <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {t.requiredWorkers} needed</span>
+                      <div className="flex items-center gap-2 sm:gap-4 mt-1 text-xs text-surface-500 flex-wrap">
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {t.startTime}–{t.endTime} ({calcHours(t.startTime, t.endTime)}h)</span>
+                        <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {t.requiredWorkers}</span>
                          <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {dayLabelsForTemplate(t)}</span>
                          {t.breakMinutes > 0 && <span>{t.breakMinutes}min break</span>}
                          {t.rules && t.rules.length > 0 && (
@@ -209,7 +209,7 @@ export default function ShiftTemplatesPage() {
                         </div>
                       )}
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 flex-shrink-0 self-end sm:self-center">
                       <button onClick={() => openEdit(t)} className="btn-icon !w-8 !h-8"><Pencil className="w-3.5 h-3.5" /></button>
                       <button onClick={() => handleDelete(t.id)} className="btn-icon !w-8 !h-8 hover:!text-red-600 hover:!bg-red-50"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>

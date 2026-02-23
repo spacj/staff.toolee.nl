@@ -13,6 +13,9 @@ export const viewport = {
 export const metadata = {
   title: 'StaffHub — Staff Management Platform',
   description: 'Manage your team, shifts, costs, and projects all in one place.',
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({ children }) {

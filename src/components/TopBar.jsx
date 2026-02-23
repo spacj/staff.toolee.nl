@@ -118,12 +118,12 @@ export default function TopBar() {
         <div className="flex items-center gap-3">
           <button onClick={() => setSidebarOpen(true)} className="btn-icon lg:hidden"><Menu className="w-5 h-5" /></button>
           {isManager && (
-          <div ref={searchRef} className={cn('relative transition-all duration-300', searchFocused ? 'w-72 sm:w-96' : 'w-48 sm:w-64')}>
+          <div ref={searchRef} className={cn('relative transition-all duration-300', searchFocused ? 'w-44 sm:w-72 md:w-96' : 'w-28 sm:w-48 md:w-64')}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
             <input type="text" value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               onFocus={() => { setSearchOpen(true); setSearchFocused(true); }}
-              placeholder="Search staff, shops, pages..."
+              placeholder={searchFocused ? "Search staff, shops, pages..." : "Search..."}
               className="w-full pl-9 pr-8 py-2 bg-surface-50 border border-surface-200 rounded-xl text-sm placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 focus:bg-white transition-all" />
             {searchQuery && (
               <button onClick={() => { setSearchQuery(''); }} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-surface-200 transition-colors"><X className="w-3.5 h-3.5 text-surface-400" /></button>
@@ -222,7 +222,7 @@ export default function TopBar() {
               )}
             </button>
             {showNotifs && (
-              <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-surface-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-[384px] bg-white border border-surface-200 rounded-2xl shadow-xl z-50 overflow-hidden">
                 <div className="px-4 py-3 border-b border-surface-100 flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-surface-800">Notifications</h3>
                   {unreadCount > 0 && (
