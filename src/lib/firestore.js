@@ -172,6 +172,34 @@ export async function getAttendance(filters = {}) {
   return getAll(C.ATTENDANCE, ...c);
 }
 export const updateAttendance = (id, data) => upd(C.ATTENDANCE, id, data);
+export const deleteAttendance = (id) => del(C.ATTENDANCE, id);
+
+// Create attendance manually (admin/manager) — for adding records for any date
+export async function createAttendance(data) {
+  const entries = (data.entries || []).map(e => ({
+    clockIn: e.clockIn,
+    clockOut: e.clockOut || null,
+  }));
+  const totalHours = entries.reduce((sum, e) => {
+    if (!e.clockIn || !e.clockOut) return sum;
+    return sum + Math.max(0, (new Date(e.clockOut) - new Date(e.clockIn)) / 3600000);
+  }, 0);
+  const allClosed = entries.length > 0 && entries.every(e => e.clockOut);
+  return add(C.ATTENDANCE, {
+    workerId: data.workerId,
+    workerName: data.workerName || '',
+    orgId: data.orgId,
+    shopId: data.shopId || '',
+    date: data.date,
+    entries,
+    totalHours: Math.round(totalHours * 100) / 100,
+    status: allClosed ? 'completed' : (entries.length > 0 ? 'clocked-in' : 'completed'),
+    approvalStatus: data.approvalStatus || 'approved',
+    approvedBy: data.approvedBy || null,
+    approvedAt: data.approvedAt || new Date().toISOString(),
+    adminNotes: data.adminNotes || 'Manually created by management',
+  });
+}
 
 // Clock in: creates a new attendance doc with one entry, or adds entry to existing doc for same day
 export async function clockIn(data) {
