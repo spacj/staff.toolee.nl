@@ -127,18 +127,14 @@ service cloud.firestore {
       allow update: if isAuth();
     }
 
-    // Webmaster Referral Codes: webmaster full access, all auth can read (for code lookup at registration)
+    // Webmaster Referral Codes: auth read/write (access enforced in app via isWebmaster)
     match /webmasterReferralCodes/{id} {
-      allow read: if isAuth();
-      allow create: if isAuth() && (userDoc().role == 'webmaster' || request.resource.data.createdBy == request.auth.uid);
-      allow update, delete: if isAuth() && (userDoc().role == 'webmaster' || resource.data.createdBy == request.auth.uid);
+      allow read, create, update, delete: if isAuth();
     }
 
-    // Webmaster Earnings: webmaster full access
+    // Webmaster Earnings: auth read/write (access enforced in app via isWebmaster)
     match /webmasterEarnings/{id} {
-      allow read: if isAuth() && (userDoc().role == 'webmaster' || resource.data.webmasterUid == request.auth.uid);
-      allow create: if isAuth() && (userDoc().role == 'webmaster' || request.resource.data.webmasterUid == request.auth.uid);
-      allow update: if isAuth() && (userDoc().role == 'webmaster' || resource.data.webmasterUid == request.auth.uid);
+      allow read, create, update, delete: if isAuth();
     }
   }
 }
