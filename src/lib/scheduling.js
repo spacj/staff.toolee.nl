@@ -530,6 +530,8 @@ export function calculateWorkerCostWithOvertime(worker, shifts, overtimeRules = 
   // Calculate daily hours and apply daily overtime
   const dailyThreshold = overtimeRules.dailyThreshold || 0;
   const dailyMultiplier = overtimeRules.dailyMultiplier || 1.5;
+  const dailyThreshold2 = overtimeRules.dailyThreshold2 || 12;
+  const dailyMultiplier2 = overtimeRules.dailyMultiplier2 || 2.0;
 
   for (const [date, dayShifts] of Object.entries(shiftsByDate)) {
     const dayHours = dayShifts.reduce((sum, s) => sum + (s.hours || 0), 0);
@@ -560,15 +562,12 @@ export function calculateWorkerCostWithOvertime(worker, shifts, overtimeRules = 
       }
     });
 
-    // Calculate costs
-    const baseCost = dayBaseHours * baseRate;
-    const overtimeCost = dayOvertimeHours * baseRate * (dailyMultiplier - 1);
-    const nightPremiumCost = nightPremiumHours * baseRate * ((overtimeRules.nightMultiplier || 1.25) - 1);
-    const earlyPremiumCost = earlyPremiumHours * baseRate * ((overtimeRules.earlyMultiplier || 1.1) - 1);
-    const holidayPremiumCost = dayHours * baseRate * (holidayMultiplier - 1);
+    const nightPremiumCost = nightPremiumHours * baseRate * ((overtimeRules.nightMultiplier || 1.25) - 1) * weekendMultiplier;
+    const earlyPremiumCost = earlyPremiumHours * baseRate * ((overtimeRules.earlyMultiplier || 1.1) - 1) * weekendMultiplier;
+    const holidayPremiumCost = dayHours * baseRate * (holidayMultiplier - 1) * weekendMultiplier;
 
     totalBaseCost += baseCost;
-    totalOvertimeCost += overtimeCost;
+    totalOvertimeCost += overtimeCost + overtime2Cost;
     totalPremiumCost += nightPremiumCost + earlyPremiumCost + holidayPremiumCost;
 
     breakdown.push({
@@ -576,11 +575,14 @@ export function calculateWorkerCostWithOvertime(worker, shifts, overtimeRules = 
       dayHours,
       baseHours: dayBaseHours,
       overtimeHours: dayOvertimeHours,
+      overtime2Hours: dayOvertime2Hours,
       nightPremiumHours,
       earlyPremiumHours,
       isHoliday: isHolidayDay,
+      isWeekend,
       baseCost,
       overtimeCost,
+      overtime2Cost,
       nightPremiumCost,
       earlyPremiumCost,
       holidayPremiumCost,

@@ -85,17 +85,20 @@ export async function getOvertimeRules(orgId) {
   return org?.overtimeRules || {
     dailyThreshold: 0,       // hours/day before overtime kicks in (0 = disabled)
     dailyMultiplier: 1.5,    // pay multiplier for daily overtime
+    dailyMultiplier2: 2.0,   // second tier daily OT multiplier (e.g. double time)
+    dailyThreshold2: 12,     // hours for second tier (0 = disabled)
     weeklyThreshold: 0,      // hours/week before overtime (0 = disabled)
-    weeklyMultiplier: 1.5,
+    weeklyMultiplier: 1.5,   // pay multiplier for weekly overtime
     monthlyThreshold: 0,     // hours/month before overtime (0 = disabled)
-    monthlyMultiplier: 1.5,
-    nightStart: '',           // e.g. '22:00' — night premium start
-    nightEnd: '',             // e.g. '06:00' — night premium end
-    nightMultiplier: 1.25,
-    earlyStart: '',           // e.g. '05:00' — early morning premium start
-    earlyEnd: '',             // e.g. '07:00'
-    earlyMultiplier: 1.1,
-    holidayMultiplier: 2.0,   // pay multiplier on public holidays
+    monthlyMultiplier: 1.5,  // pay multiplier for monthly overtime
+    weekendMultiplier: 1.25, // weekend premium multiplier (applied to all hours on Sat/Sun)
+    nightStart: '',          // night premium start time (HH:MM)
+    nightEnd: '',            // night premium end time
+    nightMultiplier: 1.25,   // night premium multiplier
+    earlyStart: '',          // early morning premium start time
+    earlyEnd: '',            // early morning premium end time
+    earlyMultiplier: 1.1,    // early morning premium multiplier
+    holidayMultiplier: 2.0,  // pay multiplier on public holidays
     enabled: false,
   };
 }

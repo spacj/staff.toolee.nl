@@ -318,11 +318,13 @@ function CostsContent() {
                           <span className="text-surface-600">{new Date(day.date).toLocaleDateString()}</span>
                           <div className="flex gap-2">
                             <span>{day.dayHours.toFixed(1)}h</span>
+                            {day.isWeekend && <span className="text-blue-600">Weekend</span>}
                             {day.isHoliday && <span className="text-purple-600">Holiday</span>}
                             {day.overtimeHours > 0 && <span className="text-amber-600">OT: {day.overtimeHours.toFixed(1)}h</span>}
+                            {day.overtime2Hours > 0 && <span className="text-red-600">DT: {day.overtime2Hours.toFixed(1)}h</span>}
                             {day.nightPremiumHours > 0 && <span className="text-indigo-600">Night: {day.nightPremiumHours.toFixed(1)}h</span>}
                             {day.earlyPremiumHours > 0 && <span className="text-blue-600">Early: {day.earlyPremiumHours.toFixed(1)}h</span>}
-                            <span className="font-medium">{formatCurrency(day.baseCost + day.overtimeCost + day.nightPremiumCost + day.earlyPremiumCost + day.holidayPremiumCost)}</span>
+                            <span className="font-medium">{formatCurrency(day.baseCost + day.overtimeCost + day.overtime2Cost + day.nightPremiumCost + day.earlyPremiumCost + day.holidayPremiumCost)}</span>
                           </div>
                         </div>
                       ))}
