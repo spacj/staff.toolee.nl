@@ -12,6 +12,7 @@ export default function Sidebar({ mobile, onClose }) {
   const webmasterLinks = [
     { href: '/webmaster', icon: Globe, label: 'Dashboard' },
     { href: '/webmaster/tickets', icon: Inbox, label: 'Support Tickets' },
+    { href: '/webmaster/sales', icon: DollarSign, label: 'Sales Leads' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 

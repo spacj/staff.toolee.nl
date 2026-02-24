@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { PRICE_PER_WORKER, PRICE_PER_SHOP, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE, ENTERPRISE_THRESHOLD, FREE_WORKER_LIMIT } from '@/lib/pricing';
 import { createSupportTicket } from '@/lib/firestore';
+import Modal from '@/components/Modal';
 import toast from 'react-hot-toast';
-import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ExternalLink, HelpCircle, Send, Loader2 } from 'lucide-react';
+import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ExternalLink, HelpCircle, Send, Loader2, Building2, Users as UsersIcon, Mail, Phone } from 'lucide-react';
 
 const features = [
   { icon: Store, title: 'Multi-Shop Management', desc: 'Manage multiple locations from one dashboard with separate schedules and staff.', color: 'from-brand-500 to-brand-600' },
@@ -32,6 +33,7 @@ const CATEGORIES = [
   { value: 'technical', label: 'Technical Support' },
   { value: 'feature', label: 'Feature Request' },
   { value: 'account', label: 'Account Help' },
+  { value: 'sales', label: 'Sales Inquiry' },
 ];
 
 function ContactForm() {
@@ -155,9 +157,140 @@ function ContactForm() {
   );
 }
 
+function ContactSalesForm({ onClose }) {
+  const [form, setForm] = useState({ name: '', email: '', company: '', phone: '', employees: '', message: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim() || !form.company.trim()) {
+      toast.error('Please fill in name, email, and company');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await createSupportTicket({
+        subject: `[Sales Inquiry] Enterprise - ${form.company}`,
+        message: `Company: ${form.company}\nName: ${form.name}\nEmail: ${form.email}\nPhone: ${form.phone}\nEmployees: ${form.employees}\n\nMessage:\n${form.message}`,
+        category: 'sales',
+        priority: 'high',
+        source: 'website',
+        senderName: form.name.trim(),
+        senderEmail: form.email.trim(),
+        senderRole: 'prospect',
+        orgName: form.company.trim(),
+      });
+      setSubmitted(true);
+      toast.success('Thank you! Our sales team will contact you within 24 hours.');
+    } catch (err) {
+      console.error('Sales form error:', err);
+      toast.error('Failed to submit. Please try again.');
+    }
+    setSubmitting(false);
+  };
+
+  if (submitted) {
+    return (
+      <div className="text-center py-8">
+        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Check className="w-8 h-8 text-emerald-600" />
+        </div>
+        <h3 className="text-xl font-display font-bold text-slate-900 mb-2">Request Received!</h3>
+        <p className="text-slate-600 mb-4">Our sales team will contact you within 24 hours.</p>
+        <button onClick={onClose} className="btn-primary !py-2 !px-6">
+          Close
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label">Full Name *</label>
+          <input
+            type="text"
+            value={form.name}
+            onChange={e => setForm({ ...form, name: e.target.value })}
+            placeholder="John Smith"
+            className="input-field"
+            required
+          />
+        </div>
+        <div>
+          <label className="label">Work Email *</label>
+          <input
+            type="email"
+            value={form.email}
+            onChange={e => setForm({ ...form, email: e.target.value })}
+            placeholder="john@company.com"
+            className="input-field"
+            required
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label">Company Name *</label>
+          <input
+            type="text"
+            value={form.company}
+            onChange={e => setForm({ ...form, company: e.target.value })}
+            placeholder="Acme Inc."
+            className="input-field"
+            required
+          />
+        </div>
+        <div>
+          <label className="label">Phone Number</label>
+          <input
+            type="tel"
+            value={form.phone}
+            onChange={e => setForm({ ...form, phone: e.target.value })}
+            placeholder="+31 6 12345678"
+            className="input-field"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="label">Number of Employees</label>
+        <select
+          value={form.employees}
+          onChange={e => setForm({ ...form, employees: e.target.value })}
+          className="select-field"
+        >
+          <option value="">Select...</option>
+          <option value="1-10">1-10</option>
+          <option value="11-25">11-25</option>
+          <option value="26-50">26-50</option>
+          <option value="51-100">51-100</option>
+          <option value="101-250">101-250</option>
+          <option value="250+">250+</option>
+        </select>
+      </div>
+      <div>
+        <label className="label">How can we help? *</label>
+        <textarea
+          value={form.message}
+          onChange={e => setForm({ ...form, message: e.target.value })}
+          placeholder="Tell us about your needs..."
+          className="input-field min-h-[100px] resize-none"
+          required
+        />
+      </div>
+      <button type="submit" disabled={submitting} className="btn-primary w-full !py-3">
+        {submitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : <>Submit Inquiry <Send className="w-4 h-4 ml-2" /></>}
+      </button>
+    </form>
+  );
+}
+
 export default function HomePage() {
   const { user, userProfile, loading, isWebmaster } = useAuth();
   const router = useRouter();
+  const [showSalesModal, setShowSalesModal] = useState(false);
 
   useEffect(() => {
     if (!loading && user && userProfile) {
@@ -308,9 +441,15 @@ export default function HomePage() {
                     </li>
                   ))}
                 </ul>
-                <Link href={plan.href} className={`block w-full text-center py-4 rounded-xl text-sm font-semibold transition-all ${plan.popular ? 'bg-gradient-to-b from-brand-500 to-brand-600 text-white hover:from-brand-600 hover:to-brand-700 shadow-lg shadow-brand-500/30' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                  {plan.cta}
-                </Link>
+                {plan.name === 'Enterprise' ? (
+                  <button onClick={() => setShowSalesModal(true)} className="block w-full text-center py-4 rounded-xl text-sm font-semibold transition-all bg-purple-100 text-purple-700 hover:bg-purple-200">
+                    {plan.cta}
+                  </button>
+                ) : (
+                  <Link href={plan.href} className={`block w-full text-center py-4 rounded-xl text-sm font-semibold transition-all ${plan.popular ? 'bg-gradient-to-b from-brand-500 to-brand-600 text-white hover:from-brand-600 hover:to-brand-700 shadow-lg shadow-brand-500/30' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                    {plan.cta}
+                  </Link>
+                )}
               </div>
             ))}
           </div>
@@ -351,6 +490,14 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Contact Sales Modal */}
+      <Modal open={showSalesModal} onClose={() => setShowSalesModal(false)} title="Contact Sales">
+        <div className="p-2">
+          <p className="text-sm text-surface-500 mb-4">Get a custom quote for your enterprise needs. Our team will get back to you within 24 hours.</p>
+          <ContactSalesForm onClose={() => setShowSalesModal(false)} />
+        </div>
+      </Modal>
 
       {/* Footer */}
       <footer className="py-12 px-4 sm:px-6 border-t border-slate-200/60 bg-white">
