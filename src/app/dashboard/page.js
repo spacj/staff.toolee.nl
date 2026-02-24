@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog, getCorrectionRequests, getMessages, updatePermit, reviewCorrectionRequest, notifyWorker } from '@/lib/firestore';
@@ -17,7 +18,13 @@ const STAT_STYLES = [
 ];
 
 export default function DashboardPage() {
-  const { orgId, isManager, userProfile, user, organization } = useAuth();
+  const router = useRouter();
+  const { orgId, isManager, isWebmaster, userProfile, user, organization } = useAuth();
+
+  // Redirect webmasters to their dedicated dashboard
+  useEffect(() => {
+    if (isWebmaster) router.replace('/webmaster');
+  }, [isWebmaster, router]);
   const [workers, setWorkers] = useState([]);
   const [shops, setShops] = useState([]);
   const [shifts, setShifts] = useState([]);

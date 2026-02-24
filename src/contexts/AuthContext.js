@@ -255,6 +255,7 @@ export function AuthProvider({ children }) {
     isAdmin: userProfile?.role === 'admin',
     isManager: userProfile?.role === 'manager' || userProfile?.role === 'admin',
     isWorker: userProfile?.role === 'worker',
+    isWebmaster: userProfile?.role === 'webmaster',
     role: userProfile?.role || 'worker',
     orgId: userProfile?.orgId || null,
   };

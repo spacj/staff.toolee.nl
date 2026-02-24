@@ -5,6 +5,7 @@ service cloud.firestore {
     function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
     function isAdmin() { return isAuth() && userDoc().role == 'admin'; }
     function isManager() { return isAuth() && (userDoc().role == 'admin' || userDoc().role == 'manager'); }
+    function isWebmaster() { return isAuth() && userDoc().role == 'webmaster'; }
 
     // Users: anyone can read, only self or admin can write
     match /users/{uid} {
@@ -124,6 +125,21 @@ service cloud.firestore {
       allow read: if isAuth();
       allow create: if isAuth();
       allow update: if isAuth();
+    }
+
+    // Webmaster Referral Codes: webmaster read/write own, all auth read (for code lookup at registration)
+    match /webmasterReferralCodes/{id} {
+      allow read: if isAuth();
+      allow create: if isWebmaster();
+      allow update: if isWebmaster();
+      allow delete: if isWebmaster();
+    }
+
+    // Webmaster Earnings: webmaster read own, system create (via webhooks/admin SDK bypasses rules)
+    match /webmasterEarnings/{id} {
+      allow read: if isWebmaster();
+      allow create: if isWebmaster();
+      allow update: if isWebmaster();
     }
   }
 }

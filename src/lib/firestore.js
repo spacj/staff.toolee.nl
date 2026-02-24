@@ -13,6 +13,7 @@ const C = {
   PERMITS: 'permits', PAYMENTS: 'payments', NOTIFICATIONS: 'notifications',
   ACTIVITY_LOG: 'activityLog', INVITES: 'invites', REFERRALS: 'referrals',
   CORRECTION_REQUESTS: 'correctionRequests', MESSAGES: 'messages',
+  WEBMASTER_REFERRAL_CODES: 'webmasterReferralCodes', WEBMASTER_EARNINGS: 'webmasterEarnings',
 };
 
 // ─── Helpers ──────────────────────────────────────────
@@ -500,6 +501,63 @@ export async function getMessageThread(parentId) {
   replies.sort((a, b) => (a.createdAt || '') > (b.createdAt || '') ? 1 : -1);
   const parent = await get1(C.MESSAGES, parentId);
   return parent ? [parent, ...replies] : replies;
+}
+
+// ─── Webmaster: Organizations (cross-org read) ───────
+export async function getAllOrganizations() {
+  return getAll(C.ORGANIZATIONS, orderBy('createdAt', 'desc'));
+}
+
+// ─── Webmaster: All Users (for enriching company owner info) ─
+export async function getAllUsers() {
+  return getAll(C.USERS);
+}
+
+// ─── Webmaster: All Referrals (cross-org) ─────────────
+export async function getAllReferrals() {
+  return getAll(C.REFERRALS, orderBy('createdAt', 'desc'));
+}
+
+// ─── Webmaster: All Payments (cross-org) ──────────────
+export async function getAllPayments() {
+  return getAll(C.PAYMENTS, orderBy('createdAt', 'desc'));
+}
+
+// ─── Webmaster Referral Codes ─────────────────────────
+// Schema: { code, description, commissionPercent, commissionFlat, isActive, usageCount, createdBy, createdAt }
+export async function getWebmasterReferralCodes(webmasterUid) {
+  return getAll(C.WEBMASTER_REFERRAL_CODES, where('createdBy', '==', webmasterUid), orderBy('createdAt', 'desc'));
+}
+export async function createWebmasterReferralCode(data) {
+  return add(C.WEBMASTER_REFERRAL_CODES, { ...data, usageCount: 0, isActive: true });
+}
+export async function updateWebmasterReferralCode(id, data) {
+  return upd(C.WEBMASTER_REFERRAL_CODES, id, data);
+}
+export async function deleteWebmasterReferralCode(id) {
+  return del(C.WEBMASTER_REFERRAL_CODES, id);
+}
+export async function getWebmasterReferralCodeByCode(code) {
+  const snap = await getDocs(query(collection(db, C.WEBMASTER_REFERRAL_CODES), where('code', '==', code.toUpperCase()), where('isActive', '==', true)));
+  return snap.empty ? null : ser(snap.docs[0]);
+}
+
+// ─── Webmaster Earnings ───────────────────────────────
+// Schema: { webmasterUid, orgId, orgName, referralCodeId, referralCode, amount, type: 'commission'|'bonus', status: 'pending'|'paid', paidAt?, createdAt }
+export async function getWebmasterEarnings(webmasterUid) {
+  return getAll(C.WEBMASTER_EARNINGS, where('webmasterUid', '==', webmasterUid), orderBy('createdAt', 'desc'));
+}
+export async function createWebmasterEarning(data) {
+  return add(C.WEBMASTER_EARNINGS, data);
+}
+export async function updateWebmasterEarning(id, data) {
+  return upd(C.WEBMASTER_EARNINGS, id, data);
+}
+
+// ─── Webmaster: All Workers count (cross-org) ─────────
+export async function getAllWorkersCount() {
+  const snap = await getDocs(query(collection(db, C.WORKERS), where('status', '==', 'active')));
+  return snap.size;
 }
 
 export { C as COLLECTIONS };

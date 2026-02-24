@@ -14,7 +14,7 @@ import { getWorkers, getShops, getShifts, getAttendance } from '@/lib/firestore'
 const PUBLIC_PATHS = ['/login', '/register', '/join', '/'];
 
 export default function Layout({ children }) {
-  const { user, userProfile, loading, isManager, orgId } = useAuth();
+  const { user, userProfile, loading, isManager, isWebmaster, orgId } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const { sidebarOpen, setSidebarOpen } = useStore();

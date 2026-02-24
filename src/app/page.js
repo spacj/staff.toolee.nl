@@ -25,12 +25,14 @@ const plans = [
 ];
 
 export default function HomePage() {
-  const { user, userProfile, loading } = useAuth();
+  const { user, userProfile, loading, isWebmaster } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && user && userProfile) router.replace('/dashboard');
-  }, [user, userProfile, loading, router]);
+    if (!loading && user && userProfile) {
+      router.replace(isWebmaster ? '/webmaster' : '/dashboard');
+    }
+  }, [user, userProfile, loading, isWebmaster, router]);
 
   if (loading || (user && userProfile)) return <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50/30" />;
 
