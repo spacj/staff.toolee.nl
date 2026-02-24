@@ -437,17 +437,34 @@ export async function getMessages(filters = {}) {
 }
 
 export async function getConversations(userId, orgId, userRole, workers = []) {
-  const all = await getMessages({ orgId, limit: 100 });
+  const all = await getMessages({ orgId, limit: 200 });
   const convMap = new Map();
   
   for (const m of all) {
     // Determine conversation partner
     let partnerId, partnerName, partnerRole;
+    
+    // Check if message is from management (for workers) or to management (for managers)
+    const isToManagement = m.recipientType === 'management';
+    const isFromManagement = m.senderRole === 'manager' || m.senderRole === 'admin';
+    
     if (m.senderId === userId) {
+      // Message sent by current user
       partnerId = m.recipientId;
       partnerName = m.recipientName;
       partnerRole = m.recipientRole;
     } else if (m.recipientId === userId) {
+      // Message directly sent to current user
+      partnerId = m.senderId;
+      partnerName = m.senderName;
+      partnerRole = m.senderRole;
+    } else if (isToManagement && (userRole === 'manager' || userRole === 'admin')) {
+      // Worker message to management - show as conversation with that worker
+      partnerId = m.senderId;
+      partnerName = m.senderName;
+      partnerRole = m.senderRole;
+    } else if (isFromManagement && m.recipientType === 'management') {
+      // Management message to workers - show as conversation with management
       partnerId = m.senderId;
       partnerName = m.senderName;
       partnerRole = m.senderRole;

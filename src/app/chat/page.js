@@ -45,13 +45,26 @@ export default function ChatPage() {
     if (!orgId || !partnerId) return;
     try {
       const workerId = await resolveWorkerId();
-      const all = await getMessages({ orgId, limit: 100 });
+      const all = await getMessages({ orgId, limit: 200 });
       // Filter to messages between current user and partner
+      // Also handle messages via recipientType for management
       const between = (all || [])
-        .filter(m => 
-          (m.senderId === workerId && m.recipientId === partnerId) ||
-          (m.senderId === partnerId && m.recipientId === workerId)
-        )
+        .filter(m => {
+          // Direct messages
+          if ((m.senderId === workerId && m.recipientId === partnerId) ||
+              (m.senderId === partnerId && m.recipientId === workerId)) {
+            return true;
+          }
+          // Messages via recipientType (worker to management)
+          if (isManager && m.senderId === partnerId && m.recipientType === 'management') {
+            return true;
+          }
+          // Messages from management to worker
+          if (!isManager && m.senderRole === 'manager' && m.recipientType === 'management') {
+            return true;
+          }
+          return false;
+        })
         .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       setMessages(between);
       
