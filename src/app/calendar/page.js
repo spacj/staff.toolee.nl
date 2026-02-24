@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getShifts, getWorkers, getShops, getShiftTemplates, getPermits, bulkCreateShifts, deleteShift, createShift } from '@/lib/firestore';
+import { getShifts, getWorkers, getShops, getShiftTemplates, getPermits, bulkCreateShifts, deleteShift, createShift, getPublicHolidays, savePublicHolidays } from '@/lib/firestore';
 import { generateWeeklySchedule, DAY_LABELS } from '@/lib/scheduling';
 import { cn } from '@/utils/helpers';
 import { ChevronLeft, ChevronRight, Plus, Wand2, Trash2, Calendar as CalIcon, Users, Clock, Grid3X3, List, LayoutGrid, AlertTriangle, CheckCircle } from 'lucide-react';
@@ -21,6 +21,14 @@ export default function CalendarPage() {
   const [templates, setTemplates] = useState([]);
   const [permits, setPermits] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
+  const [showAutoSchedule, setShowAutoSchedule] = useState(false);
+  const [showAddShift, setShowAddShift] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState(null); // { assignments, stats, warnings }
+  const [selectedTemplates, setSelectedTemplates] = useState([]);
+  const [shiftForm, setShiftForm] = useState({ workerId: '', shopId: '', date: '', startTime: '09:00', endTime: '17:00', templateName: '', notes: '' });
+  const [publicHolidays, setPublicHolidays] = useState([]);
   const [showAutoSchedule, setShowAutoSchedule] = useState(false);
   const [showAddShift, setShowAddShift] = useState(false);
   const [scheduling, setScheduling] = useState(false);
@@ -51,6 +59,7 @@ export default function CalendarPage() {
     getShops(orgId).then(setShops);
     getShiftTemplates(orgId).then(setTemplates);
     getPermits({ orgId, status: 'approved' }).then(setPermits);
+    getPublicHolidays(orgId).then(setPublicHolidays);
   }, [orgId, loadRange.start, loadRange.end]);
 
   const reload = async () => {
@@ -195,6 +204,23 @@ export default function CalendarPage() {
     toast.success('Shift deleted');
   };
 
+  const addPublicHoliday = async (date) => {
+    const name = prompt('Enter holiday name:', 'Public Holiday');
+    if (!name) return;
+    const newHoliday = { date, name };
+    const updated = [...publicHolidays, newHoliday];
+    await savePublicHolidays(orgId, updated);
+    setPublicHolidays(updated);
+    toast.success('Public holiday added');
+  };
+
+  const removePublicHoliday = async (date) => {
+    const updated = publicHolidays.filter(h => h.date !== date);
+    await savePublicHolidays(orgId, updated);
+    setPublicHolidays(updated);
+    toast.success('Public holiday removed');
+  };
+
   // ─── Shift Card ─────────────────────
   const ShiftCard = ({ s, compact }) => (
     <div className={cn('flex items-center justify-between rounded-xl', compact ? 'p-1.5 sm:p-2 bg-brand-50' : 'p-3 bg-surface-50')}>
@@ -219,10 +245,11 @@ export default function CalendarPage() {
     const dayPermits = permitsForDate(ds);
     const isToday = ds === todayStr;
     const isSel = ds === selectedDate;
+    const isPublicHoliday = publicHolidays.some(h => h.date === ds);
     return (
       <div onClick={() => setSelectedDate(ds)} className={cn(
         'h-14 sm:h-24 p-1 sm:p-1.5 border-b border-r border-surface-100 cursor-pointer transition-colors overflow-hidden',
-        isToday ? 'bg-brand-50/50' : '', isSel ? 'bg-brand-100/40 ring-2 ring-brand-500 ring-inset' : 'hover:bg-surface-50'
+        isToday ? 'bg-brand-50/50' : '', isSel ? 'bg-brand-100/40 ring-2 ring-brand-500 ring-inset' : 'hover:bg-surface-50', isPublicHoliday ? 'bg-red-50' : ''
       )}>
         <div className="flex items-center justify-between">
           <span className={cn('text-[10px] sm:text-xs font-medium', isToday ? 'text-brand-600 font-bold' : 'text-surface-600')}>{d}</span>
@@ -296,13 +323,15 @@ export default function CalendarPage() {
                 {monthDays.map((d, i) => d ? <DayCell key={d} d={d} /> : <div key={`e${i}`} className="h-14 sm:h-24 bg-surface-50/50 border-b border-r border-surface-100" />)}
               </div>
             </div>
-            {selectedDate && (
+            {selectedDate && (() => {
+              const isPublicHoliday = publicHolidays.some(h => h.date === selectedDate);
+              return (
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="section-title">{selectedDate}</h3>
                   {isManager && <button onClick={() => openAddShift(selectedDate)} className="btn-secondary !py-1.5 !text-xs"><Plus className="w-3.5 h-3.5" /> Add</button>}
                 </div>
-                {shiftsForDate(selectedDate).length === 0 && permitsForDate(selectedDate).length === 0 && <p className="text-sm text-surface-400">No shifts or leaves scheduled.</p>}
+                {shiftsForDate(selectedDate).length === 0 && permitsForDate(selectedDate).length === 0 && !isPublicHoliday && <p className="text-sm text-surface-400">No shifts or leaves scheduled.</p>}
                 <div className="space-y-2">
                   {shiftsForDate(selectedDate).map(s => <ShiftCard key={s.id} s={s} />)}
                   {permitsForDate(selectedDate).map(p => (
@@ -310,6 +339,22 @@ export default function CalendarPage() {
                       <strong>{p.workerName}</strong> — {p.type} {p.reason && <span className="italic">"{p.reason}"</span>}
                     </div>
                   ))}
+                  {isPublicHoliday && (
+                    <div className="p-3 rounded-xl text-sm bg-red-50 text-red-700 flex items-center justify-between">
+                      <span><strong>Public Holiday:</strong> {publicHolidays.find(h => h.date === selectedDate)?.name}</span>
+                      {isManager && <button onClick={() => removePublicHoliday(selectedDate)} className="btn-icon !w-6 !h-6 hover:!text-red-800"><X className="w-4 h-4" /></button>}
+                    </div>
+                  )}
+                  {!isPublicHoliday && isManager && (
+                    <button onClick={() => addPublicHoliday(selectedDate)} className="btn-secondary !py-1.5 !text-xs w-full"><Plus className="w-3.5 h-3.5" /> Mark as Public Holiday</button>
+                  )}
+                </div>
+              </div>
+              );
+            })()}
+                  {!isPublicHoliday && isManager && (
+                    <button onClick={() => addPublicHoliday(selectedDate)} className="btn-secondary !py-1.5 !text-xs w-full"><Plus className="w-3.5 h-3.5" /> Mark as Public Holiday</button>
+                  )}
                 </div>
               </div>
             )}
