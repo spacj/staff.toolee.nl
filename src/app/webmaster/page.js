@@ -56,17 +56,18 @@ export default function WebmasterDashboard() {
     code: '', description: '', commissionPercent: 10, commissionFlat: 0, freeWorkerBonus: 0,
   });
 
-  const loadData = async () => {
+  const loadData = async (isInitial = false) => {
     if (!user) return;
-    setLoading(true);
+    if (isInitial) setLoading(true);
     try {
+      const catchLog = (label) => (err) => { console.warn(`Webmaster loadData [${label}]:`, err?.message || err); return []; };
       const [orgs, allUsers, refs, pays, codes, earns] = await Promise.all([
-        getAllOrganizations().catch(() => []),
-        getAllUsers().catch(() => []),
-        getAllReferrals().catch(() => []),
-        getAllPayments().catch(() => []),
-        getWebmasterReferralCodes(user.uid).catch(() => []),
-        getWebmasterEarnings(user.uid).catch(() => []),
+        getAllOrganizations().catch(catchLog('orgs')),
+        getAllUsers().catch(catchLog('users')),
+        getAllReferrals().catch(catchLog('referrals')),
+        getAllPayments().catch(catchLog('payments')),
+        getWebmasterReferralCodes(user.uid).catch(catchLog('codes')),
+        getWebmasterEarnings(user.uid).catch(catchLog('earnings')),
       ]);
       setOrganizations(orgs);
       setUsers(allUsers);
@@ -81,7 +82,7 @@ export default function WebmasterDashboard() {
     setLoading(false);
   };
 
-  useEffect(() => { loadData(); }, [user]);
+  useEffect(() => { loadData(true); }, [user]);
 
   // Computed stats
   const stats = useMemo(() => {
@@ -171,7 +172,7 @@ export default function WebmasterDashboard() {
       toast.success('Referral code created');
       setShowCreateCode(false);
       setCodeForm({ code: '', description: '', commissionPercent: 10, commissionFlat: 0, freeWorkerBonus: 0 });
-      loadData();
+      await loadData(false);
     } catch (err) {
       console.error('Create referral code error:', err);
       toast.error(err?.message || 'Failed to create code');
@@ -190,7 +191,7 @@ export default function WebmasterDashboard() {
       });
       toast.success('Referral code updated');
       setEditingCode(null);
-      loadData();
+      await loadData(false);
     } catch (err) {
       console.error('Update referral code error:', err);
       toast.error(err?.message || 'Failed to update code');
@@ -201,7 +202,7 @@ export default function WebmasterDashboard() {
     try {
       await updateWebmasterReferralCode(code.id, { isActive: !code.isActive });
       toast.success(code.isActive ? 'Code deactivated' : 'Code activated');
-      loadData();
+      await loadData(false);
     } catch (err) {
       console.error('Toggle referral code error:', err);
       toast.error(err?.message || 'Failed to toggle code');
@@ -213,7 +214,7 @@ export default function WebmasterDashboard() {
     try {
       await deleteWebmasterReferralCode(code.id);
       toast.success('Referral code deleted');
-      loadData();
+      await loadData(false);
     } catch (err) {
       console.error('Delete referral code error:', err);
       toast.error(err?.message || 'Failed to delete code');
@@ -263,7 +264,7 @@ export default function WebmasterDashboard() {
             <p className="text-surface-500 mt-1">Platform insights, companies, and referral management</p>
           </div>
           <button
-            onClick={loadData}
+            onClick={() => loadData(false)}
             disabled={loading}
             className="btn-secondary flex items-center gap-2"
           >

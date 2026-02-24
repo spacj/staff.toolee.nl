@@ -526,7 +526,10 @@ export async function getAllPayments() {
 // ─── Webmaster Referral Codes ─────────────────────────
 // Schema: { code, description, commissionPercent, commissionFlat, isActive, usageCount, createdBy, createdAt }
 export async function getWebmasterReferralCodes(webmasterUid) {
-  return getAll(C.WEBMASTER_REFERRAL_CODES, where('createdBy', '==', webmasterUid), orderBy('createdAt', 'desc'));
+  // Single-field where to avoid composite index requirement; sort client-side
+  let results = await getAll(C.WEBMASTER_REFERRAL_CODES, where('createdBy', '==', webmasterUid));
+  results.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+  return results;
 }
 export async function createWebmasterReferralCode(data) {
   return add(C.WEBMASTER_REFERRAL_CODES, { ...data, usageCount: 0, isActive: true });
@@ -545,7 +548,10 @@ export async function getWebmasterReferralCodeByCode(code) {
 // ─── Webmaster Earnings ───────────────────────────────
 // Schema: { webmasterUid, orgId, orgName, referralCodeId, referralCode, amount, type: 'commission'|'bonus', status: 'pending'|'paid', paidAt?, createdAt }
 export async function getWebmasterEarnings(webmasterUid) {
-  return getAll(C.WEBMASTER_EARNINGS, where('webmasterUid', '==', webmasterUid), orderBy('createdAt', 'desc'));
+  // Single-field where to avoid composite index requirement; sort client-side
+  let results = await getAll(C.WEBMASTER_EARNINGS, where('webmasterUid', '==', webmasterUid));
+  results.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+  return results;
 }
 export async function createWebmasterEarning(data) {
   return add(C.WEBMASTER_EARNINGS, data);

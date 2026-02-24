@@ -13,7 +13,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { getUserProfile, createReferral, getUserByReferralCode } from '@/lib/firestore';
+import { getUserProfile, createReferral, getUserByReferralCode, getWebmasterReferralCodeByCode, updateWebmasterReferralCode } from '@/lib/firestore';
 import { PROMO_WORKER_LIMIT } from '@/lib/pricing';
 
 const PROMO_CODES = {
@@ -73,15 +73,30 @@ export function AuthProvider({ children }) {
     const result = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(result.user, { displayName });
 
-    // 2. Create organization
+    // 2. Check referral code sources: built-in promo codes, user referral codes, and webmaster codes
     const orgId = result.user.uid + '_org';
-    const promoFreeLimit = referralCode ? PROMO_CODES[referralCode.toUpperCase()] : null;
+    let promoFreeLimit = referralCode ? PROMO_CODES[referralCode.toUpperCase()] : null;
+    let webmasterCode = null;
+
+    // Check if it's a webmaster referral code (e.g. WM-XXXXXX)
+    if (referralCode && !promoFreeLimit) {
+      try {
+        webmasterCode = await getWebmasterReferralCodeByCode(referralCode);
+        if (webmasterCode?.freeWorkerBonus) {
+          promoFreeLimit = 4 + webmasterCode.freeWorkerBonus; // base 4 + bonus
+        }
+      } catch (e) {
+        // Ignore lookup errors
+      }
+    }
+
     await setDoc(doc(db, 'organizations', orgId), {
       name: companyName,
       ownerId: result.user.uid,
       plan: 'free',
       freeWorkerLimit: promoFreeLimit || null,
-      promoCode: promoFreeLimit ? referralCode.toUpperCase() : null,
+      promoCode: (promoFreeLimit || webmasterCode) ? referralCode.toUpperCase() : null,
+      referredByWebmasterCode: webmasterCode?.code || null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -106,9 +121,10 @@ export function AuthProvider({ children }) {
     };
     await setDoc(doc(db, 'users', result.user.uid), profileData);
 
-    // Handle referral
+    // Handle referral — check user referral codes first, then webmaster codes
     if (referralCode) {
       try {
+        // Try user-to-user referral
         const referrer = await getUserByReferralCode(referralCode);
         if (referrer) {
           await createReferral({
@@ -118,6 +134,22 @@ export function AuthProvider({ children }) {
             referralCode: referralCode.toUpperCase(),
             createdAt: serverTimestamp(),
           });
+        }
+        // Track webmaster referral + increment usage
+        if (webmasterCode) {
+          await createReferral({
+            referrerId: webmasterCode.createdBy,
+            referredId: result.user.uid,
+            orgId,
+            referralCode: webmasterCode.code,
+            source: 'webmaster',
+            webmasterCodeId: webmasterCode.id,
+            createdAt: serverTimestamp(),
+          });
+          // Increment usage count
+          await updateWebmasterReferralCode(webmasterCode.id, {
+            usageCount: (webmasterCode.usageCount || 0) + 1,
+          }).catch(() => {});
         }
       } catch (e) {
         // Ignore referral errors
