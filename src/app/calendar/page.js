@@ -198,9 +198,13 @@ export default function CalendarPage() {
   };
 
   const addPublicHoliday = async (date) => {
+    if (publicHolidays.some(h => h.date === date)) {
+      toast.error('This date is already marked as a public holiday');
+      return;
+    }
     const name = prompt('Enter holiday name:', 'Public Holiday');
-    if (!name) return;
-    const newHoliday = { date, name };
+    if (!name || !name.trim()) return;
+    const newHoliday = { date, name: name.trim() };
     const updated = [...publicHolidays, newHoliday];
     await savePublicHolidays(orgId, updated);
     setPublicHolidays(updated);
