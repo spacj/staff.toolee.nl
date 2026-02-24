@@ -1,17 +1,18 @@
 'use client';
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import useStore from '@/lib/store';
 import { onNotifications, markAllNotificationsRead, markNotificationRead, getWorkers, getShops, getShiftTemplates } from '@/lib/firestore';
-import { Menu, Search, Bell, X, CheckCheck, Users, Store, Clock, Calendar, ArrowRight } from 'lucide-react';
+import { Menu, Search, Bell, X, CheckCheck, Users, Store, Clock, Calendar, ArrowRight, LayoutDashboard, CreditCard, Settings, ClipboardList, MessageCircle } from 'lucide-react';
 import { cn } from '@/utils/helpers';
 import Link from 'next/link';
 
 export default function TopBar() {
-  const { userProfile, role, user, orgId, isManager } = useAuth();
+  const { userProfile, role, user, orgId, isManager, isAdmin } = useAuth();
   const { setSidebarOpen, searchQuery, setSearchQuery } = useStore();
   const router = useRouter();
+  const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -24,6 +25,39 @@ export default function TopBar() {
   const [dataLoaded, setDataLoaded] = useState(false);
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  const adminLinks = [
+    { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/chat', icon: MessageCircle, label: 'Chat' },
+    { href: '/staff', icon: Users, label: 'Staff' },
+    { href: '/shops', icon: Store, label: 'Shops' },
+    { href: '/shifts', icon: ClipboardList, label: 'Shift Templates' },
+    { href: '/calendar', icon: Calendar, label: 'Calendar' },
+    { href: '/attendance', icon: Clock, label: 'Attendance' },
+    { href: '/costs', icon: CreditCard, label: 'Costs & Billing' },
+    { href: '/settings', icon: Settings, label: 'Settings' },
+  ];
+
+  const managerLinks = [
+    { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/chat', icon: MessageCircle, label: 'Chat' },
+    { href: '/staff', icon: Users, label: 'Staff' },
+    { href: '/shops', icon: Store, label: 'Shops' },
+    { href: '/shifts', icon: ClipboardList, label: 'Shift Templates' },
+    { href: '/calendar', icon: Calendar, label: 'Calendar' },
+    { href: '/attendance', icon: Clock, label: 'Attendance' },
+    { href: '/settings', icon: Settings, label: 'Settings' },
+  ];
+
+  const workerLinks = [
+    { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/chat', icon: MessageCircle, label: 'Chat' },
+    { href: '/time', icon: Clock, label: 'My Time' },
+    { href: '/calendar', icon: Calendar, label: 'My Schedule' },
+    { href: '/settings', icon: Settings, label: 'Settings' },
+  ];
+
+  const links = isAdmin ? adminLinks : isManager ? managerLinks : workerLinks;
 
   // Notification listener
   useEffect(() => {
@@ -116,7 +150,23 @@ export default function TopBar() {
       <div className="flex items-center justify-between h-16 max-w-7xl mx-auto">
         {/* Left */}
         <div className="flex items-center gap-3">
-          <button onClick={() => setSidebarOpen(true)} className="btn-icon lg:hidden"><Menu className="w-5 h-5" /></button>
+          <div className="flex overflow-x-auto gap-1 lg:hidden scrollbar-hide">
+            {links.map(link => {
+              const active = pathname === link.href || pathname.startsWith(link.href + '/');
+              return (
+                <Link key={link.href} href={link.href}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0',
+                    active
+                      ? 'bg-brand-100 text-brand-700 shadow-sm'
+                      : 'text-surface-600 hover:bg-surface-100 hover:text-surface-800'
+                  )}>
+                  <link.icon className="w-4 h-4 flex-shrink-0" />
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
+          </div>
           {isManager && (
           <div ref={searchRef} className={cn('relative transition-all duration-300', searchFocused ? 'w-44 sm:w-72 md:w-96' : 'w-28 sm:w-48 md:w-64')}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
