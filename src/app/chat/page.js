@@ -114,7 +114,7 @@ export default function ChatPage() {
 
   return (
     <Layout>
-      <div className="h-[calc(100vh-8rem)] flex bg-white rounded-2xl overflow-hidden border border-surface-200 shadow-sm">
+      <div className="h-[calc(100vh-8rem)] flex bg-white rounded-2xl overflow-hidden border border-surface-200 shadow-sm md:pb-0">
         {/* Conversations List */}
         <div className={cn("w-full md:w-80 border-r border-surface-100 flex flex-col", selectedConv ? 'hidden md:flex' : 'flex')}>
           <div className="p-4 border-b border-surface-100">
@@ -126,7 +126,7 @@ export default function ChatPage() {
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto pb-20 md:pb-0">
             {conversations.length === 0 ? (
               <div className="p-4 text-center text-surface-400 text-sm">
                 <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -182,7 +182,7 @@ export default function ChatPage() {
             </div>
 
             {/* Messages */}
-            <div id="messages-container" className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div id="messages-container" className="flex-1 overflow-y-auto p-4 space-y-3 pb-24 md:pb-3">
               {messages.map(m => {
                 const isMe = m.senderId === currentWorkerId || m.senderId === userProfile?.workerId;
                 return (
@@ -201,8 +201,8 @@ export default function ChatPage() {
             </div>
 
             {/* Input */}
-            <form onSubmit={handleSend} className="p-4 border-t border-surface-100">
-              <div className="flex gap-2">
+            <form onSubmit={handleSend} className="p-4 border-t border-surface-100 pb-28 md:pb-4">
+              <div className="flex gap-2 items-end">
                 <input
                   value={newMessage}
                   onChange={e => setNewMessage(e.target.value)}

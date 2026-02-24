@@ -206,16 +206,26 @@ export default function CalendarPage() {
     if (!name || !name.trim()) return;
     const newHoliday = { date, name: name.trim() };
     const updated = [...publicHolidays, newHoliday];
-    await savePublicHolidays(orgId, updated);
-    setPublicHolidays(updated);
-    toast.success('Public holiday added');
+    try {
+      await savePublicHolidays(orgId, updated);
+      setPublicHolidays(updated);
+      toast.success('Public holiday added');
+    } catch (err) {
+      console.error('Failed to save public holiday:', err);
+      toast.error('Failed to save public holiday. Please try again.');
+    }
   };
 
   const removePublicHoliday = async (date) => {
     const updated = publicHolidays.filter(h => h.date !== date);
-    await savePublicHolidays(orgId, updated);
-    setPublicHolidays(updated);
-    toast.success('Public holiday removed');
+    try {
+      await savePublicHolidays(orgId, updated);
+      setPublicHolidays(updated);
+      toast.success('Public holiday removed');
+    } catch (err) {
+      console.error('Failed to remove public holiday:', err);
+      toast.error('Failed to remove public holiday. Please try again.');
+    }
   };
 
   // ─── Shift Card ─────────────────────

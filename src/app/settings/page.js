@@ -136,12 +136,12 @@ export default function SettingsPage() {
   return (
     <Layout>
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <h1 className="text-2xl sm:text-3xl font-display font-bold text-surface-900">Settings</h1>
-        <p className="text-surface-500 mt-1">Manage your account and preferences</p>
+        <p className="text-surface-500 mt-1 hidden sm:block">Manage your account and preferences</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 pb-24 sm:pb-6">
         {/* Tab Navigation */}
         <div className="lg:col-span-1">
           {/* Desktop sidebar nav */}
@@ -167,32 +167,35 @@ export default function SettingsPage() {
           </div>
 
           {/* Mobile tab bar */}
-          <div className="flex lg:hidden gap-1 p-1 bg-surface-100 rounded-xl overflow-x-auto scrollbar-none -mx-4 sm:mx-0 px-4 sm:px-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'flex-1 min-w-0 py-2 px-2 sm:px-3 text-xs font-medium rounded-lg transition-colors whitespace-nowrap',
-                  activeTab === tab.id ? 'bg-white text-brand-700 shadow-sm' : 'text-surface-500'
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="lg:hidden -mx-4 sm:mx-0">
+            <div className="flex gap-1 p-2 bg-surface-100 overflow-x-auto scrollbar-none">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg transition-colors whitespace-nowrap',
+                    activeTab === tab.id ? 'bg-white text-brand-700 shadow-sm' : 'text-surface-500 hover:text-surface-700'
+                  )}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  <span className="hidden xs:inline">{tab.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Content */}
+          {/* Content */}
         <div className="lg:col-span-3">
           {/* Profile Tab */}
           {activeTab === 'profile' && (
             <div className="card overflow-hidden">
-              <div className="px-6 py-5 border-b border-surface-100">
+              <div className="px-4 sm:px-6 py-5 border-b border-surface-100">
                 <h2 className="text-lg font-display font-semibold text-surface-900">Profile Information</h2>
                 <p className="text-sm text-surface-500 mt-0.5">Update your personal details</p>
               </div>
-              <div className="p-6 space-y-6">
+              <div className="p-4 sm:p-6 space-y-6">
                 {/* Avatar */}
                 <div className="flex items-center gap-4">
                   <div className={cn(
@@ -585,12 +588,12 @@ export default function SettingsPage() {
                   <h2 className="text-lg font-display font-semibold text-surface-900">Public Holidays</h2>
                   <p className="text-sm text-surface-500 mt-0.5">Manage public holidays for overtime calculations</p>
                 </div>
-                <div className="p-6 space-y-4">
-                  <div className="flex items-center justify-between">
+                <div className="p-4 sm:p-6 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <p className="text-sm text-surface-600">Set dates that trigger holiday pay multipliers.</p>
                     <button
                       onClick={() => setHolidays([...holidays, { date: '', name: '' }])}
-                      className="btn-secondary !text-sm"
+                      className="btn-secondary !text-sm self-start"
                     >
                       + Add Holiday
                     </button>
@@ -600,7 +603,7 @@ export default function SettingsPage() {
                   ) : (
                     <div className="space-y-3">
                       {holidays.map((holiday, idx) => (
-                        <div key={idx} className="flex items-center gap-3 p-3 bg-surface-50 rounded-xl">
+                        <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 bg-surface-50 rounded-xl">
                           <input
                             type="date"
                             value={holiday.date}
@@ -609,7 +612,7 @@ export default function SettingsPage() {
                               newHolidays[idx].date = e.target.value;
                               setHolidays(newHolidays);
                             }}
-                            className="input-field !w-40 !py-1.5 text-sm"
+                            className="input-field !w-full sm:!w-40 !py-1.5 text-sm"
                           />
                           <input
                             placeholder="Holiday name"
@@ -619,11 +622,11 @@ export default function SettingsPage() {
                               newHolidays[idx].name = e.target.value;
                               setHolidays(newHolidays);
                             }}
-                            className="input-field flex-1 !py-1.5 text-sm"
+                            className="input-field flex-1 !py-1.5 text-sm !w-full"
                           />
                           <button
                             onClick={() => setHolidays(holidays.filter((_, i) => i !== idx))}
-                            className="btn-icon !w-8 !h-8 hover:!text-red-600 hover:!bg-red-50"
+                            className="btn-icon !w-8 !h-8 hover:!text-red-600 hover:!bg-red-50 self-end sm:self-center"
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -805,7 +808,7 @@ function QRCodesTab({ orgId, organization }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         <QRCodeCard
           title="Homepage"
           description="Links to your StaffHub homepage"
