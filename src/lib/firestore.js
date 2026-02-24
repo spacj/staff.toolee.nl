@@ -14,6 +14,7 @@ const C = {
   ACTIVITY_LOG: 'activityLog', INVITES: 'invites', REFERRALS: 'referrals',
   CORRECTION_REQUESTS: 'correctionRequests', MESSAGES: 'messages',
   WEBMASTER_REFERRAL_CODES: 'webmasterReferralCodes', WEBMASTER_EARNINGS: 'webmasterEarnings',
+  SUPPORT_TICKETS: 'supportTickets',
 };
 
 // ─── Helpers ──────────────────────────────────────────
@@ -564,6 +565,40 @@ export async function updateWebmasterEarning(id, data) {
 export async function getAllWorkersCount() {
   const snap = await getDocs(query(collection(db, C.WORKERS), where('status', '==', 'active')));
   return snap.size;
+}
+
+// ─── Support Tickets ─────────────────────────────────────
+// Schema: { ticketId, subject, message, category, priority, status, source, senderName, senderEmail, senderRole, senderId, orgId, orgName, replies: [{message, senderName, senderRole, createdAt}], assignedTo, createdAt, updatedAt }
+// Categories: 'billing', 'technical', 'feature', 'account', 'general'
+// Priorities: 'low', 'medium', 'high', 'urgent'
+// Status: 'open', 'in-progress', 'resolved', 'closed'
+// Source: 'website' (public form), 'app' (from chat)
+export async function getAllSupportTickets() {
+  return getAll(C.SUPPORT_TICKETS, orderBy('createdAt', 'desc'));
+}
+export async function getSupportTicketsByOrg(orgId) {
+  const all = await getAll(C.SUPPORT_TICKETS);
+  return all.filter(t => t.orgId === orgId).sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+}
+export async function getSupportTicketById(id) {
+  return get1(C.SUPPORT_TICKETS, id);
+}
+export async function createSupportTicket(data) {
+  return add(C.SUPPORT_TICKETS, {
+    ...data,
+    status: 'open',
+    replies: [],
+  });
+}
+export async function updateSupportTicket(id, data) {
+  return upd(C.SUPPORT_TICKETS, id, data);
+}
+export async function addSupportTicketReply(ticketId, reply) {
+  const ticket = await get1(C.SUPPORT_TICKETS, ticketId);
+  if (!ticket) throw new Error('Ticket not found');
+  const replies = ticket.replies || [];
+  replies.push({ ...reply, createdAt: new Date().toISOString() });
+  return upd(C.SUPPORT_TICKETS, ticketId, { replies, updatedAt: ts() });
 }
 
 export { C as COLLECTIONS };

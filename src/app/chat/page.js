@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getMessages, createMessage, markMessageRead, getWorkers, getConversations } from '@/lib/firestore';
+import { getMessages, createMessage, markMessageRead, getWorkers, getConversations, getOrganization, createSupportTicket } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
-import { MessageCircle, Send, Plus, Search, ArrowLeft, User, Users } from 'lucide-react';
+import { MessageCircle, Send, Plus, Search, ArrowLeft, User, Users, HelpCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function ChatPage() {
@@ -18,6 +18,20 @@ export default function ChatPage() {
   const [showNewChat, setShowNewChat] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sending, setSending] = useState(false);
+
+  // Support ticket state
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [supportForm, setSupportForm] = useState({ subject: '', message: '', category: 'general' });
+  const [sendingSupport, setSendingSupport] = useState(false);
+  const [orgName, setOrgName] = useState('');
+
+  useEffect(() => {
+    if (orgId) {
+      getOrganization(orgId).then(org => {
+        if (org) setOrgName(org.name || '');
+      }).catch(() => {});
+    }
+  }, [orgId]);
 
   const resolveWorkerId = async () => {
     if (userProfile?.workerId) return userProfile.workerId;
@@ -144,9 +158,16 @@ export default function ChatPage() {
           <div className="p-4 border-b border-surface-100">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold text-surface-800">Messages</h2>
-              <button onClick={() => setShowNewChat(true)} className="p-2 rounded-lg bg-brand-100 text-brand-600 hover:bg-brand-200">
-                <Plus className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {isManager && (
+                  <button onClick={() => setShowSupportModal(true)} className="p-2 rounded-lg bg-purple-100 text-purple-600 hover:bg-purple-200" title="Contact Support">
+                    <HelpCircle className="w-5 h-5" />
+                  </button>
+                )}
+                <button onClick={() => setShowNewChat(true)} className="p-2 rounded-lg bg-brand-100 text-brand-600 hover:bg-brand-200">
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
           
@@ -286,6 +307,81 @@ export default function ChatPage() {
               ))
             )}
           </div>
+        </div>
+      </Modal>
+
+      {/* Support Ticket Modal */}
+      <Modal open={showSupportModal} onClose={() => setShowSupportModal(false)} title="Contact Support">
+        <div className="space-y-4">
+          <p className="text-sm text-surface-500">Having issues? Send a message to our support team. We'll get back to you within 24 hours.</p>
+          <div>
+            <label className="label">Subject *</label>
+            <input
+              type="text"
+              value={supportForm.subject}
+              onChange={e => setSupportForm({ ...supportForm, subject: e.target.value })}
+              placeholder="Brief description of your issue"
+              className="input-field"
+            />
+          </div>
+          <div>
+            <label className="label">Category</label>
+            <select
+              value={supportForm.category}
+              onChange={e => setSupportForm({ ...supportForm, category: e.target.value })}
+              className="select-field"
+            >
+              <option value="general">General Question</option>
+              <option value="billing">Billing & Pricing</option>
+              <option value="technical">Technical Support</option>
+              <option value="feature">Feature Request</option>
+              <option value="account">Account Help</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Message *</label>
+            <textarea
+              value={supportForm.message}
+              onChange={e => setSupportForm({ ...supportForm, message: e.target.value })}
+              placeholder="Describe your issue in detail..."
+              className="input-field min-h-[120px] resize-none"
+            />
+          </div>
+          <button
+            onClick={async () => {
+              if (!supportForm.subject.trim() || !supportForm.message.trim()) {
+                toast.error('Please fill in subject and message');
+                return;
+              }
+              setSendingSupport(true);
+              try {
+                await createSupportTicket({
+                  subject: supportForm.subject.trim(),
+                  message: supportForm.message.trim(),
+                  category: supportForm.category,
+                  priority: 'medium',
+                  source: 'app',
+                  senderName: userProfile?.displayName || `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim(),
+                  senderEmail: user?.email,
+                  senderRole: userProfile?.role || 'admin',
+                  senderId: user?.uid,
+                  orgId,
+                  orgName,
+                });
+                toast.success('Support ticket submitted!');
+                setShowSupportModal(false);
+                setSupportForm({ subject: '', message: '', category: 'general' });
+              } catch (err) {
+                console.error('Support ticket error:', err);
+                toast.error('Failed to submit ticket');
+              }
+              setSendingSupport(false);
+            }}
+            disabled={sendingSupport}
+            className="btn-primary w-full !py-3"
+          >
+            {sendingSupport ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Submit Ticket'}
+          </button>
         </div>
       </Modal>
     </Layout>

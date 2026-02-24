@@ -136,5 +136,12 @@ service cloud.firestore {
     match /webmasterEarnings/{id} {
       allow read, create, update, delete: if isAuth();
     }
+
+    // Support Tickets: public create (contact form), auth read/write
+    match /supportTickets/{id} {
+      allow read: if isAuth();
+      allow create: if true;  // Public contact form (no auth required)
+      allow update: if isAuth();
+    }
   }
 }

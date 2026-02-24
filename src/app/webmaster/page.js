@@ -9,6 +9,7 @@ import {
   getWebmasterReferralCodes, createWebmasterReferralCode,
   updateWebmasterReferralCode, deleteWebmasterReferralCode,
   getWebmasterEarnings, createWebmasterEarning, updateWebmasterEarning,
+  getAllSupportTickets, updateSupportTicket, addSupportTicketReply,
 } from '@/lib/firestore';
 import { formatCurrency } from '@/lib/pricing';
 import { cn, formatDate } from '@/utils/helpers';
@@ -18,7 +19,8 @@ import {
   Plus, Edit3, Trash2, Copy, Check, Search, Filter, ChevronDown,
   ChevronUp, ArrowUpRight, BarChart3, Activity, Tag, Hash,
   Calendar, Clock, CreditCard, Shield, AlertCircle, RefreshCw,
-  X, ToggleLeft, ToggleRight, Download, ExternalLink,
+  X, ToggleLeft, ToggleRight, Download, ExternalLink, HelpCircle,
+  MessageSquare, Send, Loader2,
 } from 'lucide-react';
 
 const TABS = [
@@ -26,6 +28,7 @@ const TABS = [
   { id: 'companies', label: 'Companies', icon: Building2 },
   { id: 'earnings', label: 'Earnings', icon: DollarSign },
   { id: 'referrals', label: 'Referral Codes', icon: Tag },
+  { id: 'tickets', label: 'Support Tickets', icon: HelpCircle },
 ];
 
 export default function WebmasterDashboard() {
@@ -40,6 +43,16 @@ export default function WebmasterDashboard() {
   const [payments, setPayments] = useState([]);
   const [referralCodes, setReferralCodes] = useState([]);
   const [earnings, setEarnings] = useState([]);
+  const [supportTickets, setSupportTickets] = useState([]);
+
+  // Ticket filters
+  const [ticketFilter, setTicketFilter] = useState('all'); // all, open, in-progress, resolved, closed
+  const [ticketPriorityFilter, setTicketPriorityFilter] = useState('all'); // all, low, medium, high, urgent
+  const [ticketSourceFilter, setTicketSourceFilter] = useState('all'); // all, website, app
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [ticketReply, setTicketReply] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
 
   // Search & filters
   const [companySearch, setCompanySearch] = useState('');
@@ -61,13 +74,14 @@ export default function WebmasterDashboard() {
     if (isInitial) setLoading(true);
     try {
       const catchLog = (label) => (err) => { console.warn(`Webmaster loadData [${label}]:`, err?.message || err); return []; };
-      const [orgs, allUsers, refs, pays, codes, earns] = await Promise.all([
+      const [orgs, allUsers, refs, pays, codes, earns, tickets] = await Promise.all([
         getAllOrganizations().catch(catchLog('orgs')),
         getAllUsers().catch(catchLog('users')),
         getAllReferrals().catch(catchLog('referrals')),
         getAllPayments().catch(catchLog('payments')),
         getWebmasterReferralCodes(user.uid).catch(catchLog('codes')),
         getWebmasterEarnings(user.uid).catch(catchLog('earnings')),
+        getAllSupportTickets().catch(catchLog('tickets')),
       ]);
       setOrganizations(orgs);
       setUsers(allUsers);
@@ -75,6 +89,7 @@ export default function WebmasterDashboard() {
       setPayments(pays);
       setReferralCodes(codes);
       setEarnings(earns);
+      setSupportTickets(tickets);
     } catch (err) {
       console.error('Failed to load webmaster data:', err);
       toast.error('Failed to load data');
@@ -227,6 +242,52 @@ export default function WebmasterDashboard() {
     setCopiedCode(text);
     setTimeout(() => setCopiedCode(null), 2000);
   };
+
+  // Ticket helpers
+  const ticketStatusBadge = (status) => {
+    const styles = {
+      open: 'bg-red-100 text-red-700',
+      'in-progress': 'bg-amber-100 text-amber-700',
+      resolved: 'bg-emerald-100 text-emerald-700',
+      closed: 'bg-surface-100 text-surface-500',
+    };
+    return (
+      <span className={cn('px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize', styles[status] || styles.open)}>
+        {status || 'open'}
+      </span>
+    );
+  };
+
+  const ticketPriorityBadge = (priority) => {
+    const styles = {
+      low: 'bg-surface-100 text-surface-500',
+      medium: 'bg-blue-100 text-blue-700',
+      high: 'bg-orange-100 text-orange-700',
+      urgent: 'bg-red-100 text-red-700',
+    };
+    return (
+      <span className={cn('px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize', styles[priority] || styles.medium)}>
+        {priority || 'medium'}
+      </span>
+    );
+  };
+
+  // Filtered tickets
+  const filteredTickets = supportTickets.filter(t => {
+    if (ticketFilter !== 'all' && t.status !== ticketFilter) return false;
+    if (ticketPriorityFilter !== 'all' && t.priority !== ticketPriorityFilter) return false;
+    if (ticketSourceFilter !== 'all' && t.source !== ticketSourceFilter) return false;
+    if (ticketSearch) {
+      const q = ticketSearch.toLowerCase();
+      return (
+        (t.subject || '').toLowerCase().includes(q) ||
+        (t.senderName || '').toLowerCase().includes(q) ||
+        (t.senderEmail || '').toLowerCase().includes(q) ||
+        (t.message || '').toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
 
   // Access guard
   if (!isWebmaster) {
@@ -927,6 +988,284 @@ export default function WebmasterDashboard() {
               })()}
             </div>
           </Modal>
+        )}
+
+        {/* ─── Support Tickets Tab ────────────────────────── */}
+        {activeTab === 'tickets' && (
+          <div className="space-y-6">
+            {/* Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="card p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-brand-100 flex items-center justify-center">
+                    <HelpCircle className="w-5 h-5 text-brand-600" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-surface-800">{supportTickets.length}</p>
+                    <p className="text-xs text-surface-500">Total Tickets</p>
+                  </div>
+                </div>
+              </div>
+              <div className="card p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-surface-800">{supportTickets.filter(t => t.status === 'open').length}</p>
+                    <p className="text-xs text-surface-500">Open</p>
+                  </div>
+                </div>
+              </div>
+              <div className="card p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-surface-800">{supportTickets.filter(t => t.status === 'in-progress').length}</p>
+                    <p className="text-xs text-surface-500">In Progress</p>
+                  </div>
+                </div>
+              </div>
+              <div className="card p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                    <Check className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-surface-800">{supportTickets.filter(t => t.status === 'resolved' || t.status === 'closed').length}</p>
+                    <p className="text-xs text-surface-500">Resolved</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="card p-4 space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
+                  <input
+                    type="text"
+                    value={ticketSearch}
+                    onChange={(e) => setTicketSearch(e.target.value)}
+                    placeholder="Search tickets..."
+                    className="input-field !pl-10"
+                  />
+                </div>
+                <select
+                  value={ticketFilter}
+                  onChange={(e) => setTicketFilter(e.target.value)}
+                  className="select-field !w-auto"
+                >
+                  <option value="all">All Status</option>
+                  <option value="open">Open</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="closed">Closed</option>
+                </select>
+                <select
+                  value={ticketPriorityFilter}
+                  onChange={(e) => setTicketPriorityFilter(e.target.value)}
+                  className="select-field !w-auto"
+                >
+                  <option value="all">All Priority</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+                <select
+                  value={ticketSourceFilter}
+                  onChange={(e) => setTicketSourceFilter(e.target.value)}
+                  className="select-field !w-auto"
+                >
+                  <option value="all">All Source</option>
+                  <option value="website">Website</option>
+                  <option value="app">App</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Ticket List */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Ticket List */}
+              <div className="lg:col-span-1 card divide-y divide-surface-100">
+                <div className="p-4">
+                  <h3 className="font-semibold text-surface-800">Tickets ({filteredTickets.length})</h3>
+                </div>
+                <div className="max-h-[600px] overflow-y-auto">
+                  {filteredTickets.length === 0 ? (
+                    <div className="p-8 text-center text-surface-400">
+                      <HelpCircle className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                      <p>No tickets found</p>
+                    </div>
+                  ) : (
+                    filteredTickets.map((ticket) => (
+                      <button
+                        key={ticket.id}
+                        onClick={() => { setSelectedTicket(ticket); setTicketReply(''); }}
+                        className={cn(
+                          "w-full p-4 text-left hover:bg-surface-50 transition-colors",
+                          selectedTicket?.id === ticket.id && 'bg-brand-50'
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="font-medium text-surface-800 text-sm line-clamp-1">{ticket.subject}</p>
+                          {ticketPriorityBadge(ticket.priority)}
+                        </div>
+                        <div className="flex items-center gap-2 mb-2">
+                          {ticketStatusBadge(ticket.status)}
+                          <span className={cn("text-[10px] px-1.5 py-0.5 rounded", ticket.source === 'website' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600')}>
+                            {ticket.source}
+                          </span>
+                        </div>
+                        <p className="text-xs text-surface-400">{formatDate(ticket.createdAt)}</p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Ticket Detail */}
+              <div className="lg:col-span-2 card p-6">
+                {selectedTicket ? (
+                  <div className="space-y-6">
+                    {/* Header */}
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-surface-800">{selectedTicket.subject}</h3>
+                        <div className="flex items-center gap-3 mt-2">
+                          {ticketStatusBadge(selectedTicket.status)}
+                          {ticketPriorityBadge(selectedTicket.priority)}
+                          <span className={cn("text-xs px-2 py-1 rounded", selectedTicket.source === 'website' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600')}>
+                            {selectedTicket.source}
+                          </span>
+                        </div>
+                      </div>
+                      <select
+                        value={selectedTicket.status}
+                        onChange={async (e) => {
+                          try {
+                            await updateSupportTicket(selectedTicket.id, { status: e.target.value });
+                            toast.success('Status updated');
+                            setSelectedTicket({ ...selectedTicket, status: e.target.value });
+                            loadData(false);
+                          } catch (err) {
+                            toast.error('Failed to update status');
+                          }
+                        }}
+                        className="select-field !w-auto"
+                      >
+                        <option value="open">Open</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    </div>
+
+                    {/* Sender Info */}
+                    <div className="p-4 bg-surface-50 rounded-xl space-y-2">
+                      <p className="text-xs font-semibold text-surface-500 uppercase tracking-wide">From</p>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-surface-400">Name:</span> <span className="text-surface-700">{selectedTicket.senderName}</span>
+                        </div>
+                        <div>
+                          <span className="text-surface-400">Email:</span> <span className="text-surface-700">{selectedTicket.senderEmail}</span>
+                        </div>
+                        {selectedTicket.orgName && (
+                          <div className="col-span-2">
+                            <span className="text-surface-400">Company:</span> <span className="text-surface-700">{selectedTicket.orgName}</span>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-surface-400">Role:</span> <span className="text-surface-700 capitalize">{selectedTicket.senderRole}</span>
+                        </div>
+                        <div>
+                          <span className="text-surface-400">Category:</span> <span className="text-surface-700 capitalize">{selectedTicket.category}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Original Message */}
+                    <div>
+                      <p className="text-xs font-semibold text-surface-500 uppercase tracking-wide mb-2">Message</p>
+                      <div className="p-4 bg-surface-50 rounded-xl">
+                        <p className="text-surface-700 whitespace-pre-wrap">{selectedTicket.message}</p>
+                      </div>
+                    </div>
+
+                    {/* Replies */}
+                    {selectedTicket.replies && selectedTicket.replies.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-surface-500 uppercase tracking-wide mb-2">Replies ({selectedTicket.replies.length})</p>
+                        <div className="space-y-3">
+                          {selectedTicket.replies.map((reply, idx) => (
+                            <div key={idx} className={cn("p-3 rounded-xl", reply.senderRole === 'webmaster' ? 'bg-brand-50 ml-8' : 'bg-surface-50 mr-8')}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-medium text-surface-700">{reply.senderName}</span>
+                                <span className="text-[10px] text-surface-400">{formatDate(reply.createdAt)}</span>
+                              </div>
+                              <p className="text-sm text-surface-700 whitespace-pre-wrap">{reply.message}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Reply Form */}
+                    {selectedTicket.status !== 'closed' && (
+                      <div>
+                        <p className="text-xs font-semibold text-surface-500 uppercase tracking-wide mb-2">Reply</p>
+                        <div className="flex gap-2">
+                          <textarea
+                            value={ticketReply}
+                            onChange={(e) => setTicketReply(e.target.value)}
+                            placeholder="Type your reply..."
+                            className="input-field flex-1 min-h-[80px] resize-none"
+                          />
+                        </div>
+                        <div className="flex justify-end mt-2">
+                          <button
+                            onClick={async () => {
+                              if (!ticketReply.trim()) { toast.error('Please enter a reply'); return; }
+                              setSendingReply(true);
+                              try {
+                                await addSupportTicketReply(selectedTicket.id, {
+                                  message: ticketReply.trim(),
+                                  senderName: userProfile?.displayName || 'Webmaster',
+                                  senderRole: 'webmaster',
+                                });
+                                toast.success('Reply sent');
+                                setTicketReply('');
+                                loadData(false);
+                                const updated = supportTickets.find(t => t.id === selectedTicket.id);
+                                if (updated) setSelectedTicket(updated);
+                              } catch (err) {
+                                toast.error('Failed to send reply');
+                              }
+                              setSendingReply(false);
+                            }}
+                            disabled={sendingReply}
+                            className="btn-primary !py-2"
+                          >
+                            {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Send Reply <Send className="w-4 h-4 ml-2" /></>}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-surface-400 py-16">
+                    <MessageSquare className="w-12 h-12 mb-3 opacity-30" />
+                    <p>Select a ticket to view details</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </Layout>

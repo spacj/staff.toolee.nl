@@ -1,10 +1,12 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { PRICE_PER_WORKER, PRICE_PER_SHOP, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE, ENTERPRISE_THRESHOLD, FREE_WORKER_LIMIT } from '@/lib/pricing';
-import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ExternalLink } from 'lucide-react';
+import { createSupportTicket } from '@/lib/firestore';
+import toast from 'react-hot-toast';
+import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ExternalLink, HelpCircle, Send, Loader2 } from 'lucide-react';
 
 const features = [
   { icon: Store, title: 'Multi-Shop Management', desc: 'Manage multiple locations from one dashboard with separate schedules and staff.', color: 'from-brand-500 to-brand-600' },
@@ -23,6 +25,129 @@ const plans = [
   { name: 'Enterprise', price: `€${ENTERPRISE_DISCOUNTED_PRICE}`, period: '/month', desc: 'For large operations', badge: 'bg-purple-100 text-purple-700',
     features: ['Unlimited workers & shops', `€${ENTERPRISE_PRICE_MONTHLY}/mo (€${ENTERPRISE_DISCOUNTED_PRICE} with discount)`, 'Dedicated support', 'Custom integrations', 'SLA guarantee', 'Everything included'], cta: 'Contact Sales', href: '/register' },
 ];
+
+const CATEGORIES = [
+  { value: 'general', label: 'General Question' },
+  { value: 'billing', label: 'Billing & Pricing' },
+  { value: 'technical', label: 'Technical Support' },
+  { value: 'feature', label: 'Feature Request' },
+  { value: 'account', label: 'Account Help' },
+];
+
+function ContactForm() {
+  const [form, setForm] = useState({ name: '', email: '', company: '', message: '', category: 'general' });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim() || !form.message.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await createSupportTicket({
+        subject: `[${CATEGORIES.find(c => c.value === form.category)?.label || 'General'}] ${form.name}`,
+        message: form.message,
+        category: form.category,
+        priority: 'medium',
+        source: 'website',
+        senderName: form.name.trim(),
+        senderEmail: form.email.trim(),
+        senderRole: 'visitor',
+        orgName: form.company.trim() || null,
+      });
+      setSubmitted(true);
+      toast.success('Message sent! We\'ll get back to you soon.');
+    } catch (err) {
+      console.error('Contact form error:', err);
+      toast.error('Failed to send message. Please try again.');
+    }
+    setSubmitting(false);
+  };
+
+  if (submitted) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
+        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Check className="w-8 h-8 text-emerald-600" />
+        </div>
+        <h3 className="text-xl font-display font-bold text-slate-900 mb-2">Message Sent!</h3>
+        <p className="text-slate-600 mb-4">Thank you for reaching out. We'll respond within 24 hours.</p>
+        <button onClick={() => { setSubmitted(false); setForm({ name: '', email: '', company: '', message: '', category: 'general' }); }} className="text-brand-600 font-medium hover:text-brand-700">
+          Send another message
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className="label">Name *</label>
+          <input
+            type="text"
+            value={form.name}
+            onChange={e => setForm({ ...form, name: e.target.value })}
+            placeholder="Your name"
+            className="input-field"
+            required
+          />
+        </div>
+        <div>
+          <label className="label">Email *</label>
+          <input
+            type="email"
+            value={form.email}
+            onChange={e => setForm({ ...form, email: e.target.value })}
+            placeholder="you@company.com"
+            className="input-field"
+            required
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className="label">Company</label>
+          <input
+            type="text"
+            value={form.company}
+            onChange={e => setForm({ ...form, company: e.target.value })}
+            placeholder="Your company (optional)"
+            className="input-field"
+          />
+        </div>
+        <div>
+          <label className="label">Category</label>
+          <select
+            value={form.category}
+            onChange={e => setForm({ ...form, category: e.target.value })}
+            className="select-field"
+          >
+            {CATEGORIES.map(cat => (
+              <option key={cat.value} value={cat.value}>{cat.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="mb-6">
+        <label className="label">Message *</label>
+        <textarea
+          value={form.message}
+          onChange={e => setForm({ ...form, message: e.target.value })}
+          placeholder="How can we help you?"
+          className="input-field min-h-[120px] resize-none"
+          required
+        />
+      </div>
+      <button type="submit" disabled={submitting} className="btn-primary w-full !py-3">
+        {submitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : <>Send Message <Send className="w-4 h-4 ml-2" /></>}
+      </button>
+    </form>
+  );
+}
 
 export default function HomePage() {
   const { user, userProfile, loading, isWebmaster } = useAuth();
@@ -51,6 +176,7 @@ export default function HomePage() {
             </div>
           </Link>
           <div className="flex items-center gap-4">
+            <a href="#contact" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2">Contact</a>
             <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2">Sign In</Link>
             <Link href="/register" className="btn-primary !py-2.5 !px-6 !text-sm !shadow-lg !shadow-brand-500/30">Get Started</Link>
           </div>
@@ -182,6 +308,21 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Contact Section */}
+      <section id="contact" className="py-24 px-4 sm:px-6 bg-gradient-to-br from-slate-50 to-brand-50/30">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 bg-brand-100 text-brand-700 text-sm font-medium px-5 py-2.5 rounded-full mb-6">
+              <HelpCircle className="w-4 h-4" /> Get in Touch
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-slate-900 mb-4">Have questions?</h2>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">Can't find what you're looking for? Send us a message and we'll get back to you within 24 hours.</p>
+          </div>
+          
+          <ContactForm />
         </div>
       </section>
 
