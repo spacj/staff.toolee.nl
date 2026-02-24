@@ -29,13 +29,6 @@ export default function CalendarPage() {
   const [selectedTemplates, setSelectedTemplates] = useState([]);
   const [shiftForm, setShiftForm] = useState({ workerId: '', shopId: '', date: '', startTime: '09:00', endTime: '17:00', templateName: '', notes: '' });
   const [publicHolidays, setPublicHolidays] = useState([]);
-  const [showAutoSchedule, setShowAutoSchedule] = useState(false);
-  const [showAddShift, setShowAddShift] = useState(false);
-  const [scheduling, setScheduling] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [preview, setPreview] = useState(null); // { assignments, stats, warnings }
-  const [selectedTemplates, setSelectedTemplates] = useState([]);
-  const [shiftForm, setShiftForm] = useState({ workerId: '', shopId: '', date: '', startTime: '09:00', endTime: '17:00', templateName: '', notes: '' });
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
