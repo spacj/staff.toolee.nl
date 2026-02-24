@@ -393,29 +393,51 @@ export default function WebmasterSalesPage() {
                     </div>
                   )}
 
-                  {/* Reply */}
-                  {selectedLead.status !== 'won' && selectedLead.status !== 'lost' && (
-                    <div>
-                      <p className="text-xs font-semibold text-surface-500 uppercase tracking-wide mb-2">Send Reply</p>
-                      <div className="flex gap-2">
-                        <textarea
-                          value={reply}
-                          onChange={(e) => setReply(e.target.value)}
-                          placeholder="Type your reply..."
-                          className="input-field flex-1 min-h-[80px] resize-none"
-                        />
-                      </div>
-                      <div className="flex justify-end mt-2">
-                        <button
-                          onClick={handleSendReply}
-                          disabled={sendingReply || !reply.trim()}
-                          className="btn-primary !py-2"
+                  {/* Contact Actions */}
+                  <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
+                    <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-3">Contact Lead</p>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href={`mailto:${info.email || selectedLead.senderEmail}?subject=Re: ${selectedLead.subject}`}
+                        className="btn-primary !py-2 !px-4 !text-sm flex items-center gap-2"
+                      >
+                        <Mail className="w-4 h-4" /> Send Email
+                      </a>
+                      {info.phone && (
+                        <a
+                          href={`tel:${info.phone}`}
+                          className="btn-secondary !py-2 !px-4 !text-sm flex items-center gap-2"
                         >
-                          {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Send <Send className="w-4 h-4 ml-2" /></>}
-                        </button>
-                      </div>
+                          <Phone className="w-4 h-4" /> Call
+                        </a>
+                      )}
                     </div>
-                  )}
+                    <p className="text-xs text-purple-600 mt-2">
+                      Use email to communicate with this lead. Add internal notes below to track conversations.
+                    </p>
+                  </div>
+
+                  {/* Internal Notes */}
+                  <div>
+                    <p className="text-xs font-semibold text-surface-500 uppercase tracking-wide mb-2">Internal Notes</p>
+                    <div className="flex gap-2">
+                      <textarea
+                        value={reply}
+                        onChange={(e) => setReply(e.target.value)}
+                        placeholder="Add a private note about this lead..."
+                        className="input-field flex-1 min-h-[80px] resize-none"
+                      />
+                    </div>
+                    <div className="flex justify-end mt-2">
+                      <button
+                        onClick={handleSendReply}
+                        disabled={sendingReply || !reply.trim()}
+                        className="btn-secondary !py-2"
+                      >
+                        {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Save Note <Check className="w-4 h-4 ml-2" /></>}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               );
             })() : (
