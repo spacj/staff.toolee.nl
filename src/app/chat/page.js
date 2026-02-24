@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +11,7 @@ import { MessageCircle, Send, Plus, Search, ArrowLeft, User, Users, HelpCircle, 
 import toast from 'react-hot-toast';
 
 export default function ChatPage() {
+  const router = useRouter();
   const { orgId, user, userProfile, isManager, isAdmin } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [ticketConversations, setTicketConversations] = useState([]);
@@ -32,6 +34,13 @@ export default function ChatPage() {
 
   const canCreateTickets = isManager || isAdmin;
 
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!user && !orgId) {
+      router.replace('/login');
+    }
+  }, [user, orgId, router]);
+
   useEffect(() => {
     if (orgId) {
       getOrganization(orgId).then(org => {
@@ -42,17 +51,19 @@ export default function ChatPage() {
 
   const resolveWorkerId = async () => {
     if (userProfile?.workerId) return userProfile.workerId;
+    if (!user) return null;
     const allWorkers = await getWorkers({ orgId });
     const match = allWorkers.find(w => w.email === userProfile?.email && w.status === 'active');
     return match?.id || user.uid;
   };
 
   const loadConversations = async () => {
-    if (!orgId) return;
+    if (!orgId || !user) return;
     try {
       const w = await getWorkers({ orgId });
       setWorkers(w || []);
       const workerId = await resolveWorkerId();
+      if (!workerId) return;
       const convs = await getConversations(workerId, orgId, isManager ? 'manager' : 'worker', w || []);
       setConversations(convs || []);
     } catch (err) {
@@ -202,7 +213,7 @@ export default function ChatPage() {
   };
 
   const filteredWorkers = workers.filter(w => 
-    w.id !== user.uid &&
+    user && w.id !== user.uid &&
     `${w.firstName} ${w.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -504,6 +515,10 @@ export default function ChatPage() {
             onClick={async () => {
               if (!supportForm.subject.trim() || !supportForm.message.trim()) {
                 toast.error('Please fill in subject and message');
+                return;
+              }
+              if (!user) {
+                toast.error('Please log in to submit a ticket');
                 return;
               }
               setSendingSupport(true);
