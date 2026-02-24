@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
-import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle, Globe, Building2, DollarSign, Tag } from 'lucide-react';
+import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle, Globe, Building2, DollarSign, Tag, Inbox } from 'lucide-react';
 
 export default function Sidebar({ mobile, onClose }) {
   const pathname = usePathname();
@@ -11,6 +11,7 @@ export default function Sidebar({ mobile, onClose }) {
 
   const webmasterLinks = [
     { href: '/webmaster', icon: Globe, label: 'Dashboard' },
+    { href: '/webmaster/tickets', icon: Inbox, label: 'Support Tickets' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 

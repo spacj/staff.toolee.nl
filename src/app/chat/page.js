@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
@@ -368,7 +369,11 @@ export default function ChatPage() {
                   orgId,
                   orgName,
                 });
-                toast.success('Support ticket submitted!');
+                toast.success(
+                  <span>
+                    Ticket submitted! <Link href="/webmaster/tickets" className="underline font-medium">View tickets</Link>
+                  </span>
+                );
                 setShowSupportModal(false);
                 setSupportForm({ subject: '', message: '', category: 'general' });
               } catch (err) {

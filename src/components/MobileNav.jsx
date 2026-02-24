@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
-import { LayoutDashboard, Users, Calendar, Clock, Settings, Store, ClipboardList, CreditCard, MessageCircle, Globe } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Clock, Settings, Store, ClipboardList, CreditCard, MessageCircle, Globe, Inbox } from 'lucide-react';
 
 export default function MobileNav() {
   const pathname = usePathname();
@@ -11,6 +11,7 @@ export default function MobileNav() {
 
   const webmasterItems = [
     { href: '/webmaster', icon: Globe, label: 'Dashboard' },
+    { href: '/webmaster/tickets', icon: Inbox, label: 'Tickets' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 

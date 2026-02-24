@@ -74,10 +74,16 @@ function ContactForm() {
           <Check className="w-8 h-8 text-emerald-600" />
         </div>
         <h3 className="text-xl font-display font-bold text-slate-900 mb-2">Message Sent!</h3>
-        <p className="text-slate-600 mb-4">Thank you for reaching out. We'll respond within 24 hours.</p>
-        <button onClick={() => { setSubmitted(false); setForm({ name: '', email: '', company: '', message: '', category: 'general' }); }} className="text-brand-600 font-medium hover:text-brand-700">
-          Send another message
-        </button>
+        <p className="text-slate-600 mb-2">Thank you for reaching out. We'll respond within 24 hours.</p>
+        <p className="text-sm text-slate-500 mb-4">Create an account to track your support tickets.</p>
+        <div className="flex justify-center gap-3">
+          <Link href="/register" className="btn-primary !py-2 !px-4 text-sm">
+            Get Started
+          </Link>
+          <button onClick={() => { setSubmitted(false); setForm({ name: '', email: '', company: '', message: '', category: 'general' }); }} className="btn-secondary !py-2 !px-4 text-sm">
+            Send another
+          </button>
+        </div>
       </div>
     );
   }
