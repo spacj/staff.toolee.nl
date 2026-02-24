@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getShifts, getWorkers, getShops, getShiftTemplates, getPermits, bulkCreateShifts, deleteShift, createShift, getPublicHolidays, savePublicHolidays } from '@/lib/firestore';
 import { generateWeeklySchedule, DAY_LABELS } from '@/lib/scheduling';
 import { cn } from '@/utils/helpers';
-import { ChevronLeft, ChevronRight, Plus, Wand2, Trash2, Calendar as CalIcon, Users, Clock, Grid3X3, List, LayoutGrid, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Wand2, Trash2, Calendar as CalIcon, Users, Clock, Grid3X3, List, LayoutGrid, AlertTriangle, CheckCircle, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const VIEWS = { MONTH: 'month', WEEK: 'week', LIST: 'list' };
