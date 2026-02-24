@@ -64,8 +64,10 @@ export function calculateCost(workerCount, shopCount, cycle = 'monthly', freeLim
     return { total, monthlyEquivalent: Math.round(monthlyEquiv * 100) / 100, workerCost: 0, shopCost: 0, tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings, freeLimit };
   }
 
-  // Standard — first shop is free, additional shops €15/mo each
-  const workerCostMonthly = workerCount * PRICE_PER_WORKER;
+  // Standard — first `freeLimit` workers are free, additional workers €2/mo each
+  // First shop is free, additional shops €15/mo each
+  const billableWorkers = Math.max(0, workerCount - freeLimit);
+  const workerCostMonthly = billableWorkers * PRICE_PER_WORKER;
   const billableShops = Math.max(0, shopCount - 1);
   const shopCostMonthly = billableShops * PRICE_PER_SHOP;
   const monthlyTotal = workerCostMonthly + shopCostMonthly;
@@ -78,7 +80,7 @@ export function calculateCost(workerCount, shopCount, cycle = 'monthly', freeLim
     monthlyEquivalent: Math.round(monthlyEquiv * 100) / 100,
     workerCost: isYearly ? Math.round(workerCostMonthly * YEARLY_MULTIPLIER * 100) / 100 : workerCostMonthly,
     shopCost: isYearly ? Math.round(shopCostMonthly * YEARLY_MULTIPLIER * 100) / 100 : shopCostMonthly,
-    monthlyTotal, billableShops,
+    monthlyTotal, billableShops, billableWorkers,
     tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings, freeLimit,
   };
 }
@@ -176,6 +178,36 @@ export function canAddShop(currentShopCount, currentActiveWorkers, freeLimit = F
 
 export function formatCurrency(amount) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount);
+}
+
+/**
+ * Calculate the prorated cost difference when a plan changes mid-cycle.
+ * Used when adding/removing workers or shops during an active billing period.
+ *
+ * @param {Object} oldCost - Previous calculateCost() result
+ * @param {Object} newCost - New calculateCost() result
+ * @returns {{ proratedDifference: number, daysRemaining: number, totalDaysInMonth: number, dailyRate: number }}
+ */
+export function calculateProration(oldCost, newCost) {
+  const now = new Date();
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const totalDaysInMonth = endOfMonth.getDate();
+  const dayOfMonth = now.getDate();
+  const daysRemaining = totalDaysInMonth - dayOfMonth;
+
+  const monthlyDifference = (newCost.monthlyTotal || newCost.total) - (oldCost.monthlyTotal || oldCost.total);
+
+  if (monthlyDifference <= 0) {
+    // Downgrade: no charge now, takes effect next billing cycle
+    return { proratedDifference: 0, daysRemaining, totalDaysInMonth, dailyRate: 0, monthlyDifference, isUpgrade: false };
+  }
+
+  // Upgrade: charge prorated difference for remainder of current month
+  const dailyRate = monthlyDifference / totalDaysInMonth;
+  const proratedDifference = Math.round(dailyRate * daysRemaining * 100) / 100;
+
+  return { proratedDifference, daysRemaining, totalDaysInMonth, dailyRate: Math.round(dailyRate * 100) / 100, monthlyDifference, isUpgrade: true };
 }
 
 export {

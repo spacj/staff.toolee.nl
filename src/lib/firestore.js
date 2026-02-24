@@ -53,23 +53,22 @@ export async function syncOrgPlan(orgId) {
   const workers = await getAll(C.WORKERS, where('orgId', '==', orgId), where('status', '==', 'active'));
   const shops = await getAll(C.SHOPS, where('orgId', '==', orgId));
   const org = await get1(C.ORGANIZATIONS, orgId);
-  const freeLimit = org?.freeWorkerLimit;
+  const freeLimit = org?.freeWorkerLimit || FREE_WORKER_LIMIT;
   const newTier = getTier(workers.length, freeLimit);
   const cost = calculateCost(workers.length, shops.length, 'monthly', freeLimit);
   await upd(C.ORGANIZATIONS, orgId, { plan: newTier, activeWorkerCount: workers.length, shopCount: shops.length, monthlyCost: cost.total });
 
   // Sync PayPal subscription quantity (fire-and-forget)
   try {
-    const org = await get1(C.ORGANIZATIONS, orgId);
     const subId = org?.subscriptionId;
     if (subId && org.subscriptionStatus === 'active') {
       if (newTier === 'free') {
         fetch('/api/paypal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriptionId: subId, action: 'suspend' }) });
       } else if (newTier === 'standard') {
-        const qty = Math.round(monthlyCost);
+        const qty = Math.round(cost.total * 100); // cents for PayPal quantity
         if (qty !== (org.subscriptionQuantity || 0)) {
           fetch('/api/paypal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriptionId: subId, action: 'update_quantity', quantity: qty }) });
-          await upd(C.ORGANIZATIONS, orgId, { subscriptionQuantity: qty });
+          await upd(C.ORGANIZATIONS, orgId, { subscriptionQuantity: qty, previousMonthlyCost: org.monthlyCost || 0 });
         }
       }
     } else if (subId && org.subscriptionStatus === 'suspended' && newTier !== 'free') {

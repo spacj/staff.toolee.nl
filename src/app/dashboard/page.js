@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog, getCorrectionRequests, getMessages, updatePermit, reviewCorrectionRequest, notifyWorker } from '@/lib/firestore';
-import { calculateMonthlyCost, formatCurrency } from '@/lib/pricing';
+import { calculateCost, formatCurrency } from '@/lib/pricing';
 import { cn } from '@/utils/helpers';
 import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3, MessageCircle, AlertTriangle, XCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -17,7 +17,7 @@ const STAT_STYLES = [
 ];
 
 export default function DashboardPage() {
-  const { orgId, isManager, userProfile, user } = useAuth();
+  const { orgId, isManager, userProfile, user, organization } = useAuth();
   const [workers, setWorkers] = useState([]);
   const [shops, setShops] = useState([]);
   const [shifts, setShifts] = useState([]);
@@ -93,7 +93,7 @@ export default function DashboardPage() {
   }, [orgId, isManager]);
 
   const activeWorkers = workers.filter(w => w.status === 'active');
-  const cost = useMemo(() => calculateMonthlyCost(activeWorkers.length, shops.length), [activeWorkers.length, shops.length]);
+  const cost = useMemo(() => calculateCost(activeWorkers.length, shops.length, 'monthly', organization?.freeWorkerLimit), [activeWorkers.length, shops.length, organization?.freeWorkerLimit]);
   const clockedIn = attendance.filter(a => a.status === 'clocked-in').length;
   const todayShifts = shifts.length;
   const firstName = userProfile?.displayName?.split(' ')[0] || 'there';

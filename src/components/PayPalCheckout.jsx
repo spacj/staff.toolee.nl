@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 import { useAuth } from '@/contexts/AuthContext';
 import { updateOrganization, createPayment } from '@/lib/firestore';
-import { formatCurrency, calculateCost, getSubscriptionQuantity, CYCLES, PRICE_PER_WORKER, PRICE_PER_SHOP } from '@/lib/pricing';
+import { formatCurrency, calculateCost, getSubscriptionQuantity, calculateProration, CYCLES, PRICE_PER_WORKER, PRICE_PER_SHOP, FREE_WORKER_LIMIT } from '@/lib/pricing';
 import { CheckCircle, AlertCircle, Zap, CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -33,12 +33,21 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
 
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  const cost = calculateCost(workerCount, shopCount, cycle, organization?.freeWorkerLimit || 4);
-  const quantity = getSubscriptionQuantity(workerCount, shopCount, organization?.freeWorkerLimit || 4);
+  const freeLimit = organization?.freeWorkerLimit || FREE_WORKER_LIMIT;
+  const cost = calculateCost(workerCount, shopCount, cycle, freeLimit);
+  const quantity = getSubscriptionQuantity(workerCount, shopCount, freeLimit);
   const planId = PLAN_IDS[tier]?.[cycle];
   const isMonthly = cycle === CYCLES.MONTHLY;
-  const monthlyAlt = calculateCost(workerCount, shopCount, 'monthly', organization?.freeWorkerLimit || 4);
-  const yearlyAlt = calculateCost(workerCount, shopCount, 'yearly', organization?.freeWorkerLimit || 4);
+  const monthlyAlt = calculateCost(workerCount, shopCount, 'monthly', freeLimit);
+  const yearlyAlt = calculateCost(workerCount, shopCount, 'yearly', freeLimit);
+
+  // Calculate proration if upgrading an active subscription
+  const previousCost = organization?.monthlyCost
+    ? { monthlyTotal: organization.monthlyCost, total: organization.monthlyCost }
+    : null;
+  const proration = previousCost && organization?.subscriptionStatus === 'active'
+    ? calculateProration(previousCost, monthlyAlt)
+    : null;
 
   // Free tier
   if (cost.total === 0) {
@@ -124,9 +133,15 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
         {cost.tier === 'standard' && (
           <>
             <div className="flex justify-between">
-              <span className="text-surface-500">{workerCount} workers × {formatCurrency(PRICE_PER_WORKER)}/mo{!isMonthly ? ' × 10' : ''}</span>
-              <span className="text-surface-700">{formatCurrency(cost.workerCost)}</span>
+              <span className="text-surface-500">First {freeLimit} workers</span>
+              <span className="text-emerald-600 font-medium">Free</span>
             </div>
+            {cost.billableWorkers > 0 && (
+              <div className="flex justify-between">
+                <span className="text-surface-500">{cost.billableWorkers} extra worker{cost.billableWorkers > 1 ? 's' : ''} × {formatCurrency(PRICE_PER_WORKER)}/mo{!isMonthly ? ' × 10' : ''}</span>
+                <span className="text-surface-700">{formatCurrency(cost.workerCost)}</span>
+              </div>
+            )}
             {cost.billableShops > 0 && (
               <div className="flex justify-between">
                 <span className="text-surface-500">{cost.billableShops} extra shop{cost.billableShops > 1 ? 's' : ''} × {formatCurrency(PRICE_PER_SHOP)}/mo{!isMonthly ? ' × 10' : ''}</span>
@@ -144,6 +159,12 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
         {cost.savings > 0 && (
           <div className="flex justify-between text-emerald-600">
             <span>Yearly savings</span><span className="font-semibold">−{formatCurrency(cost.savings)}</span>
+          </div>
+        )}
+        {proration && proration.isUpgrade && proration.proratedDifference > 0 && (
+          <div className="flex justify-between text-amber-600 pt-1 border-t border-surface-200">
+            <span>Prorated upgrade ({proration.daysRemaining} days remaining)</span>
+            <span className="font-semibold">+{formatCurrency(proration.proratedDifference)}</span>
           </div>
         )}
         <div className="flex justify-between pt-2 border-t border-surface-200">
@@ -192,6 +213,7 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
                 subscriptionCycle: cycle,
                 subscriptionQuantity: quantity || null,
                 subscriptionStartTime: new Date().toISOString(),
+                monthlyCost: cost.monthlyTotal || cost.total,
                 pendingSubscriptionId: null,
               });
               // Record the subscription event

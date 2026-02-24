@@ -3,14 +3,14 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
-import { updateUserProfile, getReferrals, getOrganization, getPublicHolidays, savePublicHolidays } from '@/lib/firestore';
+import { updateUserProfile, getReferrals, getOrganization, getPublicHolidays, savePublicHolidays, getInvites } from '@/lib/firestore';
 import { ROLE_LABELS, cn, getInitials, generateAvatarColor } from '@/utils/helpers';
 import toast from 'react-hot-toast';
 import {
   User, Bell, Palette, Shield, Save, Camera,
   Mail, Phone, Building, MapPin, Globe, Clock,
   ChevronRight, ToggleLeft, ToggleRight, AlertCircle,
-  Key, LogOut, Trash2, CheckCircle, Link2, Users, X
+  Key, LogOut, Trash2, CheckCircle, Link2, Users, X, QrCode, Download
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -73,6 +73,7 @@ export default function SettingsPage() {
     { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'account', label: 'Account', icon: Shield },
     ...(isAdmin ? [{ id: 'organization', label: 'Organization', icon: Building }] : []),
+    ...(isAdmin ? [{ id: 'qrcodes', label: 'QR Codes', icon: QrCode }] : []),
     ...(isAdmin ? [{ id: 'referrals', label: 'Referrals', icon: Users }] : []),
   ];
 
@@ -664,6 +665,11 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* QR Codes Tab */}
+          {activeTab === 'qrcodes' && isAdmin && (
+            <QRCodesTab orgId={orgId} organization={organization} />
+          )}
+
           {/* Referrals Tab */}
           {activeTab === 'referrals' && isAdmin && (
             <ReferralsTab orgId={orgId} />
@@ -730,6 +736,113 @@ function ReferralsTab({ orgId }) {
                 </div>
               </div>
             ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QRCodeCard({ title, description, url, filename }) {
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}&format=png&margin=10`;
+
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${filename}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    } catch {
+      // Fallback: open in new tab
+      window.open(qrUrl, '_blank');
+    }
+  };
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="p-5 border-b border-surface-100">
+        <h3 className="font-semibold text-surface-800">{title}</h3>
+        <p className="text-xs text-surface-500 mt-0.5">{description}</p>
+      </div>
+      <div className="p-6 flex flex-col items-center gap-4">
+        <div className="bg-white p-3 rounded-xl border border-surface-200 shadow-sm">
+          <img src={qrUrl} alt={`QR Code for ${title}`} width={200} height={200} className="block" />
+        </div>
+        <p className="text-xs text-surface-400 text-center break-all max-w-[280px]">{url}</p>
+        <button onClick={handleDownload} className="btn-primary !text-sm flex items-center gap-2">
+          <Download className="w-4 h-4" /> Download QR Code
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function QRCodesTab({ orgId, organization }) {
+  const [invites, setInvites] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (orgId) {
+      getInvites(orgId).then(i => setInvites(i.filter(inv => !inv.used))).finally(() => setLoading(false));
+    }
+  }, [orgId]);
+
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://staff.toolee.nl';
+  const homepageUrl = baseUrl;
+  const loginUrl = `${baseUrl}/login`;
+
+  return (
+    <div className="space-y-6">
+      <div className="card">
+        <div className="px-6 py-5 border-b border-surface-100">
+          <h2 className="text-lg font-display font-semibold text-surface-900">QR Codes</h2>
+          <p className="text-sm text-surface-500 mt-0.5">Download QR codes for quick access to your StaffHub. Print them and put them on display for your workers.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <QRCodeCard
+          title="Homepage"
+          description="Links to your StaffHub homepage"
+          url={homepageUrl}
+          filename="staffhub-homepage-qr"
+        />
+        <QRCodeCard
+          title="Login Page"
+          description="Quick access to the login page for workers and managers"
+          url={loginUrl}
+          filename="staffhub-login-qr"
+        />
+      </div>
+
+      {/* Worker invite codes */}
+      <div className="card">
+        <div className="px-6 py-5 border-b border-surface-100">
+          <h2 className="text-lg font-display font-semibold text-surface-900">Worker Invite Codes</h2>
+          <p className="text-sm text-surface-500 mt-0.5">QR codes for workers to join your organization using their invite code</p>
+        </div>
+        <div className="p-6">
+          {loading ? (
+            <p className="text-sm text-surface-400 text-center">Loading invites...</p>
+          ) : invites.length === 0 ? (
+            <p className="text-sm text-surface-400 text-center">No unused invite codes. Create invites from the Staff page.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {invites.map(inv => (
+                <QRCodeCard
+                  key={inv.id}
+                  title={`Invite: ${inv.code}`}
+                  description={inv.role ? `Role: ${inv.role}` : 'Worker invite'}
+                  url={`${baseUrl}/join?code=${inv.code}`}
+                  filename={`staffhub-invite-${inv.code}`}
+                />
+              ))}
+            </div>
           )}
         </div>
       </div>
