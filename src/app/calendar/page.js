@@ -252,7 +252,7 @@ export default function CalendarPage() {
     const dayPermits = permitsForDate(ds);
     const isToday = ds === todayStr;
     const isSel = ds === selectedDate;
-    const isPublicHoliday = publicHolidays.some(h => h.date === ds);
+    const isPublicHoliday = publicHolidays?.some ? publicHolidays.some(h => h.date === ds) : false;
     return (
       <div onClick={() => setSelectedDate(ds)} className={cn(
         'h-14 sm:h-24 p-1 sm:p-1.5 border-b border-r border-surface-100 cursor-pointer transition-colors overflow-hidden',
@@ -331,7 +331,8 @@ export default function CalendarPage() {
               </div>
             </div>
             {selectedDate && (() => {
-              const isPublicHoliday = publicHolidays.some(h => h.date === selectedDate);
+              const isPublicHoliday = publicHolidays?.some ? publicHolidays.some(h => h.date === selectedDate) : false;
+              const holiday = publicHolidays?.find ? publicHolidays.find(h => h.date === selectedDate) : null;
               return (
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-4">
@@ -348,7 +349,7 @@ export default function CalendarPage() {
                   ))}
                   {isPublicHoliday && (
                     <div className="p-3 rounded-xl text-sm bg-red-50 text-red-700 flex items-center justify-between">
-                      <span><strong>Public Holiday:</strong> {publicHolidays.find(h => h.date === selectedDate)?.name}</span>
+                      <span><strong>Public Holiday:</strong> {holiday?.name || 'Holiday'}</span>
                       {isManager && <button onClick={() => removePublicHoliday(selectedDate)} className="btn-icon !w-6 !h-6 hover:!text-red-800"><X className="w-4 h-4" /></button>}
                     </div>
                   )}

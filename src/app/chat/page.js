@@ -28,30 +28,41 @@ export default function ChatPage() {
 
   const loadConversations = async () => {
     if (!orgId) return;
-    const w = await getWorkers({ orgId });
-    setWorkers(w);
-    const workerId = await resolveWorkerId();
-    const convs = await getConversations(workerId, orgId, isManager ? 'manager' : 'worker', w);
-    setConversations(convs);
+    try {
+      const w = await getWorkers({ orgId });
+      setWorkers(w || []);
+      const workerId = await resolveWorkerId();
+      const convs = await getConversations(workerId, orgId, isManager ? 'manager' : 'worker', w || []);
+      setConversations(convs || []);
+    } catch (err) {
+      console.error('Failed to load conversations:', err);
+      setWorkers([]);
+      setConversations([]);
+    }
   };
 
   const loadMessages = async (partnerId) => {
     if (!orgId || !partnerId) return;
-    const workerId = await resolveWorkerId();
-    const all = await getMessages({ orgId, limit: 100 });
-    // Filter to messages between current user and partner
-    const between = all
-      .filter(m => 
-        (m.senderId === workerId && m.recipientId === partnerId) ||
-        (m.senderId === partnerId && m.recipientId === workerId)
-      )
-      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    setMessages(between);
-    
-    // Mark unread as read
-    between.filter(m => m.recipientId === workerId && !m.read).forEach(m => {
-      markMessageRead(m.id).catch(() => {});
-    });
+    try {
+      const workerId = await resolveWorkerId();
+      const all = await getMessages({ orgId, limit: 100 });
+      // Filter to messages between current user and partner
+      const between = (all || [])
+        .filter(m => 
+          (m.senderId === workerId && m.recipientId === partnerId) ||
+          (m.senderId === partnerId && m.recipientId === workerId)
+        )
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      setMessages(between);
+      
+      // Mark unread as read
+      between.filter(m => m.recipientId === workerId && !m.read).forEach(m => {
+        markMessageRead(m.id).catch(() => {});
+      });
+    } catch (err) {
+      console.error('Failed to load messages:', err);
+      setMessages([]);
+    }
   };
 
   useEffect(() => { loadConversations(); }, [orgId]);
@@ -127,7 +138,7 @@ export default function ChatPage() {
           </div>
           
           <div className="flex-1 overflow-y-auto pb-20 md:pb-0">
-            {conversations.length === 0 ? (
+            {!conversations || conversations.length === 0 ? (
               <div className="p-4 text-center text-surface-400 text-sm">
                 <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 No conversations yet.<br />Start a new chat!
