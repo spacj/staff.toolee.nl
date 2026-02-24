@@ -173,7 +173,8 @@ export default function WebmasterDashboard() {
       setCodeForm({ code: '', description: '', commissionPercent: 10, commissionFlat: 0, freeWorkerBonus: 0 });
       loadData();
     } catch (err) {
-      toast.error('Failed to create code');
+      console.error('Create referral code error:', err);
+      toast.error(err?.message || 'Failed to create code');
     }
   };
 
@@ -191,7 +192,8 @@ export default function WebmasterDashboard() {
       setEditingCode(null);
       loadData();
     } catch (err) {
-      toast.error('Failed to update code');
+      console.error('Update referral code error:', err);
+      toast.error(err?.message || 'Failed to update code');
     }
   };
 
@@ -201,7 +203,8 @@ export default function WebmasterDashboard() {
       toast.success(code.isActive ? 'Code deactivated' : 'Code activated');
       loadData();
     } catch (err) {
-      toast.error('Failed to toggle code');
+      console.error('Toggle referral code error:', err);
+      toast.error(err?.message || 'Failed to toggle code');
     }
   };
 
@@ -212,7 +215,8 @@ export default function WebmasterDashboard() {
       toast.success('Referral code deleted');
       loadData();
     } catch (err) {
-      toast.error('Failed to delete code');
+      console.error('Delete referral code error:', err);
+      toast.error(err?.message || 'Failed to delete code');
     }
   };
 
