@@ -10,7 +10,7 @@ import {
   User, Bell, Palette, Shield, Save, Camera,
   Mail, Phone, Building, MapPin, Globe, Clock,
   ChevronRight, ToggleLeft, ToggleRight, AlertCircle,
-  Key, LogOut, Trash2, CheckCircle, Link2, Users
+  Key, LogOut, Trash2, CheckCircle, Link2, Users, X
 } from 'lucide-react';
 
 export default function SettingsPage() {

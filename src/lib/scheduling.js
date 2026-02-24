@@ -530,20 +530,30 @@ export function calculateWorkerCostWithOvertime(worker, shifts, overtimeRules = 
   // Calculate daily hours and apply daily overtime
   const dailyThreshold = overtimeRules.dailyThreshold || 0;
   const dailyMultiplier = overtimeRules.dailyMultiplier || 1.5;
-  const dailyThreshold2 = overtimeRules.dailyThreshold2 || 12;
+  const dailyThreshold2 = overtimeRules.dailyThreshold2 || 0;
   const dailyMultiplier2 = overtimeRules.dailyMultiplier2 || 2.0;
 
   for (const [date, dayShifts] of Object.entries(shiftsByDate)) {
     const dayHours = dayShifts.reduce((sum, s) => sum + (s.hours || 0), 0);
     const isHolidayDay = isHoliday(date, holidays);
     const holidayMultiplier = isHolidayDay ? (overtimeRules.holidayMultiplier || 2.0) : 1.0;
+    const dateObj = new Date(date + 'T12:00:00');
+    const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+    const weekendMultiplier = isWeekend ? (overtimeRules.weekendMultiplier || 1.25) : 1.0;
 
+    // Calculate base, OT tier 1, OT tier 2 hours
     let dayBaseHours = dayHours;
     let dayOvertimeHours = 0;
+    let dayOvertime2Hours = 0;
 
     if (dailyThreshold > 0 && dayHours > dailyThreshold) {
-      dayOvertimeHours = dayHours - dailyThreshold;
       dayBaseHours = dailyThreshold;
+      if (dailyThreshold2 > 0 && dailyThreshold2 > dailyThreshold && dayHours > dailyThreshold2) {
+        dayOvertimeHours = dailyThreshold2 - dailyThreshold;
+        dayOvertime2Hours = dayHours - dailyThreshold2;
+      } else {
+        dayOvertimeHours = dayHours - dailyThreshold;
+      }
     }
 
     // Apply time-of-day premiums
@@ -562,6 +572,10 @@ export function calculateWorkerCostWithOvertime(worker, shifts, overtimeRules = 
       }
     });
 
+    // Calculate costs with all multipliers
+    const baseCost = dayBaseHours * baseRate * weekendMultiplier;
+    const overtimeCost = dayOvertimeHours * baseRate * (dailyMultiplier - 1) * weekendMultiplier;
+    const overtime2Cost = dayOvertime2Hours * baseRate * (dailyMultiplier2 - 1) * weekendMultiplier;
     const nightPremiumCost = nightPremiumHours * baseRate * ((overtimeRules.nightMultiplier || 1.25) - 1) * weekendMultiplier;
     const earlyPremiumCost = earlyPremiumHours * baseRate * ((overtimeRules.earlyMultiplier || 1.1) - 1) * weekendMultiplier;
     const holidayPremiumCost = dayHours * baseRate * (holidayMultiplier - 1) * weekendMultiplier;

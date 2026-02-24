@@ -34,7 +34,6 @@ export default function SubscriptionAlert() {
 
   if (dismissed || !isManager || !orgId || !needsSubscription || hasActiveSubscription) return null;
 
-  const freeLimit = organization?.freeWorkerLimit || FREE_WORKER_LIMIT;
   const cost = calculateCost(workerCount, shopCount, 'monthly', freeLimit);
 
   // Determine alert severity
