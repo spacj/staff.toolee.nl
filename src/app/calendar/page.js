@@ -352,12 +352,6 @@ export default function CalendarPage() {
               </div>
               );
             })()}
-                  {!isPublicHoliday && isManager && (
-                    <button onClick={() => addPublicHoliday(selectedDate)} className="btn-secondary !py-1.5 !text-xs w-full"><Plus className="w-3.5 h-3.5" /> Mark as Public Holiday</button>
-                  )}
-                </div>
-              </div>
-            )}
           </>
         )}
 
