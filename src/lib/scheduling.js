@@ -457,4 +457,153 @@ export function calculateWorkerCost(worker, hoursWorked) {
   };
 }
 
+/**
+ * Check if a date is a public holiday
+ */
+function isHoliday(dateStr, holidays) {
+  if (!holidays) return false;
+  return holidays.some(h => h.date === dateStr);
+}
+
+/**
+ * Check if a time falls in night premium range
+ */
+function isNightTime(time, nightStart, nightEnd) {
+  if (!nightStart || !nightEnd) return false;
+  const t = toMinutes(time);
+  const s = toMinutes(nightStart);
+  const e = toMinutes(nightEnd);
+  if (s < e) return t >= s && t <= e; // same day
+  return t >= s || t <= e; // overnight
+}
+
+/**
+ * Check if a time falls in early morning premium range
+ */
+function isEarlyTime(time, earlyStart, earlyEnd) {
+  if (!earlyStart || !earlyEnd) return false;
+  const t = toMinutes(time);
+  const s = toMinutes(earlyStart);
+  const e = toMinutes(earlyEnd);
+  if (s < e) return t >= s && t <= e;
+  return t >= s || t <= e;
+}
+
+/**
+ * Calculate cost with overtime rules applied
+ * @param {Object} worker - Worker object
+ * @param {Array} shifts - Array of shifts for the worker in the period
+ * @param {Object} overtimeRules - Overtime rules object
+ * @param {Array} holidays - Public holidays array
+ * @returns {Object} Cost breakdown including base, overtime, premiums
+ */
+export function calculateWorkerCostWithOvertime(worker, shifts, overtimeRules = {}, holidays = []) {
+  if (worker.payType === 'salaried') {
+    // For salaried workers, overtime doesn't apply (fixed salary)
+    const totalHours = shifts.reduce((sum, s) => sum + (s.hours || 0), 0);
+    return {
+      type: 'salaried',
+      monthlySalary: worker.monthlySalary || 0,
+      hours: totalHours,
+      effectiveRate: worker.fixedHoursWeek > 0 ? (worker.monthlySalary / (worker.fixedHoursWeek * 4.33)) : 0,
+      baseCost: worker.monthlySalary || 0,
+      overtimeCost: 0,
+      premiumCost: 0,
+      totalCost: worker.monthlySalary || 0,
+      breakdown: [],
+    };
+  }
+
+  const baseRate = worker.costPerHour || 0;
+  let totalBaseCost = 0;
+  let totalOvertimeCost = 0;
+  let totalPremiumCost = 0;
+  const breakdown = [];
+
+  // Group shifts by date for daily calculations
+  const shiftsByDate = {};
+  shifts.forEach(s => {
+    if (!shiftsByDate[s.date]) shiftsByDate[s.date] = [];
+    shiftsByDate[s.date].push(s);
+  });
+
+  // Calculate daily hours and apply daily overtime
+  const dailyThreshold = overtimeRules.dailyThreshold || 0;
+  const dailyMultiplier = overtimeRules.dailyMultiplier || 1.5;
+
+  for (const [date, dayShifts] of Object.entries(shiftsByDate)) {
+    const dayHours = dayShifts.reduce((sum, s) => sum + (s.hours || 0), 0);
+    const isHolidayDay = isHoliday(date, holidays);
+    const holidayMultiplier = isHolidayDay ? (overtimeRules.holidayMultiplier || 2.0) : 1.0;
+
+    let dayBaseHours = dayHours;
+    let dayOvertimeHours = 0;
+
+    if (dailyThreshold > 0 && dayHours > dailyThreshold) {
+      dayOvertimeHours = dayHours - dailyThreshold;
+      dayBaseHours = dailyThreshold;
+    }
+
+    // Apply time-of-day premiums
+    let nightPremiumHours = 0;
+    let earlyPremiumHours = 0;
+
+    dayShifts.forEach(shift => {
+      const startTime = shift.startTime;
+      const shiftHours = shift.hours || 0;
+
+      if (isNightTime(startTime, overtimeRules.nightStart, overtimeRules.nightEnd)) {
+        nightPremiumHours += shiftHours;
+      }
+      if (isEarlyTime(startTime, overtimeRules.earlyStart, overtimeRules.earlyEnd)) {
+        earlyPremiumHours += shiftHours;
+      }
+    });
+
+    // Calculate costs
+    const baseCost = dayBaseHours * baseRate;
+    const overtimeCost = dayOvertimeHours * baseRate * (dailyMultiplier - 1);
+    const nightPremiumCost = nightPremiumHours * baseRate * ((overtimeRules.nightMultiplier || 1.25) - 1);
+    const earlyPremiumCost = earlyPremiumHours * baseRate * ((overtimeRules.earlyMultiplier || 1.1) - 1);
+    const holidayPremiumCost = dayHours * baseRate * (holidayMultiplier - 1);
+
+    totalBaseCost += baseCost;
+    totalOvertimeCost += overtimeCost;
+    totalPremiumCost += nightPremiumCost + earlyPremiumCost + holidayPremiumCost;
+
+    breakdown.push({
+      date,
+      dayHours,
+      baseHours: dayBaseHours,
+      overtimeHours: dayOvertimeHours,
+      nightPremiumHours,
+      earlyPremiumHours,
+      isHoliday: isHolidayDay,
+      baseCost,
+      overtimeCost,
+      nightPremiumCost,
+      earlyPremiumCost,
+      holidayPremiumCost,
+    });
+  }
+
+  // Apply weekly and monthly overtime (simplified - assumes shifts are in order)
+  // For now, skip weekly/monthly as it's complex without full period data
+  // Would need all shifts for the worker in the week/month
+
+  const totalHours = shifts.reduce((sum, s) => sum + (s.hours || 0), 0);
+  const totalCost = totalBaseCost + totalOvertimeCost + totalPremiumCost;
+
+  return {
+    type: 'hourly',
+    costPerHour: baseRate,
+    hours: totalHours,
+    baseCost: Math.round(totalBaseCost * 100) / 100,
+    overtimeCost: Math.round(totalOvertimeCost * 100) / 100,
+    premiumCost: Math.round(totalPremiumCost * 100) / 100,
+    totalCost: Math.round(totalCost * 100) / 100,
+    breakdown,
+  };
+}
+
 export { getShiftPeriod, calcHours, calcPaidHours, DAY_NAMES, DAY_LABELS, DAY_LABELS_FULL };

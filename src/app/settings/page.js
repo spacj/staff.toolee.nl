@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
-import { updateUserProfile, getReferrals } from '@/lib/firestore';
+import { updateUserProfile, getReferrals, getOrganization, getPublicHolidays, savePublicHolidays } from '@/lib/firestore';
 import { ROLE_LABELS, cn, getInitials, generateAvatarColor } from '@/utils/helpers';
 import toast from 'react-hot-toast';
 import {
@@ -45,6 +45,9 @@ export default function SettingsPage() {
     timeFormat: '24h',
   });
 
+  const [holidays, setHolidays] = useState([]);
+  const [orgData, setOrgData] = useState(null);
+
   useEffect(() => {
     if (userProfile) {
       setProfile((prev) => ({
@@ -58,13 +61,18 @@ export default function SettingsPage() {
         language: userProfile.language || 'en',
       }));
     }
-  }, [userProfile]);
+    if (isAdmin && orgId) {
+      getPublicHolidays(orgId).then(setHolidays);
+      getOrganization(orgId).then(setOrgData);
+    }
+  }, [userProfile, isAdmin, orgId]);
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'account', label: 'Account', icon: Shield },
+    ...(isAdmin ? [{ id: 'organization', label: 'Organization', icon: Building }] : []),
     ...(isAdmin ? [{ id: 'referrals', label: 'Referrals', icon: Users }] : []),
   ];
 
@@ -562,6 +570,95 @@ export default function SettingsPage() {
                       <p className="text-xs text-surface-400">Permanently delete your account and all data</p>
                     </div>
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Organization Tab */}
+          {activeTab === 'organization' && isAdmin && (
+            <div className="space-y-6">
+              {/* Public Holidays */}
+              <div className="card">
+                <div className="px-6 py-5 border-b border-surface-100">
+                  <h2 className="text-lg font-display font-semibold text-surface-900">Public Holidays</h2>
+                  <p className="text-sm text-surface-500 mt-0.5">Manage public holidays for overtime calculations</p>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-surface-600">Set dates that trigger holiday pay multipliers.</p>
+                    <button
+                      onClick={() => setHolidays([...holidays, { date: '', name: '' }])}
+                      className="btn-secondary !text-sm"
+                    >
+                      + Add Holiday
+                    </button>
+                  </div>
+                  {holidays.length === 0 ? (
+                    <p className="text-sm text-surface-400 text-center py-8">No public holidays set.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {holidays.map((holiday, idx) => (
+                        <div key={idx} className="flex items-center gap-3 p-3 bg-surface-50 rounded-xl">
+                          <input
+                            type="date"
+                            value={holiday.date}
+                            onChange={(e) => {
+                              const newHolidays = [...holidays];
+                              newHolidays[idx].date = e.target.value;
+                              setHolidays(newHolidays);
+                            }}
+                            className="input-field !w-40 !py-1.5 text-sm"
+                          />
+                          <input
+                            placeholder="Holiday name"
+                            value={holiday.name}
+                            onChange={(e) => {
+                              const newHolidays = [...holidays];
+                              newHolidays[idx].name = e.target.value;
+                              setHolidays(newHolidays);
+                            }}
+                            className="input-field flex-1 !py-1.5 text-sm"
+                          />
+                          <button
+                            onClick={() => setHolidays(holidays.filter((_, i) => i !== idx))}
+                            className="btn-icon !w-8 !h-8 hover:!text-red-600 hover:!bg-red-50"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={async () => {
+                        setLoading(true);
+                        try {
+                          await savePublicHolidays(orgId, holidays.filter(h => h.date && h.name));
+                          toast.success('Public holidays updated');
+                        } catch (err) {
+                          toast.error('Failed to save holidays');
+                        }
+                        setLoading(false);
+                      }}
+                      disabled={loading}
+                      className="btn-primary flex items-center gap-2"
+                    >
+                      <Save className="w-4 h-4" /> {loading ? 'Saving...' : 'Save Holidays'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Overtime Defaults */}
+              <div className="card">
+                <div className="px-6 py-5 border-b border-surface-100">
+                  <h2 className="text-lg font-display font-semibold text-surface-900">Organization Overtime Defaults</h2>
+                  <p className="text-sm text-surface-500 mt-0.5">Default overtime rules applied to new shift templates</p>
+                </div>
+                <div className="p-6">
+                  <p className="text-sm text-surface-400">Overtime defaults are configured per shift template in the Shifts section.</p>
                 </div>
               </div>
             </div>

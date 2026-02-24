@@ -79,6 +79,40 @@ export async function syncOrgPlan(orgId) {
   return { plan: newTier, activeWorkerCount: workers.length, shopCount: shops.length };
 }
 
+// ─── Overtime Rules (org-level defaults) ──────────────
+export async function getOvertimeRules(orgId) {
+  const org = await get1(C.ORGANIZATIONS, orgId);
+  return org?.overtimeRules || {
+    dailyThreshold: 0,       // hours/day before overtime kicks in (0 = disabled)
+    dailyMultiplier: 1.5,    // pay multiplier for daily overtime
+    weeklyThreshold: 0,      // hours/week before overtime (0 = disabled)
+    weeklyMultiplier: 1.5,
+    monthlyThreshold: 0,     // hours/month before overtime (0 = disabled)
+    monthlyMultiplier: 1.5,
+    nightStart: '',           // e.g. '22:00' — night premium start
+    nightEnd: '',             // e.g. '06:00' — night premium end
+    nightMultiplier: 1.25,
+    earlyStart: '',           // e.g. '05:00' — early morning premium start
+    earlyEnd: '',             // e.g. '07:00'
+    earlyMultiplier: 1.1,
+    holidayMultiplier: 2.0,   // pay multiplier on public holidays
+    enabled: false,
+  };
+}
+export async function saveOvertimeRules(orgId, rules) {
+  await upd(C.ORGANIZATIONS, orgId, { overtimeRules: rules });
+}
+
+// ─── Public Holidays (org-level) ──────────────────────
+export async function getPublicHolidays(orgId) {
+  const org = await get1(C.ORGANIZATIONS, orgId);
+  return org?.publicHolidays || [];
+  // Each: { date: 'YYYY-MM-DD', name: 'King\'s Day', multiplier?: 2.0 }
+}
+export async function savePublicHolidays(orgId, holidays) {
+  await upd(C.ORGANIZATIONS, orgId, { publicHolidays: holidays });
+}
+
 // ─── Invites ──────────────────────────────────────────
 function genCode() { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 8; i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
 export async function createInvite(data) { const code = genCode(); const ref = await addDoc(collection(db, C.INVITES), { ...data, code, used: false, createdAt: ts() }); return { id: ref.id, code }; }

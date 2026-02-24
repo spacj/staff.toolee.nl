@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate, getShops, getWorkers } from '@/lib/firestore';
+import { getShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate, getShops, getWorkers, getOvertimeRules } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
 import { DAY_LABELS } from '@/lib/scheduling';
-import { ClipboardList, Plus, Pencil, Trash2, Clock, Users, Store, Calendar, X } from 'lucide-react';
+import { ClipboardList, Plus, Pencil, Trash2, Clock, Users, Store, Calendar, X, DollarSign, Moon, Sun, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const SHIFT_TYPES = ['morning', 'afternoon', 'evening', 'night', 'split', 'custom'];
@@ -18,6 +18,7 @@ const RULE_TYPES = [
   { value: 'min_rest_hours', label: 'Minimum Rest Between Shifts', description: 'Hours of rest required before next shift' },
   { value: 'max_consecutive_days', label: 'Max Consecutive Days', description: 'Limit how many days in a row a worker can do this shift' },
 ];
+const DEFAULT_OT = { dailyThreshold: 0, dailyMultiplier: 1.5, weeklyThreshold: 0, weeklyMultiplier: 1.5, monthlyThreshold: 0, monthlyMultiplier: 1.5, nightStart: '', nightEnd: '', nightMultiplier: 1.25, earlyStart: '', earlyEnd: '', earlyMultiplier: 1.1, holidayMultiplier: 2.0, enabled: false };
 
 export default function ShiftTemplatesPage() {
   const { orgId } = useAuth();
@@ -35,24 +36,33 @@ export default function ShiftTemplatesPage() {
   });
   const [workers, setWorkers] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [orgOvertimeDefaults, setOrgOvertimeDefaults] = useState(DEFAULT_OT);
 
   const load = () => {
     if (!orgId) return;
     getShiftTemplates(orgId).then(setTemplates);
     getShops(orgId).then(setShops);
     getWorkers({ orgId }).then(setWorkers);
+    getOvertimeRules(orgId).then(r => setOrgOvertimeDefaults(r || DEFAULT_OT));
   };
   useEffect(() => { load(); }, [orgId]);
 
   const openAdd = () => {
     setEdit(null);
-    setForm({ name: '', shopId: shops[0]?.id || '', type: 'morning', startTime: '06:00', endTime: '14:00', requiredWorkers: 1, breakMinutes: 30, notes: '', daysOfWeek: [], usePerDayRequirements: false, requiredByDay: {}, rules: [] });
+    setForm({
+      name: '', shopId: shops[0]?.id || '', type: 'morning', startTime: '06:00', endTime: '14:00',
+      requiredWorkers: 1, breakMinutes: 30, notes: '', daysOfWeek: [],
+      usePerDayRequirements: false, requiredByDay: {}, rules: [],
+      useOvertimeOverride: false,
+      overtime: { ...orgOvertimeDefaults, enabled: orgOvertimeDefaults.enabled },
+    });
     setShowForm(true);
   };
 
   const openEdit = (t) => {
     setEdit(t);
     const hasPerDay = t.requiredByDay && Object.keys(t.requiredByDay).length > 0;
+    const hasOtOverride = !!t.overtimeOverride;
     setForm({
       name: t.name, shopId: t.shopId || '', type: t.type || 'morning',
       startTime: t.startTime, endTime: t.endTime,
@@ -62,6 +72,8 @@ export default function ShiftTemplatesPage() {
       usePerDayRequirements: hasPerDay,
       requiredByDay: t.requiredByDay || {},
       rules: (t.rules || []).map(migrateRule),
+      useOvertimeOverride: hasOtOverride,
+      overtime: hasOtOverride ? t.overtimeOverride : { ...orgOvertimeDefaults },
     });
     setShowForm(true);
   };
@@ -109,8 +121,11 @@ export default function ShiftTemplatesPage() {
         breakMinutes: parseInt(form.breakMinutes) || 0,
         requiredByDay: form.usePerDayRequirements ? form.requiredByDay : {},
         rules: normalizedRules,
+        overtimeOverride: form.useOvertimeOverride ? form.overtime : null,
       };
       delete data.usePerDayRequirements;
+      delete data.useOvertimeOverride;
+      delete data.overtime;
       if (edit) { await updateShiftTemplate(edit.id, data); toast.success('Template updated'); }
       else { await createShiftTemplate(data); toast.success('Template created'); }
       setShowForm(false); load();
@@ -199,7 +214,12 @@ export default function ShiftTemplatesPage() {
                              {t.rules.some(r => r.type === 'unpaid_break') && ' (unpaid break)'}
                              {t.rules.some(r => r.type === 'incompatible_workers') && ' (incompatible)'}
                            </span>
-                         )}
+                          )}
+                         {t.overtimeOverride && (
+                           <span className="flex items-center gap-1 text-amber-600">
+                             <DollarSign className="w-3 h-3" /> OT rules
+                           </span>
+                          )}
                        </div>
                       {t.requiredByDay && Object.keys(t.requiredByDay).length > 0 && (
                         <div className="flex gap-1.5 mt-1.5">
@@ -392,6 +412,126 @@ export default function ShiftTemplatesPage() {
                 </div>
               </div>
             </div>
+            {/* Overtime Rules */}
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.useOvertimeOverride} onChange={e => setForm(f => ({ ...f, useOvertimeOverride: e.target.checked, overtime: f.overtime || { ...orgOvertimeDefaults } }))} className="w-4 h-4 rounded border-surface-300 text-brand-600 focus:ring-brand-500" />
+                <span className="text-sm font-medium text-surface-700">Custom overtime rules for this template</span>
+                {!form.useOvertimeOverride && orgOvertimeDefaults.enabled && (
+                  <span className="text-[11px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Using org defaults</span>
+                )}
+              </label>
+              {form.useOvertimeOverride && (
+                <div className="mt-3 p-4 bg-amber-50/50 rounded-xl border border-amber-100 space-y-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <DollarSign className="w-4 h-4 text-amber-600" />
+                    <span className="text-sm font-semibold text-amber-800">Overtime & Premium Pay</span>
+                  </div>
+
+                  {/* Daily overtime */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-surface-600 font-medium">Daily hours threshold</label>
+                      <input type="number" min="0" max="24" step="0.5" value={form.overtime.dailyThreshold || 0}
+                        onChange={e => setForm(f => ({ ...f, overtime: { ...f.overtime, dailyThreshold: parseFloat(e.target.value) || 0 } }))}
+                        className="input-field !py-1.5 text-sm" placeholder="e.g. 8" />
+                      <p className="text-[10px] text-surface-400 mt-0.5">0 = disabled. Hours over this per day = overtime</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-surface-600 font-medium">Daily OT multiplier</label>
+                      <input type="number" min="1" max="5" step="0.05" value={form.overtime.dailyMultiplier || 1.5}
+                        onChange={e => setForm(f => ({ ...f, overtime: { ...f.overtime, dailyMultiplier: parseFloat(e.target.value) || 1.5 } }))}
+                        className="input-field !py-1.5 text-sm" />
+                    </div>
+                  </div>
+
+                  {/* Weekly overtime */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-surface-600 font-medium">Weekly hours threshold</label>
+                      <input type="number" min="0" max="168" step="0.5" value={form.overtime.weeklyThreshold || 0}
+                        onChange={e => setForm(f => ({ ...f, overtime: { ...f.overtime, weeklyThreshold: parseFloat(e.target.value) || 0 } }))}
+                        className="input-field !py-1.5 text-sm" placeholder="e.g. 40" />
+                      <p className="text-[10px] text-surface-400 mt-0.5">0 = disabled. Hours over this per week = overtime</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-surface-600 font-medium">Weekly OT multiplier</label>
+                      <input type="number" min="1" max="5" step="0.05" value={form.overtime.weeklyMultiplier || 1.5}
+                        onChange={e => setForm(f => ({ ...f, overtime: { ...f.overtime, weeklyMultiplier: parseFloat(e.target.value) || 1.5 } }))}
+                        className="input-field !py-1.5 text-sm" />
+                    </div>
+                  </div>
+
+                  {/* Monthly overtime */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-surface-600 font-medium">Monthly hours threshold</label>
+                      <input type="number" min="0" max="744" step="1" value={form.overtime.monthlyThreshold || 0}
+                        onChange={e => setForm(f => ({ ...f, overtime: { ...f.overtime, monthlyThreshold: parseFloat(e.target.value) || 0 } }))}
+                        className="input-field !py-1.5 text-sm" placeholder="e.g. 160" />
+                      <p className="text-[10px] text-surface-400 mt-0.5">0 = disabled</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-surface-600 font-medium">Monthly OT multiplier</label>
+                      <input type="number" min="1" max="5" step="0.05" value={form.overtime.monthlyMultiplier || 1.5}
+                        onChange={e => setForm(f => ({ ...f, overtime: { ...f.overtime, monthlyMultiplier: parseFloat(e.target.value) || 1.5 } }))}
+                        className="input-field !py-1.5 text-sm" />
+                    </div>
+                  </div>
+
+                  {/* Night premium */}
+                  <div className="border-t border-amber-200 pt-3">
+                    <div className="flex items-center gap-1 mb-2">
+                      <Moon className="w-3.5 h-3.5 text-indigo-500" />
+                      <span className="text-xs font-semibold text-surface-700">Night & Early Morning Premium</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-xs text-surface-600 font-medium">Night start</label>
+                        <input type="time" value={form.overtime.nightStart || ''} onChange={e => setForm(f => ({ ...f, overtime: { ...f.overtime, nightStart: e.target.value } }))} className="input-field !py-1.5 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-surface-600 font-medium">Night end</label>
+                        <input type="time" value={form.overtime.nightEnd || ''} onChange={e => setForm(f => ({ ...f, overtime: { ...f.overtime, nightEnd: e.target.value } }))} className="input-field !py-1.5 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-surface-600 font-medium">Night multiplier</label>
+                        <input type="number" min="1" max="5" step="0.05" value={form.overtime.nightMultiplier || 1.25} onChange={e => setForm(f => ({ ...f, overtime: { ...f.overtime, nightMultiplier: parseFloat(e.target.value) || 1.25 } }))} className="input-field !py-1.5 text-sm" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 mt-2">
+                      <div>
+                        <label className="text-xs text-surface-600 font-medium">Early start</label>
+                        <input type="time" value={form.overtime.earlyStart || ''} onChange={e => setForm(f => ({ ...f, overtime: { ...f.overtime, earlyStart: e.target.value } }))} className="input-field !py-1.5 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-surface-600 font-medium">Early end</label>
+                        <input type="time" value={form.overtime.earlyEnd || ''} onChange={e => setForm(f => ({ ...f, overtime: { ...f.overtime, earlyEnd: e.target.value } }))} className="input-field !py-1.5 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-surface-600 font-medium">Early multiplier</label>
+                        <input type="number" min="1" max="5" step="0.05" value={form.overtime.earlyMultiplier || 1.1} onChange={e => setForm(f => ({ ...f, overtime: { ...f.overtime, earlyMultiplier: parseFloat(e.target.value) || 1.1 } }))} className="input-field !py-1.5 text-sm" />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-surface-400 mt-1">Leave times empty to disable. Hours falling in these ranges get the premium multiplier.</p>
+                  </div>
+
+                  {/* Holiday multiplier */}
+                  <div className="border-t border-amber-200 pt-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-surface-600 font-medium">Public holiday multiplier</label>
+                        <input type="number" min="1" max="5" step="0.1" value={form.overtime.holidayMultiplier || 2.0}
+                          onChange={e => setForm(f => ({ ...f, overtime: { ...f.overtime, holidayMultiplier: parseFloat(e.target.value) || 2.0 } }))}
+                          className="input-field !py-1.5 text-sm" />
+                        <p className="text-[10px] text-surface-400 mt-0.5">Applied to all hours worked on public holidays (set holidays in Settings)</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div><label className="label">Notes</label><textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} className="input-field resize-none" /></div>
             <p className="text-xs text-surface-400 bg-surface-50 p-3 rounded-xl">Duration: <strong>{calcHours(form.startTime, form.endTime)}h</strong>{(() => {
               const unpaidRule = form.rules.find(r => r.type === 'unpaid_break');

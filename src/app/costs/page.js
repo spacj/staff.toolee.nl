@@ -5,9 +5,9 @@ import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import PayPalCheckout from '@/components/PayPalCheckout';
 import { useAuth } from '@/contexts/AuthContext';
-import { getWorkers, getShops, getShifts, getPayments, getOrganization } from '@/lib/firestore';
+import { getWorkers, getShops, getShifts, getPayments, getOrganization, getPublicHolidays, getOvertimeRules } from '@/lib/firestore';
 import { calculateCost, formatCurrency, getTierInfo, FREE_WORKER_LIMIT } from '@/lib/pricing';
-import { calculateWorkerCost } from '@/lib/scheduling';
+import { calculateWorkerCost, calculateWorkerCostWithOvertime } from '@/lib/scheduling';
 import { cn } from '@/utils/helpers';
 import { CreditCard, TrendingUp, Users, Store, CheckCircle, AlertTriangle, XCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -22,22 +22,31 @@ function CostsContent() {
   const [shifts, setShifts] = useState([]);
   const [payments, setPayments] = useState([]);
   const [orgData, setOrgData] = useState(null);
+  const [holidays, setHolidays] = useState([]);
+  const [overtimeRules, setOvertimeRules] = useState({});
   const [showSubscribe, setShowSubscribe] = useState(false);
+  const [filters, setFilters] = useState({
+    startDate: new Date().toISOString().slice(0, 7) + '-01',
+    endDate: new Date().toISOString().slice(0, 7) + '-31',
+    selectedWorkers: [],
+    selectedShops: [],
+  });
 
-  const currentPeriod = new Date().toISOString().slice(0, 7);
-  const monthStart = `${currentPeriod}-01`;
-  const monthEnd = `${currentPeriod}-31`;
+  const startDate = filters.startDate;
+  const endDate = filters.endDate;
 
   const load = () => {
     if (!orgId) return;
     getWorkers({ orgId }).then(setWorkers);
     getShops(orgId).then(setShops);
-    getShifts({ orgId, startDate: monthStart, endDate: monthEnd }).then(setShifts);
+    getShifts({ orgId, startDate, endDate }).then(setShifts);
     getPayments({ orgId, limit: 20 }).then(setPayments);
     getOrganization(orgId).then(setOrgData);
+    getPublicHolidays(orgId).then(setHolidays);
+    getOvertimeRules(orgId).then(setOvertimeRules);
   };
 
-  useEffect(() => { load(); }, [orgId]);
+  useEffect(() => { load(); }, [orgId, startDate, endDate]);
 
   useEffect(() => {
     const sub = searchParams.get('subscription');
@@ -65,16 +74,25 @@ function CostsContent() {
   }, [activeWorkers.length, shops.length, subscriptionCycle, hasActiveSubscription, hasSuspendedSubscription, freeLimit]);
 
   const laborCosts = useMemo(() => {
-    return activeWorkers.map(w => {
-      const wShifts = shifts.filter(s => s.workerId === w.id);
-      const hours = wShifts.reduce((sum, s) => sum + (s.hours || 0), 0);
-      const result = calculateWorkerCost(w, hours);
-      return { ...w, ...result, hours, shifts: wShifts.length };
+    let filteredWorkers = activeWorkers;
+    if (filters.selectedWorkers.length > 0) {
+      filteredWorkers = activeWorkers.filter(w => filters.selectedWorkers.includes(w.id));
+    }
+
+    let filteredShifts = shifts;
+    if (filters.selectedShops.length > 0) {
+      filteredShifts = shifts.filter(s => filters.selectedShops.includes(s.shopId));
+    }
+
+    return filteredWorkers.map(w => {
+      const wShifts = filteredShifts.filter(s => s.workerId === w.id);
+      const result = calculateWorkerCostWithOvertime(w, wShifts, overtimeRules, holidays);
+      return { ...w, ...result, shifts: wShifts.length };
     });
-  }, [activeWorkers, shifts]);
+  }, [activeWorkers, shifts, overtimeRules, holidays, filters]);
 
   const totalLaborCost = laborCosts.reduce((sum, w) => {
-    return sum + (w.type === 'salaried' ? (w.monthlySalary || 0) : (w.total || 0));
+    return sum + (w.type === 'salaried' ? (w.monthlySalary || 0) : (w.totalCost || 0));
   }, 0);
 
   return (
@@ -83,6 +101,64 @@ function CostsContent() {
         <div>
           <h1 className="page-title">Costs & Billing</h1>
           <p className="text-sm text-surface-500">Manage subscription, labor costs, and payment history</p>
+        </div>
+
+        {/* Filters */}
+        <div className="card p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label className="label">Start Date</label>
+              <input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters(f => ({ ...f, startDate: e.target.value }))}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="label">End Date</label>
+              <input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilters(f => ({ ...f, endDate: e.target.value }))}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="label">Workers</label>
+              <select
+                multiple
+                value={filters.selectedWorkers}
+                onChange={(e) => {
+                  const values = Array.from(e.target.selectedOptions, o => o.value);
+                  setFilters(f => ({ ...f, selectedWorkers: values }));
+                }}
+                className="input-field"
+              >
+                <option value="">All Workers</option>
+                {activeWorkers.map(w => (
+                  <option key={w.id} value={w.id}>{w.firstName} {w.lastName}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Shops</label>
+              <select
+                multiple
+                value={filters.selectedShops}
+                onChange={(e) => {
+                  const values = Array.from(e.target.selectedOptions, o => o.value);
+                  setFilters(f => ({ ...f, selectedShops: values }));
+                }}
+                className="input-field"
+              >
+                <option value="">All Shops</option>
+                {shops.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         {freeLimit && freeLimit > FREE_WORKER_LIMIT && (
@@ -201,6 +277,62 @@ function CostsContent() {
                 <p className="text-sm font-semibold text-surface-800">Total Labor</p>
                 <p className="text-sm font-bold text-surface-900">{formatCurrency(totalLaborCost)}</p>
               </div>
+            )}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="px-5 py-4 border-b border-surface-100">
+            <h3 className="section-title">Labor Costs Detail</h3>
+            <p className="text-sm text-surface-500">Breakdown by worker including overtime and premiums</p>
+          </div>
+          <div className="divide-y divide-surface-100">
+            {laborCosts.length === 0 ? (
+              <p className="p-6 text-sm text-surface-400 text-center">No labor costs for this period.</p>
+            ) : (
+              laborCosts.map(w => (
+                <div key={w.id} className="px-5 py-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-semibold text-brand-700">
+                          {(w.firstName || '')[0]}{(w.lastName || '')[0]}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-surface-800">{w.firstName} {w.lastName}</p>
+                        <p className="text-xs text-surface-500 capitalize">{w.payType} · {w.shifts} shifts · {w.hours?.toFixed(1)}h</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-surface-900">{formatCurrency(w.type === 'salaried' ? w.monthlySalary : w.totalCost)}</p>
+                      {w.type === 'hourly' && w.totalCost > w.baseCost && (
+                        <p className="text-xs text-amber-600">+{formatCurrency(w.totalCost - w.baseCost)} OT/premium</p>
+                      )}
+                    </div>
+                  </div>
+                  {w.type === 'hourly' && w.breakdown && w.breakdown.length > 0 && (
+                    <div className="mt-3 space-y-1">
+                      {w.breakdown.slice(0, 5).map((day, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-xs bg-surface-50 p-2 rounded">
+                          <span className="text-surface-600">{new Date(day.date).toLocaleDateString()}</span>
+                          <div className="flex gap-2">
+                            <span>{day.dayHours.toFixed(1)}h</span>
+                            {day.isHoliday && <span className="text-purple-600">Holiday</span>}
+                            {day.overtimeHours > 0 && <span className="text-amber-600">OT: {day.overtimeHours.toFixed(1)}h</span>}
+                            {day.nightPremiumHours > 0 && <span className="text-indigo-600">Night: {day.nightPremiumHours.toFixed(1)}h</span>}
+                            {day.earlyPremiumHours > 0 && <span className="text-blue-600">Early: {day.earlyPremiumHours.toFixed(1)}h</span>}
+                            <span className="font-medium">{formatCurrency(day.baseCost + day.overtimeCost + day.nightPremiumCost + day.earlyPremiumCost + day.holidayPremiumCost)}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {w.breakdown.length > 5 && (
+                        <p className="text-xs text-surface-400 text-center">... and {w.breakdown.length - 5} more days</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))
             )}
           </div>
         </div>

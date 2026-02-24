@@ -25,7 +25,7 @@ const PLAN_IDS = {
 };
 
 export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess }) {
-  const { orgId, user } = useAuth();
+  const { orgId, user, organization } = useAuth();
   const [cycle, setCycle] = useState(CYCLES.MONTHLY);
   const [status, setStatus] = useState('idle'); // idle | success | error
   const [errorMsg, setErrorMsg] = useState('');
@@ -33,12 +33,12 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
 
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  const cost = calculateCost(workerCount, shopCount, cycle);
-  const quantity = getSubscriptionQuantity(workerCount, shopCount);
+  const cost = calculateCost(workerCount, shopCount, cycle, organization?.freeWorkerLimit || 4);
+  const quantity = getSubscriptionQuantity(workerCount, shopCount, organization?.freeWorkerLimit || 4);
   const planId = PLAN_IDS[tier]?.[cycle];
   const isMonthly = cycle === CYCLES.MONTHLY;
-  const monthlyAlt = calculateCost(workerCount, shopCount, 'monthly');
-  const yearlyAlt = calculateCost(workerCount, shopCount, 'yearly');
+  const monthlyAlt = calculateCost(workerCount, shopCount, 'monthly', organization?.freeWorkerLimit || 4);
+  const yearlyAlt = calculateCost(workerCount, shopCount, 'yearly', organization?.freeWorkerLimit || 4);
 
   // Free tier
   if (cost.total === 0) {

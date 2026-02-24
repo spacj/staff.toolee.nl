@@ -24,7 +24,8 @@ export default function SubscriptionAlert() {
   }, [orgId]);
 
   // Don't show if: dismissed, not a manager, still loading, or on free tier
-  const tier = getTier(workerCount);
+  const freeLimit = organization?.freeWorkerLimit || FREE_WORKER_LIMIT;
+  const tier = getTier(workerCount, freeLimit);
   const needsSubscription = tier !== TIERS.FREE;
   const subStatus = organization?.subscriptionStatus;
   const hasActiveSubscription = subStatus === 'active';
@@ -33,7 +34,8 @@ export default function SubscriptionAlert() {
 
   if (dismissed || !isManager || !orgId || !needsSubscription || hasActiveSubscription) return null;
 
-  const cost = calculateCost(workerCount, shopCount, 'monthly');
+  const freeLimit = organization?.freeWorkerLimit || FREE_WORKER_LIMIT;
+  const cost = calculateCost(workerCount, shopCount, 'monthly', freeLimit);
 
   // Determine alert severity
   const isMissing = !subStatus; // never subscribed
@@ -46,8 +48,8 @@ export default function SubscriptionAlert() {
         <div className="flex-1 min-w-0">
           {isMissing && (
             <p>
-              <strong>Subscription required.</strong> You have {workerCount} active workers — billing starts from the {FREE_WORKER_LIMIT}th worker at {formatCurrency(cost.total)}/month.
-              {' '}First {FREE_WORKER_LIMIT - 1} workers are always free.
+              <strong>Subscription required.</strong> You have {workerCount} active workers — billing starts from the {freeLimit + 1}th worker at {formatCurrency(cost.total)}/month.
+              {' '}First {freeLimit} workers are always free.
             </p>
           )}
           {isSuspended && (

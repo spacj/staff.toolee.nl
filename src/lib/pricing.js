@@ -93,11 +93,12 @@ export function calculateMonthlyCost(workerCount, shopCount) {
  * Standard: quantity = monthly cost in whole euros (€1/unit pricing).
  * Enterprise: null (fixed price plan).
  */
-export function getSubscriptionQuantity(workerCount, shopCount) {
-  const tier = getTier(workerCount);
+export function getSubscriptionQuantity(workerCount, shopCount, freeLimit = FREE_WORKER_LIMIT) {
+  const tier = getTier(workerCount, freeLimit);
   if (tier !== TIERS.STANDARD) return null;
   const billableShops = Math.max(0, shopCount - 1);
-  const total = workerCount * PRICE_PER_WORKER + billableShops * PRICE_PER_SHOP;
+  const billableWorkers = Math.max(0, workerCount - freeLimit);
+  const total = billableWorkers * PRICE_PER_WORKER + billableShops * PRICE_PER_SHOP;
   // Return total cost in cents as PayPal quantity expects an integer
   return Math.round(total * 100);
 }
