@@ -143,5 +143,39 @@ service cloud.firestore {
       allow create: if true;  // Public contact form (no auth required)
       allow update: if isAuth();
     }
+
+    // Staff Availability: workers submit/manage own, managers/admins read all
+    // Schema: { orgId, workerId, workerName, date, shiftType, status, createdAt, updatedAt }
+    match /staffAvailability/{id} {
+      allow read: if isAuth() && (
+        // Workers can read their own availability
+        isAuth() && get(/databases/$(database)/documents/staffAvailability/$(id)).data.workerId == request.auth.uid ||
+        // Managers can read all availability in their org
+        isManager()
+      );
+      allow create: if isAuth() && (
+        // Only workers can create their own availability
+        request.resource.data.workerId == request.auth.uid &&
+        request.resource.data.orgId != null &&
+        request.resource.data.date != null &&
+        request.resource.data.shiftType != null
+      );
+      allow update: if isAuth() && (
+        // Workers can update their own availability
+        (resource.data.workerId == request.auth.uid && request.resource.data.workerId == request.auth.uid) ||
+        // Managers can update any availability in their org
+        isManager()
+      );
+      allow delete: if isAuth() && (
+        // Workers can delete their own availability
+        (resource.data.workerId == request.auth.uid) ||
+        // Managers can delete any availability in their org
+        isManager()
+      );
+    }
+
+    // Availability Settings: stored in organizations doc, only admins can update
+    // This is part of the organizations collection, so we use the rule above
+    // Rule: allow update on availabilitySettings field if isAdmin()
   }
 }
