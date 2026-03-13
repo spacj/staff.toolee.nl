@@ -503,7 +503,6 @@ export async function getMessageThread(parentId) {
   return parent ? [parent, ...replies] : replies;
 }
 
-<<<<<<< HEAD
 // ─── Staff Availability ─────────────────────────────
 // Schema: { orgId, workerId, workerName, date, shiftType: 'morning'|'afternoon'|'evening'|'full', notes?, status: 'available'|'unavailable', createdAt, updatedAt }
 export async function getStaffAvailability(filters = {}) {
@@ -549,7 +548,8 @@ export async function getAvailabilitySettings(orgId) {
 }
 export async function saveAvailabilitySettings(orgId, settings) {
   await upd(C.ORGANIZATIONS, orgId, { availabilitySettings: settings });
-=======
+}
+
 // ─── Webmaster: Organizations (cross-org read) ───────
 export async function getAllOrganizations() {
   return getAll(C.ORGANIZATIONS, orderBy('createdAt', 'desc'));
@@ -645,7 +645,6 @@ export async function addSupportTicketReply(ticketId, reply) {
   const replies = ticket.replies || [];
   replies.push({ ...reply, createdAt: new Date().toISOString() });
   return upd(C.SUPPORT_TICKETS, ticketId, { replies, updatedAt: ts() });
->>>>>>> opencode/witty-knight
 }
 
 export { C as COLLECTIONS };
