@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
-import { updateUserProfile, getReferrals, getOrganization, getPublicHolidays, savePublicHolidays, getInvites } from '@/lib/firestore';
+import { updateUserProfile, getReferrals, getOrganization, getPublicHolidays, savePublicHolidays, getInvites, getAvailabilitySettings, saveAvailabilitySettings } from '@/lib/firestore';
 import { ROLE_LABELS, cn, getInitials, generateAvatarColor } from '@/utils/helpers';
 import toast from 'react-hot-toast';
 import {
@@ -47,6 +47,7 @@ export default function SettingsPage() {
 
   const [holidays, setHolidays] = useState([]);
   const [orgData, setOrgData] = useState(null);
+  const [availabilitySettings, setAvailabilitySettings] = useState({ deadlineDays: 7, enabled: true });
 
   useEffect(() => {
     if (userProfile) {
@@ -64,6 +65,7 @@ export default function SettingsPage() {
     if (isAdmin && orgId) {
       getPublicHolidays(orgId).then(setHolidays);
       getOrganization(orgId).then(setOrgData);
+      getAvailabilitySettings(orgId).then(setAvailabilitySettings);
     }
   }, [userProfile, isAdmin, orgId]);
 
@@ -660,6 +662,69 @@ export default function SettingsPage() {
                 </div>
                 <div className="p-6">
                   <p className="text-sm text-surface-400">Overtime defaults are configured per shift template in the Shifts section.</p>
+                </div>
+              </div>
+
+              {/* Staff Availability Settings */}
+              <div className="card">
+                <div className="px-6 py-5 border-b border-surface-100">
+                  <h2 className="text-lg font-display font-semibold text-surface-900">Staff Availability Requirements</h2>
+                  <p className="text-sm text-surface-500 mt-0.5">Configure how far in advance staff must submit their availability</p>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="flex items-center justify-between py-3">
+                    <div>
+                      <p className="text-sm font-medium text-surface-700">Enable Availability Tracking</p>
+                      <p className="text-xs text-surface-400 mt-0.5">Require staff to submit their availability</p>
+                    </div>
+                    <button
+                      onClick={() => setAvailabilitySettings(prev => ({ ...prev, enabled: !prev.enabled }))}
+                      className="flex-shrink-0"
+                    >
+                      {availabilitySettings.enabled ? (
+                        <ToggleRight className="w-10 h-6 text-brand-600" />
+                      ) : (
+                        <ToggleLeft className="w-10 h-6 text-surface-300" />
+                      )}
+                    </button>
+                  </div>
+                  
+                  <div>
+                    <label className="label">Minimum Days in Advance</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={availabilitySettings.deadlineDays}
+                        onChange={(e) => setAvailabilitySettings(prev => ({ ...prev, deadlineDays: parseInt(e.target.value) || 7 }))}
+                        className="input-field !w-24"
+                        disabled={!availabilitySettings.enabled}
+                      />
+                      <span className="text-sm text-surface-500">
+                        days before the shift date (e.g., set 7 to require availability 7 days in advance)
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={async () => {
+                        setLoading(true);
+                        try {
+                          await saveAvailabilitySettings(orgId, availabilitySettings);
+                          toast.success('Availability settings updated');
+                        } catch (err) {
+                          toast.error('Failed to save settings');
+                        }
+                        setLoading(false);
+                      }}
+                      disabled={loading}
+                      className="btn-primary flex items-center gap-2"
+                    >
+                      <Save className="w-4 h-4" /> {loading ? 'Saving...' : 'Save Settings'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -7,12 +7,11 @@ import { db } from './firebase';
 import { getTier, calculateCost, FREE_WORKER_LIMIT } from './pricing';
 
 const C = {
-  USERS: 'users', ORGANIZATIONS: 'organizations', WORKERS: 'workers',
-  SHOPS: 'shops', SHIFT_TEMPLATES: 'shiftTemplates', SHIFTS: 'shifts',
-  SHIFT_PREFERENCES: 'shiftPreferences', ATTENDANCE: 'attendance',
-  PERMITS: 'permits', PAYMENTS: 'payments', NOTIFICATIONS: 'notifications',
-  ACTIVITY_LOG: 'activityLog', INVITES: 'invites', REFERRALS: 'referrals',
-  CORRECTION_REQUESTS: 'correctionRequests', MESSAGES: 'messages',
+  USERS: 'users', ORGANIZATIONS: 'organizations', WORKERS: 'workers', SHOPS: 'shops', 
+  SHIFT_TEMPLATES: 'shiftTemplates', SHIFTS: 'shifts', SHIFT_PREFERENCES: 'shiftPreferences', 
+  ATTENDANCE: 'attendance', PERMITS: 'permits', PAYMENTS: 'payments', NOTIFICATIONS: 'notifications',
+  ACTIVITY_LOG: 'activityLog', INVITES: 'invites', REFERRALS: 'referrals', 
+  CORRECTION_REQUESTS: 'correctionRequests', MESSAGES: 'messages', STAFF_AVAILABILITY: 'staffAvailability',
 };
 
 // ─── Helpers ──────────────────────────────────────────
@@ -483,6 +482,53 @@ export async function getMessageThread(parentId) {
   replies.sort((a, b) => (a.createdAt || '') > (b.createdAt || '') ? 1 : -1);
   const parent = await get1(C.MESSAGES, parentId);
   return parent ? [parent, ...replies] : replies;
+}
+
+// ─── Staff Availability ─────────────────────────────
+// Schema: { orgId, workerId, workerName, date, shiftType: 'morning'|'afternoon'|'evening'|'full', notes?, status: 'available'|'unavailable', createdAt, updatedAt }
+export async function getStaffAvailability(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  if (filters.workerId) c.push(where('workerId', '==', filters.workerId));
+  if (filters.startDate) c.push(where('date', '>=', filters.startDate));
+  if (filters.endDate) c.push(where('date', '<=', filters.endDate));
+  c.push(orderBy('date', 'asc'));
+  return getAll(C.STAFF_AVAILABILITY, ...c);
+}
+export async function setStaffAvailability(data) {
+  // Check if availability already exists for this worker + date
+  const snap = await getDocs(query(
+    collection(db, C.STAFF_AVAILABILITY),
+    where('workerId', '==', data.workerId),
+    where('date', '==', data.date)
+  ));
+  if (snap.empty) {
+    await add(C.STAFF_AVAILABILITY, data);
+  } else {
+    await upd(C.STAFF_AVAILABILITY, snap.docs[0].id, data);
+  }
+}
+export async function removeStaffAvailability(workerId, date) {
+  const snap = await getDocs(query(
+    collection(db, C.STAFF_AVAILABILITY),
+    where('workerId', '==', workerId),
+    where('date', '==', date)
+  ));
+  if (!snap.empty) {
+    await del(C.STAFF_AVAILABILITY, snap.docs[0].id);
+  }
+}
+
+// ─── Availability Settings (org-level) ────────────
+export async function getAvailabilitySettings(orgId) {
+  const org = await get1(C.ORGANIZATIONS, orgId);
+  return org?.availabilitySettings || {
+    deadlineDays: 7, // minimum days in advance workers must submit availability
+    enabled: true,
+  };
+}
+export async function saveAvailabilitySettings(orgId, settings) {
+  await upd(C.ORGANIZATIONS, orgId, { availabilitySettings: settings });
 }
 
 export { C as COLLECTIONS };

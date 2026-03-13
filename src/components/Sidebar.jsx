@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
-import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle, CalendarCheck } from 'lucide-react';
 
 export default function Sidebar({ mobile, onClose }) {
   const pathname = usePathname();
@@ -16,6 +16,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/shops', icon: Store, label: 'Shops' },
     { href: '/shifts', icon: ClipboardList, label: 'Shift Templates' },
     { href: '/calendar', icon: Calendar, label: 'Calendar' },
+    { href: '/staff-availability', icon: CalendarCheck, label: 'Staff Availability' },
     { href: '/attendance', icon: Clock, label: 'Attendance' },
     { href: '/costs', icon: CreditCard, label: 'Costs & Billing' },
     { href: '/settings', icon: Settings, label: 'Settings' },
@@ -28,6 +29,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/shops', icon: Store, label: 'Shops' },
     { href: '/shifts', icon: ClipboardList, label: 'Shift Templates' },
     { href: '/calendar', icon: Calendar, label: 'Calendar' },
+    { href: '/staff-availability', icon: CalendarCheck, label: 'Staff Availability' },
     { href: '/attendance', icon: Clock, label: 'Attendance' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
@@ -37,6 +39,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/chat', icon: MessageCircle, label: 'Chat' },
     { href: '/time', icon: Clock, label: 'My Time' },
     { href: '/calendar', icon: Calendar, label: 'My Schedule' },
+    { href: '/availability', icon: CalendarCheck, label: 'My Availability' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 

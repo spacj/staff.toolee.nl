@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
-import { LayoutDashboard, Users, Calendar, Clock, Settings, Store, ClipboardList, CreditCard, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Clock, Settings, Store, ClipboardList, CreditCard, MessageCircle, CalendarCheck } from 'lucide-react';
 
 export default function MobileNav() {
   const pathname = usePathname();
@@ -16,8 +16,8 @@ export default function MobileNav() {
     { href: '/shops', icon: Store, label: 'Shops' },
     { href: '/shifts', icon: ClipboardList, label: 'Shifts' },
     { href: '/calendar', icon: Calendar, label: 'Calendar' },
+    { href: '/staff-availability', icon: CalendarCheck, label: 'Availability' },
     { href: '/attendance', icon: Clock, label: 'Attendance' },
-    { href: '/costs', icon: CreditCard, label: 'Costs' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
   const managerItems = [
@@ -27,6 +27,7 @@ export default function MobileNav() {
     { href: '/shops', icon: Store, label: 'Shops' },
     { href: '/shifts', icon: ClipboardList, label: 'Shifts' },
     { href: '/calendar', icon: Calendar, label: 'Calendar' },
+    { href: '/staff-availability', icon: CalendarCheck, label: 'Availability' },
     { href: '/attendance', icon: Clock, label: 'Attendance' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
@@ -35,6 +36,7 @@ export default function MobileNav() {
     { href: '/chat', icon: MessageCircle, label: 'Chat' },
     { href: '/time', icon: Clock, label: 'My Time' },
     { href: '/calendar', icon: Calendar, label: 'Schedule' },
+    { href: '/availability', icon: CalendarCheck, label: 'Availability' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
   const items = isAdmin ? adminItems : isManager ? managerItems : workerItems;
