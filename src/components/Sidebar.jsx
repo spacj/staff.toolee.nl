@@ -3,11 +3,18 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
-import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle, CalendarCheck } from 'lucide-react';
+import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle, CalendarCheck, Globe, Building2, DollarSign, Tag, Inbox } from 'lucide-react';
 
 export default function Sidebar({ mobile, onClose }) {
   const pathname = usePathname();
-  const { signOut, isAdmin, isManager, organization, userProfile } = useAuth();
+  const { signOut, isAdmin, isManager, isWebmaster, organization, userProfile } = useAuth();
+
+  const webmasterLinks = [
+    { href: '/webmaster', icon: Globe, label: 'Dashboard' },
+    { href: '/webmaster/tickets', icon: Inbox, label: 'Support Tickets' },
+    { href: '/webmaster/sales', icon: DollarSign, label: 'Sales Leads' },
+    { href: '/settings', icon: Settings, label: 'Settings' },
+  ];
 
   const adminLinks = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -43,7 +50,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 
-  const links = isAdmin ? adminLinks : isManager ? managerLinks : workerLinks;
+  const links = isWebmaster ? webmasterLinks : isAdmin ? adminLinks : isManager ? managerLinks : workerLinks;
 
   return (
     <div className={cn(

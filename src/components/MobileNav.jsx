@@ -3,11 +3,18 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
-import { LayoutDashboard, Users, Calendar, Clock, Settings, Store, ClipboardList, CreditCard, MessageCircle, CalendarCheck } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Clock, Settings, Store, ClipboardList, CreditCard, MessageCircle, CalendarCheck, Globe, Inbox, DollarSign } from 'lucide-react';
 
 export default function MobileNav() {
   const pathname = usePathname();
-  const { isManager, isAdmin } = useAuth();
+  const { isManager, isAdmin, isWebmaster } = useAuth();
+
+  const webmasterItems = [
+    { href: '/webmaster', icon: Globe, label: 'Dashboard' },
+    { href: '/webmaster/tickets', icon: Inbox, label: 'Tickets' },
+    { href: '/webmaster/sales', icon: DollarSign, label: 'Sales' },
+    { href: '/settings', icon: Settings, label: 'Settings' },
+  ];
 
   const adminItems = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -39,7 +46,7 @@ export default function MobileNav() {
     { href: '/availability', icon: CalendarCheck, label: 'Availability' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
-  const items = isAdmin ? adminItems : isManager ? managerItems : workerItems;
+  const items = isWebmaster ? webmasterItems : isAdmin ? adminItems : isManager ? managerItems : workerItems;
 
   return (
     <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30">

@@ -12,6 +12,8 @@ const C = {
   ATTENDANCE: 'attendance', PERMITS: 'permits', PAYMENTS: 'payments', NOTIFICATIONS: 'notifications',
   ACTIVITY_LOG: 'activityLog', INVITES: 'invites', REFERRALS: 'referrals', 
   CORRECTION_REQUESTS: 'correctionRequests', MESSAGES: 'messages', STAFF_AVAILABILITY: 'staffAvailability',
+  WEBMASTER_REFERRAL_CODES: 'webmasterReferralCodes', WEBMASTER_EARNINGS: 'webmasterEarnings',
+  SUPPORT_TICKETS: 'supportTickets',
 };
 
 // ─── Helpers ──────────────────────────────────────────
@@ -436,17 +438,34 @@ export async function getMessages(filters = {}) {
 }
 
 export async function getConversations(userId, orgId, userRole, workers = []) {
-  const all = await getMessages({ orgId, limit: 100 });
+  const all = await getMessages({ orgId, limit: 200 });
   const convMap = new Map();
   
   for (const m of all) {
     // Determine conversation partner
     let partnerId, partnerName, partnerRole;
+    
+    // Check if message is from management (for workers) or to management (for managers)
+    const isToManagement = m.recipientType === 'management';
+    const isFromManagement = m.senderRole === 'manager' || m.senderRole === 'admin';
+    
     if (m.senderId === userId) {
+      // Message sent by current user
       partnerId = m.recipientId;
       partnerName = m.recipientName;
       partnerRole = m.recipientRole;
     } else if (m.recipientId === userId) {
+      // Message directly sent to current user
+      partnerId = m.senderId;
+      partnerName = m.senderName;
+      partnerRole = m.senderRole;
+    } else if (isToManagement && (userRole === 'manager' || userRole === 'admin')) {
+      // Worker message to management - show as conversation with that worker
+      partnerId = m.senderId;
+      partnerName = m.senderName;
+      partnerRole = m.senderRole;
+    } else if (isFromManagement && m.recipientType === 'management') {
+      // Management message to workers - show as conversation with management
       partnerId = m.senderId;
       partnerName = m.senderName;
       partnerRole = m.senderRole;
@@ -484,6 +503,7 @@ export async function getMessageThread(parentId) {
   return parent ? [parent, ...replies] : replies;
 }
 
+<<<<<<< HEAD
 // ─── Staff Availability ─────────────────────────────
 // Schema: { orgId, workerId, workerName, date, shiftType: 'morning'|'afternoon'|'evening'|'full', notes?, status: 'available'|'unavailable', createdAt, updatedAt }
 export async function getStaffAvailability(filters = {}) {
@@ -529,6 +549,103 @@ export async function getAvailabilitySettings(orgId) {
 }
 export async function saveAvailabilitySettings(orgId, settings) {
   await upd(C.ORGANIZATIONS, orgId, { availabilitySettings: settings });
+=======
+// ─── Webmaster: Organizations (cross-org read) ───────
+export async function getAllOrganizations() {
+  return getAll(C.ORGANIZATIONS, orderBy('createdAt', 'desc'));
+}
+
+// ─── Webmaster: All Users (for enriching company owner info) ─
+export async function getAllUsers() {
+  return getAll(C.USERS);
+}
+
+// ─── Webmaster: All Referrals (cross-org) ─────────────
+export async function getAllReferrals() {
+  return getAll(C.REFERRALS, orderBy('createdAt', 'desc'));
+}
+
+// ─── Webmaster: All Payments (cross-org) ──────────────
+export async function getAllPayments() {
+  return getAll(C.PAYMENTS, orderBy('createdAt', 'desc'));
+}
+
+// ─── Webmaster Referral Codes ─────────────────────────
+// Schema: { code, description, commissionPercent, commissionFlat, isActive, usageCount, createdBy, createdAt }
+export async function getWebmasterReferralCodes(webmasterUid) {
+  // Single-field where to avoid composite index requirement; sort client-side
+  let results = await getAll(C.WEBMASTER_REFERRAL_CODES, where('createdBy', '==', webmasterUid));
+  results.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+  return results;
+}
+export async function createWebmasterReferralCode(data) {
+  return add(C.WEBMASTER_REFERRAL_CODES, { ...data, usageCount: 0, isActive: true });
+}
+export async function updateWebmasterReferralCode(id, data) {
+  return upd(C.WEBMASTER_REFERRAL_CODES, id, data);
+}
+export async function deleteWebmasterReferralCode(id) {
+  return del(C.WEBMASTER_REFERRAL_CODES, id);
+}
+export async function getWebmasterReferralCodeByCode(code) {
+  const snap = await getDocs(query(collection(db, C.WEBMASTER_REFERRAL_CODES), where('code', '==', code.toUpperCase()), where('isActive', '==', true)));
+  return snap.empty ? null : ser(snap.docs[0]);
+}
+
+// ─── Webmaster Earnings ───────────────────────────────
+// Schema: { webmasterUid, orgId, orgName, referralCodeId, referralCode, amount, type: 'commission'|'bonus', status: 'pending'|'paid', paidAt?, createdAt }
+export async function getWebmasterEarnings(webmasterUid) {
+  // Single-field where to avoid composite index requirement; sort client-side
+  let results = await getAll(C.WEBMASTER_EARNINGS, where('webmasterUid', '==', webmasterUid));
+  results.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+  return results;
+}
+export async function createWebmasterEarning(data) {
+  return add(C.WEBMASTER_EARNINGS, data);
+}
+export async function updateWebmasterEarning(id, data) {
+  return upd(C.WEBMASTER_EARNINGS, id, data);
+}
+
+// ─── Webmaster: All Workers count (cross-org) ─────────
+export async function getAllWorkersCount() {
+  const snap = await getDocs(query(collection(db, C.WORKERS), where('status', '==', 'active')));
+  return snap.size;
+}
+
+// ─── Support Tickets ─────────────────────────────────────
+// Schema: { ticketId, subject, message, category, priority, status, source, senderName, senderEmail, senderRole, senderId, orgId, orgName, replies: [{message, senderName, senderRole, createdAt}], assignedTo, createdAt, updatedAt }
+// Categories: 'billing', 'technical', 'feature', 'account', 'general'
+// Priorities: 'low', 'medium', 'high', 'urgent'
+// Status: 'open', 'in-progress', 'resolved', 'closed'
+// Source: 'website' (public form), 'app' (from chat)
+export async function getAllSupportTickets() {
+  return getAll(C.SUPPORT_TICKETS, orderBy('createdAt', 'desc'));
+}
+export async function getSupportTicketsByOrg(orgId) {
+  const all = await getAll(C.SUPPORT_TICKETS);
+  return all.filter(t => t.orgId === orgId).sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+}
+export async function getSupportTicketById(id) {
+  return get1(C.SUPPORT_TICKETS, id);
+}
+export async function createSupportTicket(data) {
+  return add(C.SUPPORT_TICKETS, {
+    ...data,
+    status: 'open',
+    replies: [],
+  });
+}
+export async function updateSupportTicket(id, data) {
+  return upd(C.SUPPORT_TICKETS, id, data);
+}
+export async function addSupportTicketReply(ticketId, reply) {
+  const ticket = await get1(C.SUPPORT_TICKETS, ticketId);
+  if (!ticket) throw new Error('Ticket not found');
+  const replies = ticket.replies || [];
+  replies.push({ ...reply, createdAt: new Date().toISOString() });
+  return upd(C.SUPPORT_TICKETS, ticketId, { replies, updatedAt: ts() });
+>>>>>>> opencode/witty-knight
 }
 
 export { C as COLLECTIONS };

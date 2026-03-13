@@ -2,7 +2,7 @@ export function cn(...inputs) {
   return inputs.filter(Boolean).join(' ');
 }
 
-export const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', worker: 'Worker' };
+export const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', worker: 'Worker', webmaster: 'Webmaster' };
 
 export function getInitials(first = '', last = '') {
   return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();

@@ -5,6 +5,7 @@ service cloud.firestore {
     function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
     function isAdmin() { return isAuth() && userDoc().role == 'admin'; }
     function isManager() { return isAuth() && (userDoc().role == 'admin' || userDoc().role == 'manager'); }
+    function isWebmaster() { return isAuth() && userDoc().role == 'webmaster'; }
 
     // Users: anyone can read, only self or admin can write
     match /users/{uid} {
@@ -123,6 +124,23 @@ service cloud.firestore {
     match /messages/{id} {
       allow read: if isAuth();
       allow create: if isAuth();
+      allow update: if isAuth();
+    }
+
+    // Webmaster Referral Codes: auth read/write (access enforced in app via isWebmaster)
+    match /webmasterReferralCodes/{id} {
+      allow read, create, update, delete: if isAuth();
+    }
+
+    // Webmaster Earnings: auth read/write (access enforced in app via isWebmaster)
+    match /webmasterEarnings/{id} {
+      allow read, create, update, delete: if isAuth();
+    }
+
+    // Support Tickets: public create (contact form), auth read/write
+    match /supportTickets/{id} {
+      allow read: if isAuth();
+      allow create: if true;  // Public contact form (no auth required)
       allow update: if isAuth();
     }
   }

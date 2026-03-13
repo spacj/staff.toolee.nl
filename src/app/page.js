@@ -1,10 +1,13 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { PRICE_PER_WORKER, PRICE_PER_SHOP, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE, ENTERPRISE_THRESHOLD, FREE_WORKER_LIMIT } from '@/lib/pricing';
-import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ExternalLink } from 'lucide-react';
+import { createSupportTicket } from '@/lib/firestore';
+import Modal from '@/components/Modal';
+import toast from 'react-hot-toast';
+import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ExternalLink, HelpCircle, Send, Loader2, Building2, Users as UsersIcon, Mail, Phone } from 'lucide-react';
 
 const features = [
   { icon: Store, title: 'Multi-Shop Management', desc: 'Manage multiple locations from one dashboard with separate schedules and staff.', color: 'from-brand-500 to-brand-600' },
@@ -24,13 +27,276 @@ const plans = [
     features: ['Unlimited workers & shops', `€${ENTERPRISE_PRICE_MONTHLY}/mo (€${ENTERPRISE_DISCOUNTED_PRICE} with discount)`, 'Dedicated support', 'Custom integrations', 'SLA guarantee', 'Everything included'], cta: 'Contact Sales', href: '/register' },
 ];
 
+const CATEGORIES = [
+  { value: 'general', label: 'General Question' },
+  { value: 'billing', label: 'Billing & Pricing' },
+  { value: 'technical', label: 'Technical Support' },
+  { value: 'feature', label: 'Feature Request' },
+  { value: 'account', label: 'Account Help' },
+  { value: 'sales', label: 'Sales Inquiry' },
+];
+
+function ContactForm() {
+  const [form, setForm] = useState({ name: '', email: '', company: '', message: '', category: 'general' });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim() || !form.message.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await createSupportTicket({
+        subject: `[${CATEGORIES.find(c => c.value === form.category)?.label || 'General'}] ${form.name}`,
+        message: form.message,
+        category: form.category,
+        priority: 'medium',
+        source: 'website',
+        senderName: form.name.trim(),
+        senderEmail: form.email.trim(),
+        senderRole: 'visitor',
+        orgName: form.company.trim() || null,
+      });
+      setSubmitted(true);
+      toast.success('Message sent! We\'ll get back to you soon.');
+    } catch (err) {
+      console.error('Contact form error:', err);
+      toast.error('Failed to send message. Please try again.');
+    }
+    setSubmitting(false);
+  };
+
+  if (submitted) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
+        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Check className="w-8 h-8 text-emerald-600" />
+        </div>
+        <h3 className="text-xl font-display font-bold text-slate-900 mb-2">Message Sent!</h3>
+        <p className="text-slate-600 mb-2">Thank you for reaching out. We'll respond within 24 hours.</p>
+        <p className="text-sm text-slate-500 mb-4">Create an account to track your support tickets.</p>
+        <div className="flex justify-center gap-3">
+          <Link href="/register" className="btn-primary !py-2 !px-4 text-sm">
+            Get Started
+          </Link>
+          <button onClick={() => { setSubmitted(false); setForm({ name: '', email: '', company: '', message: '', category: 'general' }); }} className="btn-secondary !py-2 !px-4 text-sm">
+            Send another
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className="label">Name *</label>
+          <input
+            type="text"
+            value={form.name}
+            onChange={e => setForm({ ...form, name: e.target.value })}
+            placeholder="Your name"
+            className="input-field"
+            required
+          />
+        </div>
+        <div>
+          <label className="label">Email *</label>
+          <input
+            type="email"
+            value={form.email}
+            onChange={e => setForm({ ...form, email: e.target.value })}
+            placeholder="you@company.com"
+            className="input-field"
+            required
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className="label">Company</label>
+          <input
+            type="text"
+            value={form.company}
+            onChange={e => setForm({ ...form, company: e.target.value })}
+            placeholder="Your company (optional)"
+            className="input-field"
+          />
+        </div>
+        <div>
+          <label className="label">Category</label>
+          <select
+            value={form.category}
+            onChange={e => setForm({ ...form, category: e.target.value })}
+            className="select-field"
+          >
+            {CATEGORIES.map(cat => (
+              <option key={cat.value} value={cat.value}>{cat.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="mb-6">
+        <label className="label">Message *</label>
+        <textarea
+          value={form.message}
+          onChange={e => setForm({ ...form, message: e.target.value })}
+          placeholder="How can we help you?"
+          className="input-field min-h-[120px] resize-none"
+          required
+        />
+      </div>
+      <button type="submit" disabled={submitting} className="btn-primary w-full !py-3">
+        {submitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : <>Send Message <Send className="w-4 h-4 ml-2" /></>}
+      </button>
+    </form>
+  );
+}
+
+function ContactSalesForm({ onClose }) {
+  const [form, setForm] = useState({ name: '', email: '', company: '', phone: '', employees: '', message: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim() || !form.company.trim()) {
+      toast.error('Please fill in name, email, and company');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await createSupportTicket({
+        subject: `[Sales Inquiry] Enterprise - ${form.company}`,
+        message: `Company: ${form.company}\nName: ${form.name}\nEmail: ${form.email}\nPhone: ${form.phone}\nEmployees: ${form.employees}\n\nMessage:\n${form.message}`,
+        category: 'sales',
+        priority: 'high',
+        source: 'website',
+        senderName: form.name.trim(),
+        senderEmail: form.email.trim(),
+        senderRole: 'prospect',
+        orgName: form.company.trim(),
+      });
+      setSubmitted(true);
+      toast.success('Thank you! Our sales team will contact you within 24 hours.');
+    } catch (err) {
+      console.error('Sales form error:', err);
+      toast.error('Failed to submit. Please try again.');
+    }
+    setSubmitting(false);
+  };
+
+  if (submitted) {
+    return (
+      <div className="text-center py-8">
+        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Check className="w-8 h-8 text-emerald-600" />
+        </div>
+        <h3 className="text-xl font-display font-bold text-slate-900 mb-2">Request Received!</h3>
+        <p className="text-slate-600 mb-4">Our sales team will contact you within 24 hours.</p>
+        <button onClick={onClose} className="btn-primary !py-2 !px-6">
+          Close
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label">Full Name *</label>
+          <input
+            type="text"
+            value={form.name}
+            onChange={e => setForm({ ...form, name: e.target.value })}
+            placeholder="John Smith"
+            className="input-field"
+            required
+          />
+        </div>
+        <div>
+          <label className="label">Work Email *</label>
+          <input
+            type="email"
+            value={form.email}
+            onChange={e => setForm({ ...form, email: e.target.value })}
+            placeholder="john@company.com"
+            className="input-field"
+            required
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label">Company Name *</label>
+          <input
+            type="text"
+            value={form.company}
+            onChange={e => setForm({ ...form, company: e.target.value })}
+            placeholder="Acme Inc."
+            className="input-field"
+            required
+          />
+        </div>
+        <div>
+          <label className="label">Phone Number</label>
+          <input
+            type="tel"
+            value={form.phone}
+            onChange={e => setForm({ ...form, phone: e.target.value })}
+            placeholder="+31 6 12345678"
+            className="input-field"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="label">Number of Employees</label>
+        <select
+          value={form.employees}
+          onChange={e => setForm({ ...form, employees: e.target.value })}
+          className="select-field"
+        >
+          <option value="">Select...</option>
+          <option value="1-10">1-10</option>
+          <option value="11-25">11-25</option>
+          <option value="26-50">26-50</option>
+          <option value="51-100">51-100</option>
+          <option value="101-250">101-250</option>
+          <option value="250+">250+</option>
+        </select>
+      </div>
+      <div>
+        <label className="label">How can we help? *</label>
+        <textarea
+          value={form.message}
+          onChange={e => setForm({ ...form, message: e.target.value })}
+          placeholder="Tell us about your needs..."
+          className="input-field min-h-[100px] resize-none"
+          required
+        />
+      </div>
+      <button type="submit" disabled={submitting} className="btn-primary w-full !py-3">
+        {submitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : <>Submit Inquiry <Send className="w-4 h-4 ml-2" /></>}
+      </button>
+    </form>
+  );
+}
+
 export default function HomePage() {
-  const { user, userProfile, loading } = useAuth();
+  const { user, userProfile, loading, isWebmaster } = useAuth();
   const router = useRouter();
+  const [showSalesModal, setShowSalesModal] = useState(false);
 
   useEffect(() => {
-    if (!loading && user && userProfile) router.replace('/dashboard');
-  }, [user, userProfile, loading, router]);
+    if (!loading && user && userProfile) {
+      router.replace(isWebmaster ? '/webmaster' : '/dashboard');
+    }
+  }, [user, userProfile, loading, isWebmaster, router]);
 
   if (loading || (user && userProfile)) return <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50/30" />;
 
@@ -49,6 +315,7 @@ export default function HomePage() {
             </div>
           </Link>
           <div className="flex items-center gap-4">
+            <a href="#contact" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2">Contact</a>
             <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2">Sign In</Link>
             <Link href="/register" className="btn-primary !py-2.5 !px-6 !text-sm !shadow-lg !shadow-brand-500/30">Get Started</Link>
           </div>
@@ -174,12 +441,33 @@ export default function HomePage() {
                     </li>
                   ))}
                 </ul>
-                <Link href={plan.href} className={`block w-full text-center py-4 rounded-xl text-sm font-semibold transition-all ${plan.popular ? 'bg-gradient-to-b from-brand-500 to-brand-600 text-white hover:from-brand-600 hover:to-brand-700 shadow-lg shadow-brand-500/30' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                  {plan.cta}
-                </Link>
+                {plan.name === 'Enterprise' ? (
+                  <button onClick={() => setShowSalesModal(true)} className="block w-full text-center py-4 rounded-xl text-sm font-semibold transition-all bg-purple-100 text-purple-700 hover:bg-purple-200">
+                    {plan.cta}
+                  </button>
+                ) : (
+                  <Link href={plan.href} className={`block w-full text-center py-4 rounded-xl text-sm font-semibold transition-all ${plan.popular ? 'bg-gradient-to-b from-brand-500 to-brand-600 text-white hover:from-brand-600 hover:to-brand-700 shadow-lg shadow-brand-500/30' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                    {plan.cta}
+                  </Link>
+                )}
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Contact Section */}
+      <section id="contact" className="py-24 px-4 sm:px-6 bg-gradient-to-br from-slate-50 to-brand-50/30">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 bg-brand-100 text-brand-700 text-sm font-medium px-5 py-2.5 rounded-full mb-6">
+              <HelpCircle className="w-4 h-4" /> Get in Touch
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-slate-900 mb-4">Have questions?</h2>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">Can't find what you're looking for? Send us a message and we'll get back to you within 24 hours.</p>
+          </div>
+          
+          <ContactForm />
         </div>
       </section>
 
@@ -202,6 +490,14 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Contact Sales Modal */}
+      <Modal open={showSalesModal} onClose={() => setShowSalesModal(false)} title="Contact Sales">
+        <div className="p-2">
+          <p className="text-sm text-surface-500 mb-4">Get a custom quote for your enterprise needs. Our team will get back to you within 24 hours.</p>
+          <ContactSalesForm onClose={() => setShowSalesModal(false)} />
+        </div>
+      </Modal>
 
       {/* Footer */}
       <footer className="py-12 px-4 sm:px-6 border-t border-slate-200/60 bg-white">

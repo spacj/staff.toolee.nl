@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getShifts, getWorkers, getShops, getShiftTemplates, getPermits, bulkCreateShifts, deleteShift, createShift, getPublicHolidays, savePublicHolidays } from '@/lib/firestore';
 import { generateWeeklySchedule, DAY_LABELS } from '@/lib/scheduling';
 import { cn } from '@/utils/helpers';
-import { ChevronLeft, ChevronRight, Plus, Wand2, Trash2, Calendar as CalIcon, Users, Clock, Grid3X3, List, LayoutGrid, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Wand2, Trash2, Calendar as CalIcon, Users, Clock, Grid3X3, List, LayoutGrid, AlertTriangle, CheckCircle, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const VIEWS = { MONTH: 'month', WEEK: 'week', LIST: 'list' };
@@ -206,16 +206,26 @@ export default function CalendarPage() {
     if (!name || !name.trim()) return;
     const newHoliday = { date, name: name.trim() };
     const updated = [...publicHolidays, newHoliday];
-    await savePublicHolidays(orgId, updated);
-    setPublicHolidays(updated);
-    toast.success('Public holiday added');
+    try {
+      await savePublicHolidays(orgId, updated);
+      setPublicHolidays(updated);
+      toast.success('Public holiday added');
+    } catch (err) {
+      console.error('Failed to save public holiday:', err);
+      toast.error('Failed to save public holiday. Please try again.');
+    }
   };
 
   const removePublicHoliday = async (date) => {
     const updated = publicHolidays.filter(h => h.date !== date);
-    await savePublicHolidays(orgId, updated);
-    setPublicHolidays(updated);
-    toast.success('Public holiday removed');
+    try {
+      await savePublicHolidays(orgId, updated);
+      setPublicHolidays(updated);
+      toast.success('Public holiday removed');
+    } catch (err) {
+      console.error('Failed to remove public holiday:', err);
+      toast.error('Failed to remove public holiday. Please try again.');
+    }
   };
 
   // ─── Shift Card ─────────────────────
@@ -242,7 +252,7 @@ export default function CalendarPage() {
     const dayPermits = permitsForDate(ds);
     const isToday = ds === todayStr;
     const isSel = ds === selectedDate;
-    const isPublicHoliday = publicHolidays.some(h => h.date === ds);
+    const isPublicHoliday = publicHolidays?.some ? publicHolidays.some(h => h.date === ds) : false;
     return (
       <div onClick={() => setSelectedDate(ds)} className={cn(
         'h-14 sm:h-24 p-1 sm:p-1.5 border-b border-r border-surface-100 cursor-pointer transition-colors overflow-hidden',
@@ -321,7 +331,8 @@ export default function CalendarPage() {
               </div>
             </div>
             {selectedDate && (() => {
-              const isPublicHoliday = publicHolidays.some(h => h.date === selectedDate);
+              const isPublicHoliday = publicHolidays?.some ? publicHolidays.some(h => h.date === selectedDate) : false;
+              const holiday = publicHolidays?.find ? publicHolidays.find(h => h.date === selectedDate) : null;
               return (
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-4">
@@ -338,7 +349,7 @@ export default function CalendarPage() {
                   ))}
                   {isPublicHoliday && (
                     <div className="p-3 rounded-xl text-sm bg-red-50 text-red-700 flex items-center justify-between">
-                      <span><strong>Public Holiday:</strong> {publicHolidays.find(h => h.date === selectedDate)?.name}</span>
+                      <span><strong>Public Holiday:</strong> {holiday?.name || 'Holiday'}</span>
                       {isManager && <button onClick={() => removePublicHoliday(selectedDate)} className="btn-icon !w-6 !h-6 hover:!text-red-800"><X className="w-4 h-4" /></button>}
                     </div>
                   )}
