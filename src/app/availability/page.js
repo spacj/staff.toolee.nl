@@ -118,16 +118,25 @@ export default function AvailabilityPage() {
   const getShiftTypeInfo = (shiftType) => SHIFT_TYPES.find(s => s.id === shiftType) || SHIFT_TYPES[3];
 
    if (!isWorker) {
-    return (
-      <Layout>
-        <div className="card p-8 text-center">
-          <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-          <h2 className="text-lg font-semibold text-surface-800">Staff Availability</h2>
-          <p className="text-surface-500 mt-2">Managers and admins can view staff availability in the Staff Availability section.</p>
-        </div>
-      </Layout>
-    );
-  }
+     return (
+       <Layout>
+         <div className="space-y-4">
+           <div className="page-header">
+             <div>
+               <h1 className="page-title">My Availability</h1>
+               <p className="text-surface-500 mt-1">Workers only - Submit your availability for upcoming shifts</p>
+             </div>
+           </div>
+           <div className="card p-8 text-center bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200">
+             <AlertCircle className="w-12 h-12 text-amber-600 mx-auto mb-4" />
+             <h2 className="text-lg font-semibold text-amber-900">Access Restricted</h2>
+             <p className="text-amber-700 mt-2">This page is for staff members only. Only workers can submit their availability.</p>
+             <p className="text-sm text-amber-600 mt-4">If you are a manager or owner, you can view staff availability in the <strong>Staff Availability</strong> section from the sidebar menu.</p>
+           </div>
+         </div>
+       </Layout>
+     );
+   }
 
   return (
     <Layout>

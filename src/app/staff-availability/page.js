@@ -93,17 +93,26 @@ export default function StaffAvailabilityPage() {
     return Object.values(stats);
   }, [filteredAvailability, workers]);
 
-  if (!isManager) {
-    return (
-      <Layout>
-        <div className="card p-8 text-center">
-          <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-          <h2 className="text-lg font-semibold text-surface-800">Staff Availability</h2>
-          <p className="text-surface-500 mt-2">This page is for managers and admins only.</p>
-        </div>
-      </Layout>
-    );
-  }
+   if (!isManager) {
+     return (
+       <Layout>
+         <div className="space-y-4">
+           <div className="page-header">
+             <div>
+               <h1 className="page-title">Staff Availability</h1>
+               <p className="text-surface-500 mt-1">Managers and owners only - View and manage team availability</p>
+             </div>
+           </div>
+           <div className="card p-8 text-center bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200">
+             <AlertCircle className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+             <h2 className="text-lg font-semibold text-blue-900">Management Only</h2>
+             <p className="text-blue-700 mt-2">This page is restricted to managers and owners only.</p>
+             <p className="text-sm text-blue-600 mt-4">If you're a staff member, you can submit your availability in the <strong>My Availability</strong> section.</p>
+           </div>
+         </div>
+       </Layout>
+     );
+   }
 
   return (
     <Layout>
