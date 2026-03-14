@@ -290,6 +290,7 @@ export function AuthProvider({ children }) {
     isWebmaster: userProfile?.role === 'webmaster',
     role: userProfile?.role || 'worker',
     orgId: userProfile?.orgId || null,
+    workerId: userProfile?.workerId || null,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
