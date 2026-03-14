@@ -8,11 +8,18 @@ import toast from 'react-hot-toast';
 
 export default function StaffAvailabilityPage() {
   const { orgId, isManager, userProfile } = useAuth();
-  const [loading, setLoading] = useState(true);
+  
+  console.log('=== StaffAvailability Debug ===');
+  console.log('orgId:', orgId);
+  console.log('isManager:', isManager);
+  console.log('userProfile:', userProfile);
+  console.log('userProfile.role:', userProfile?.role);
+  console.log('================================');
   const [availability, setAvailability] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [settings, setSettings] = useState({ deadlineDays: 7, enabled: true });
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   console.log('StaffAvailabilityPage - orgId:', orgId, 'isManager:', isManager);
 
