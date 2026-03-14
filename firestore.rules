@@ -151,6 +151,22 @@ service cloud.firestore {
       allow write: if isAuth();
     }
 
+    // Knowledge Base Categories: all auth read, managers+ create/update/delete
+    match /kbCategories/{id} {
+      allow read: if isAuth();
+      allow create: if isManager();
+      allow update: if isManager();
+      allow delete: if isManager();
+    }
+
+    // Knowledge Base Articles: all auth read, managers+ create/update/delete
+    match /kbArticles/{id} {
+      allow read: if isAuth();
+      allow create: if isManager();
+      allow update: if isManager();
+      allow delete: if isManager();
+    }
+
     // Availability Settings: stored in organizations doc, only admins can update
     // This is part of the organizations collection, so we use the rule above
     // Rule: allow update on availabilitySettings field if isAdmin()
