@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
-import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle, CalendarCheck, Globe, Building2, DollarSign, Tag, Inbox, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle, CalendarCheck, Globe, Building2, DollarSign, Tag, Inbox, BookOpen, ClipboardCheck } from 'lucide-react';
 
 export default function Sidebar({ mobile, onClose }) {
   const pathname = usePathname();
@@ -25,6 +25,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/calendar', icon: Calendar, label: 'Calendar' },
     { href: '/staff-availability', icon: CalendarCheck, label: 'Staff Availability' },
     { href: '/attendance', icon: Clock, label: 'Attendance' },
+    { href: '/checklists', icon: ClipboardCheck, label: 'Checklists' },
     { href: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
     { href: '/costs', icon: CreditCard, label: 'Costs & Billing' },
     { href: '/settings', icon: Settings, label: 'Settings' },
@@ -39,6 +40,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/calendar', icon: Calendar, label: 'Calendar' },
     { href: '/staff-availability', icon: CalendarCheck, label: 'Staff Availability' },
     { href: '/attendance', icon: Clock, label: 'Attendance' },
+    { href: '/checklists', icon: ClipboardCheck, label: 'Checklists' },
     { href: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
@@ -49,6 +51,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/time', icon: Clock, label: 'My Time' },
     { href: '/calendar', icon: Calendar, label: 'My Schedule' },
     { href: '/availability', icon: CalendarCheck, label: 'My Availability' },
+    { href: '/my-checklists', icon: ClipboardCheck, label: 'My Checklists' },
     { href: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];

@@ -151,6 +151,22 @@ service cloud.firestore {
       allow write: if isAuth();
     }
 
+    // Checklist Templates: all auth read, managers+ create/update/delete
+    match /checklistTemplates/{id} {
+      allow read: if isAuth();
+      allow create: if isManager();
+      allow update: if isManager();
+      allow delete: if isManager();
+    }
+
+    // Checklist Assignments: all auth read/create/update (workers check items), managers delete
+    match /checklistAssignments/{id} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+      allow delete: if isManager();
+    }
+
     // Knowledge Base Categories: all auth read, managers+ create/update/delete
     match /kbCategories/{id} {
       allow read: if isAuth();

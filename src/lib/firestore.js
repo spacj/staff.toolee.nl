@@ -15,6 +15,7 @@ const C = {
   WEBMASTER_REFERRAL_CODES: 'webmasterReferralCodes', WEBMASTER_EARNINGS: 'webmasterEarnings',
   SUPPORT_TICKETS: 'supportTickets',
   KB_CATEGORIES: 'kbCategories', KB_ARTICLES: 'kbArticles',
+  CHECKLIST_TEMPLATES: 'checklistTemplates', CHECKLIST_ASSIGNMENTS: 'checklistAssignments',
 };
 
 // ─── Helpers ──────────────────────────────────────────
@@ -679,5 +680,107 @@ export const getKBArticle = (id) => get1(C.KB_ARTICLES, id);
 export const createKBArticle = (data) => add(C.KB_ARTICLES, data);
 export const updateKBArticle = (id, data) => upd(C.KB_ARTICLES, id, data);
 export const deleteKBArticle = (id) => del(C.KB_ARTICLES, id);
+
+// ─── Checklists ──────────────────────────────────────
+// Templates: { orgId, title, description, frequency: 'daily'|'weekly'|'monthly'|'one-time'|'qr',
+//   items: [{ id, text, required }], shopId?, assignedTo: []|'all', dayOfWeek?, dayOfMonth?,
+//   qrCode?, active, createdBy, createdByName, createdAt, updatedAt }
+// Assignments: { orgId, templateId, templateTitle, workerId, workerName, date, dueDate,
+//   frequency, shopId?, items: [{ id, text, required, checked, checkedAt, note }],
+//   status: 'pending'|'in-progress'|'completed'|'overdue', completedAt?, triggeredBy: 'schedule'|'qr'|'manual',
+//   qrScannedAt?, reviewedBy?, reviewedAt?, reviewNote?, createdAt, updatedAt }
+
+export async function getChecklistTemplates(orgId) {
+  let results = await getAll(C.CHECKLIST_TEMPLATES, where('orgId', '==', orgId));
+  results.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+  return results;
+}
+export const getChecklistTemplate = (id) => get1(C.CHECKLIST_TEMPLATES, id);
+export const createChecklistTemplate = (data) => add(C.CHECKLIST_TEMPLATES, { ...data, active: true });
+export const updateChecklistTemplate = (id, data) => upd(C.CHECKLIST_TEMPLATES, id, data);
+export const deleteChecklistTemplate = (id) => del(C.CHECKLIST_TEMPLATES, id);
+
+export async function getChecklistAssignments(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  if (filters.workerId) c.push(where('workerId', '==', filters.workerId));
+  if (filters.templateId) c.push(where('templateId', '==', filters.templateId));
+  let results = await getAll(C.CHECKLIST_ASSIGNMENTS, ...c);
+  // Client-side filtering and sorting
+  if (filters.status) results = results.filter(r => r.status === filters.status);
+  if (filters.date) results = results.filter(r => r.date === filters.date);
+  if (filters.startDate) results = results.filter(r => r.date >= filters.startDate);
+  if (filters.endDate) results = results.filter(r => r.date <= filters.endDate);
+  results.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+  return results;
+}
+export const getChecklistAssignment = (id) => get1(C.CHECKLIST_ASSIGNMENTS, id);
+export const createChecklistAssignment = (data) => add(C.CHECKLIST_ASSIGNMENTS, { ...data, status: data.status || 'pending' });
+export const updateChecklistAssignment = (id, data) => upd(C.CHECKLIST_ASSIGNMENTS, id, data);
+export const deleteChecklistAssignment = (id) => del(C.CHECKLIST_ASSIGNMENTS, id);
+
+// Batch-generate assignments for a template (used by scheduled generation)
+export async function generateChecklistAssignments(template, workers, date) {
+  const targetWorkers = template.assignedTo === 'all'
+    ? workers
+    : workers.filter(w => (template.assignedTo || []).includes(w.id));
+  const created = [];
+  for (const worker of targetWorkers) {
+    // Check if assignment already exists for this template+worker+date
+    const existing = await getDocs(query(
+      collection(db, C.CHECKLIST_ASSIGNMENTS),
+      where('templateId', '==', template.id),
+      where('workerId', '==', worker.id),
+      where('date', '==', date)
+    ));
+    if (existing.empty) {
+      const id = await add(C.CHECKLIST_ASSIGNMENTS, {
+        orgId: template.orgId,
+        templateId: template.id,
+        templateTitle: template.title,
+        workerId: worker.id,
+        workerName: `${worker.firstName} ${worker.lastName}`,
+        date,
+        dueDate: date,
+        frequency: template.frequency,
+        shopId: template.shopId || '',
+        items: template.items.map(i => ({ ...i, checked: false, checkedAt: null, note: '' })),
+        status: 'pending',
+        triggeredBy: 'schedule',
+      });
+      created.push(id);
+    }
+  }
+  return created;
+}
+
+// Create assignment from QR scan
+export async function createQRChecklistAssignment(template, workerId, workerName) {
+  const today = new Date().toISOString().split('T')[0];
+  // Check for existing today
+  const existing = await getDocs(query(
+    collection(db, C.CHECKLIST_ASSIGNMENTS),
+    where('templateId', '==', template.id),
+    where('workerId', '==', workerId),
+    where('date', '==', today)
+  ));
+  if (!existing.empty) return { id: existing.docs[0].id, existing: true };
+  const id = await add(C.CHECKLIST_ASSIGNMENTS, {
+    orgId: template.orgId,
+    templateId: template.id,
+    templateTitle: template.title,
+    workerId,
+    workerName,
+    date: today,
+    dueDate: today,
+    frequency: 'qr',
+    shopId: template.shopId || '',
+    items: template.items.map(i => ({ ...i, checked: false, checkedAt: null, note: '' })),
+    status: 'pending',
+    triggeredBy: 'qr',
+    qrScannedAt: new Date().toISOString(),
+  });
+  return { id, existing: false };
+}
 
 export { C as COLLECTIONS };
