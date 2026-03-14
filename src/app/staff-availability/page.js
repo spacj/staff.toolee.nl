@@ -3,11 +3,11 @@ import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getStaffAvailability, getWorkers, getAvailabilitySettings, saveAvailabilitySettings } from '@/lib/firestore';
+import { getStaffAvailability, getWorkers, getAvailabilitySettings, saveAvailabilitySettings, getShops, createShift } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
 import {
   ChevronLeft, ChevronRight, Calendar, Users, Sun, Sunset, Moon, Clock,
-  User, AlertCircle, Settings2, Save, Loader2, Eye, Check, X
+  User, AlertCircle, Settings2, Save, Loader2, Eye, Check, X, Plus, Briefcase
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -35,6 +35,12 @@ export default function StaffAvailabilityPage() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [localSettings, setLocalSettings] = useState({ deadlineDays: 7, enabled: true });
 
+  // Shift creation
+  const [shops, setShops] = useState([]);
+  const [creatingShiftFor, setCreatingShiftFor] = useState(null); // availability entry being scheduled
+  const [shiftForm, setShiftForm] = useState({ startTime: '09:00', endTime: '17:00', shopId: '', notes: '' });
+  const [savingShift, setSavingShift] = useState(false);
+
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
@@ -49,12 +55,14 @@ export default function StaffAvailabilityPage() {
       getStaffAvailability({ orgId, startDate: loadRange.start, endDate: loadRange.end }).catch(() => []),
       getWorkers({ orgId, status: 'active' }).catch(() => []),
       getAvailabilitySettings(orgId).catch(() => ({ deadlineDays: 7, enabled: true })),
-    ]).then(([avail, workersList, s]) => {
+      getShops(orgId).catch(() => []),
+    ]).then(([avail, workersList, s, shopsList]) => {
       setAvailability(avail || []);
       setWorkers(workersList || []);
       const sett = s || { deadlineDays: 7, enabled: true };
       setSettings(sett);
       setLocalSettings(sett);
+      setShops(shopsList || []);
     }).finally(() => setLoading(false));
   }, [orgId, loadRange.start, loadRange.end]);
 
@@ -115,6 +123,50 @@ export default function StaffAvailabilityPage() {
       toast.error('Failed to save settings');
     }
     setSavingSettings(false);
+  };
+
+  // ─── Create shift from availability ──────────────────
+  const openShiftForm = (entry) => {
+    const defaults = {
+      morning:   { startTime: '06:00', endTime: '14:00' },
+      afternoon: { startTime: '14:00', endTime: '22:00' },
+      evening:   { startTime: '22:00', endTime: '06:00' },
+      full:      { startTime: '09:00', endTime: '17:00' },
+    };
+    const times = defaults[entry.shiftType] || defaults.full;
+    setShiftForm({ startTime: times.startTime, endTime: times.endTime, shopId: '', notes: '' });
+    setCreatingShiftFor(entry);
+  };
+
+  const handleCreateShift = async () => {
+    if (!creatingShiftFor) return;
+    setSavingShift(true);
+    try {
+      const [sh, sm] = shiftForm.startTime.split(':').map(Number);
+      const [eh, em] = shiftForm.endTime.split(':').map(Number);
+      let hours = (eh + em / 60) - (sh + sm / 60);
+      if (hours <= 0) hours += 24;
+
+      await createShift({
+        orgId,
+        workerId: creatingShiftFor.workerId,
+        workerName: creatingShiftFor.workerName || 'Staff',
+        date: creatingShiftFor.date,
+        startTime: shiftForm.startTime,
+        endTime: shiftForm.endTime,
+        hours: Math.round(hours * 10) / 10,
+        shopId: shiftForm.shopId || '',
+        shopName: shops.find(s => s.id === shiftForm.shopId)?.name || '',
+        templateName: shiftForm.notes || '',
+        notes: shiftForm.notes || '',
+        type: 'from-availability',
+      });
+      toast.success(`Shift created for ${creatingShiftFor.workerName || 'Staff'}`);
+      setCreatingShiftFor(null);
+    } catch (err) {
+      toast.error('Failed to create shift: ' + err.message);
+    }
+    setSavingShift(false);
   };
 
   // ─── Auth guard ─────────────────────────────────────
@@ -500,11 +552,12 @@ export default function StaffAvailabilityPage() {
           DAY DETAIL MODAL
       ═══════════════════════════════════════════════ */}
       <Modal
-        open={!!selectedDate}
+        open={!!selectedDate && !creatingShiftFor}
         onClose={() => setSelectedDate(null)}
         title={`Availability — ${selectedDate}`}
+        size="lg"
       >
-        {selectedDate && (() => {
+        {selectedDate && !creatingShiftFor && (() => {
           const entries = availForDate(selectedDate);
           const inDeadline = selectedDate >= todayStr && selectedDate < deadlineDate;
 
@@ -525,29 +578,33 @@ export default function StaffAvailabilityPage() {
                 </div>
               </div>
 
-              {/* Staff list */}
+              {/* Staff list with assign button */}
               <div className="divide-y divide-surface-100">
                 {entries.map(entry => {
                   const info = getShiftInfo(entry.shiftType);
                   return (
-                    <div key={entry.id} className="flex items-center justify-between py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold">
+                    <div key={entry.id} className="flex items-center justify-between py-3 gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
                           {(entry.workerName || 'S')[0].toUpperCase()}
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-surface-800">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-surface-800 truncate">
                             {entry.workerName || 'Staff'}
                           </p>
-                          <p className="text-xs text-surface-400">
-                            Submitted {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString() : '—'}
-                          </p>
+                          <div className={cn('inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded', info.color)}>
+                            <info.icon className="w-3 h-3" />
+                            {info.label}
+                          </div>
                         </div>
                       </div>
-                      <div className={cn('flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg', info.color)}>
-                        <info.icon className="w-3.5 h-3.5" />
-                        {info.label}
-                      </div>
+                      <button
+                        onClick={() => openShiftForm(entry)}
+                        className="btn-primary !py-1.5 !px-3 !text-xs flex items-center gap-1.5 flex-shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Assign Shift
+                      </button>
                     </div>
                   );
                 })}
@@ -559,6 +616,117 @@ export default function StaffAvailabilityPage() {
 
               <div className="flex justify-end pt-2">
                 <button onClick={() => setSelectedDate(null)} className="btn-secondary">Close</button>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* ═══════════════════════════════════════════════
+          CREATE SHIFT MODAL
+      ═══════════════════════════════════════════════ */}
+      <Modal
+        open={!!creatingShiftFor}
+        onClose={() => setCreatingShiftFor(null)}
+        title="Create Shift from Availability"
+      >
+        {creatingShiftFor && (() => {
+          const info = getShiftInfo(creatingShiftFor.shiftType);
+          return (
+            <div className="space-y-5">
+              {/* Worker + date info */}
+              <div className="p-4 bg-surface-50 rounded-xl space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-sm font-bold">
+                    {(creatingShiftFor.workerName || 'S')[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-surface-800">{creatingShiftFor.workerName || 'Staff'}</p>
+                    <p className="text-xs text-surface-500">Date: {creatingShiftFor.date}</p>
+                  </div>
+                </div>
+                <div className={cn('inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg', info.color)}>
+                  <info.icon className="w-3.5 h-3.5" />
+                  Preferred: {info.label}
+                </div>
+              </div>
+
+              {/* Time inputs */}
+              <div>
+                <label className="label">Shift Time</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-surface-400 mb-1 block">Start</label>
+                    <input
+                      type="time"
+                      value={shiftForm.startTime}
+                      onChange={(e) => setShiftForm(f => ({ ...f, startTime: e.target.value }))}
+                      className="input-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-surface-400 mb-1 block">End</label>
+                    <input
+                      type="time"
+                      value={shiftForm.endTime}
+                      onChange={(e) => setShiftForm(f => ({ ...f, endTime: e.target.value }))}
+                      className="input-field"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-surface-400 mt-1.5">
+                  {(() => {
+                    const [sh, sm] = shiftForm.startTime.split(':').map(Number);
+                    const [eh, em] = shiftForm.endTime.split(':').map(Number);
+                    let h = (eh + em / 60) - (sh + sm / 60);
+                    if (h <= 0) h += 24;
+                    return `Duration: ${Math.round(h * 10) / 10} hours`;
+                  })()}
+                </p>
+              </div>
+
+              {/* Shop selector */}
+              {shops.length > 0 && (
+                <div>
+                  <label className="label">Location / Shop</label>
+                  <select
+                    value={shiftForm.shopId}
+                    onChange={(e) => setShiftForm(f => ({ ...f, shopId: e.target.value }))}
+                    className="select-field"
+                  >
+                    <option value="">No specific location</option>
+                    {shops.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Notes */}
+              <div>
+                <label className="label">Notes (optional)</label>
+                <input
+                  type="text"
+                  value={shiftForm.notes}
+                  onChange={(e) => setShiftForm(f => ({ ...f, notes: e.target.value }))}
+                  className="input-field"
+                  placeholder="e.g. Opening shift, Cover for John..."
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-between pt-2">
+                <button onClick={() => setCreatingShiftFor(null)} className="btn-secondary">
+                  Back
+                </button>
+                <button
+                  onClick={handleCreateShift}
+                  disabled={savingShift}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  <Briefcase className="w-4 h-4" />
+                  {savingShift ? 'Creating...' : 'Create Shift'}
+                </button>
               </div>
             </div>
           );
