@@ -23,6 +23,7 @@ export default function StaffAvailabilityPage() {
   const [selectedWorker, setSelectedWorker] = useState('all');
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('calendar');
+  const [error, setError] = useState(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -34,15 +35,33 @@ export default function StaffAvailabilityPage() {
   };
 
   useEffect(() => {
-    if (!orgId) return;
+    if (!orgId) {
+      setError('No organization ID found');
+      setLoading(false);
+      return;
+    }
+    
     Promise.all([
-      getStaffAvailability({ orgId, startDate: loadRange.start, endDate: loadRange.end }),
-      getWorkers({ orgId, status: 'active' }),
-      getAvailabilitySettings(orgId),
+      getStaffAvailability({ orgId, startDate: loadRange.start, endDate: loadRange.end }).catch(e => {
+        console.error('Error loading availability:', e);
+        return [];
+      }),
+      getWorkers({ orgId, status: 'active' }).catch(e => {
+        console.error('Error loading workers:', e);
+        return [];
+      }),
+      getAvailabilitySettings(orgId).catch(e => {
+        console.error('Error loading settings:', e);
+        return { deadlineDays: 7, enabled: true };
+      }),
     ]).then(([avail, workersList, availSettings]) => {
-      setAvailability(avail);
-      setWorkers(workersList);
-      setSettings(availSettings);
+      setAvailability(avail || []);
+      setWorkers(workersList || []);
+      setSettings(availSettings || { deadlineDays: 7, enabled: true });
+      setError(null);
+    }).catch(err => {
+      console.error('Error loading data:', err);
+      setError(err.message);
     }).finally(() => setLoading(false));
   }, [orgId, loadRange.start, loadRange.end]);
 
@@ -117,11 +136,17 @@ export default function StaffAvailabilityPage() {
   return (
     <Layout>
       <div className="space-y-6">
+        {error && (
+          <div className="card p-4 bg-red-50 border border-red-200">
+            <p className="text-sm text-red-800">Error: {error}</p>
+          </div>
+        )}
+        
         <div className="page-header">
           <div>
             <h1 className="page-title">Staff Availability</h1>
             <p className="text-surface-500 mt-1">
-              {workers.length} staff members · {filteredAvailability.length} availability entries
+              {loading ? 'Loading...' : `${workers.length} staff members · ${filteredAvailability.length} availability entries`}
               {settings.enabled && ` · Min. ${settings.deadlineDays} days advance notice`}
             </p>
           </div>
