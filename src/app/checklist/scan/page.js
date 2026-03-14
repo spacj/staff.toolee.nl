@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +17,20 @@ import toast from 'react-hot-toast';
 import Link from 'next/link';
 
 export default function ChecklistScanPage() {
+  return (
+    <Suspense fallback={
+      <Layout>
+        <div className="flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-3 border-brand-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      </Layout>
+    }>
+      <ChecklistScanContent />
+    </Suspense>
+  );
+}
+
+function ChecklistScanContent() {
   const { orgId, user, userProfile } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
