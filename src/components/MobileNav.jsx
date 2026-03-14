@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
-import { LayoutDashboard, Users, Calendar, Clock, Settings, Store, ClipboardList, CreditCard, MessageCircle, CalendarCheck, Globe, Inbox, DollarSign } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Clock, Settings, Store, ClipboardList, CreditCard, MessageCircle, CalendarCheck, Globe, Inbox, DollarSign, BookOpen } from 'lucide-react';
 
 export default function MobileNav() {
   const pathname = usePathname();
@@ -25,6 +25,7 @@ export default function MobileNav() {
     { href: '/calendar', icon: Calendar, label: 'Calendar' },
     { href: '/staff-availability', icon: CalendarCheck, label: 'Availability' },
     { href: '/attendance', icon: Clock, label: 'Attendance' },
+    { href: '/knowledge', icon: BookOpen, label: 'Guides' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
   const managerItems = [
@@ -36,6 +37,7 @@ export default function MobileNav() {
     { href: '/calendar', icon: Calendar, label: 'Calendar' },
     { href: '/staff-availability', icon: CalendarCheck, label: 'Availability' },
     { href: '/attendance', icon: Clock, label: 'Attendance' },
+    { href: '/knowledge', icon: BookOpen, label: 'Guides' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
   const workerItems = [
@@ -44,6 +46,7 @@ export default function MobileNav() {
     { href: '/time', icon: Clock, label: 'My Time' },
     { href: '/calendar', icon: Calendar, label: 'Schedule' },
     { href: '/availability', icon: CalendarCheck, label: 'Availability' },
+    { href: '/knowledge', icon: BookOpen, label: 'Guides' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
   const items = isWebmaster ? webmasterItems : isAdmin ? adminItems : isManager ? managerItems : workerItems;

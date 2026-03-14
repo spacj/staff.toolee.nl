@@ -14,6 +14,7 @@ const C = {
   CORRECTION_REQUESTS: 'correctionRequests', MESSAGES: 'messages', STAFF_AVAILABILITY: 'staffAvailability',
   WEBMASTER_REFERRAL_CODES: 'webmasterReferralCodes', WEBMASTER_EARNINGS: 'webmasterEarnings',
   SUPPORT_TICKETS: 'supportTickets',
+  KB_CATEGORIES: 'kbCategories', KB_ARTICLES: 'kbArticles',
 };
 
 // ─── Helpers ──────────────────────────────────────────
@@ -646,5 +647,37 @@ export async function addSupportTicketReply(ticketId, reply) {
   replies.push({ ...reply, createdAt: new Date().toISOString() });
   return upd(C.SUPPORT_TICKETS, ticketId, { replies, updatedAt: ts() });
 }
+
+// ─── Knowledge Base ──────────────────────────────────
+// Categories: { orgId, name, icon, color, order, createdBy, createdAt, updatedAt }
+// Articles:   { orgId, categoryId, title, content, tags[], pinned, order, createdBy, createdByName, createdAt, updatedAt }
+
+export async function getKBCategories(orgId) {
+  let results = await getAll(C.KB_CATEGORIES, where('orgId', '==', orgId));
+  results.sort((a, b) => (a.order || 0) - (b.order || 0));
+  return results;
+}
+export const getKBCategory = (id) => get1(C.KB_CATEGORIES, id);
+export const createKBCategory = (data) => add(C.KB_CATEGORIES, data);
+export const updateKBCategory = (id, data) => upd(C.KB_CATEGORIES, id, data);
+export const deleteKBCategory = (id) => del(C.KB_CATEGORIES, id);
+
+export async function getKBArticles(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  if (filters.categoryId) c.push(where('categoryId', '==', filters.categoryId));
+  let results = await getAll(C.KB_ARTICLES, ...c);
+  // Client-side sort: pinned first, then by order
+  results.sort((a, b) => {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return (a.order || 0) - (b.order || 0);
+  });
+  return results;
+}
+export const getKBArticle = (id) => get1(C.KB_ARTICLES, id);
+export const createKBArticle = (data) => add(C.KB_ARTICLES, data);
+export const updateKBArticle = (id, data) => upd(C.KB_ARTICLES, id, data);
+export const deleteKBArticle = (id) => del(C.KB_ARTICLES, id);
 
 export { C as COLLECTIONS };
