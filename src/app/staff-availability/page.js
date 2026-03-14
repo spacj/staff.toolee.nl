@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getStaffAvailability, getWorkers, getAvailabilitySettings, saveAvailabilitySettings, getShops, createShift } from '@/lib/firestore';
+import { getStaffAvailability, getWorkers, getAvailabilitySettings, saveAvailabilitySettings, getShops, createShift, getShifts } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
 import {
   ChevronLeft, ChevronRight, Calendar, Users, Sun, Sunset, Moon, Clock,
@@ -37,6 +37,7 @@ export default function StaffAvailabilityPage() {
 
   // Shift creation
   const [shops, setShops] = useState([]);
+  const [existingShifts, setExistingShifts] = useState([]);   // to check for duplicates
   const [creatingShiftFor, setCreatingShiftFor] = useState(null); // availability entry being scheduled
   const [shiftForm, setShiftForm] = useState({ startTime: '09:00', endTime: '17:00', shopId: '', notes: '' });
   const [savingShift, setSavingShift] = useState(false);
@@ -56,13 +57,15 @@ export default function StaffAvailabilityPage() {
       getWorkers({ orgId, status: 'active' }).catch(() => []),
       getAvailabilitySettings(orgId).catch(() => ({ deadlineDays: 7, enabled: true })),
       getShops(orgId).catch(() => []),
-    ]).then(([avail, workersList, s, shopsList]) => {
+      getShifts({ orgId, startDate: loadRange.start, endDate: loadRange.end }).catch(() => []),
+    ]).then(([avail, workersList, s, shopsList, shifts]) => {
       setAvailability(avail || []);
       setWorkers(workersList || []);
       const sett = s || { deadlineDays: 7, enabled: true };
       setSettings(sett);
       setLocalSettings(sett);
       setShops(shopsList || []);
+      setExistingShifts(shifts || []);
     }).finally(() => setLoading(false));
   }, [orgId, loadRange.start, loadRange.end]);
 
@@ -140,6 +143,16 @@ export default function StaffAvailabilityPage() {
 
   const handleCreateShift = async () => {
     if (!creatingShiftFor) return;
+    
+    // Check if worker already has a shift on this date
+    const alreadyScheduled = existingShifts.some(s => 
+      s.workerId === creatingShiftFor.workerId && s.date === creatingShiftFor.date
+    );
+    if (alreadyScheduled) {
+      toast.error('This worker already has a shift scheduled on this date');
+      return;
+    }
+    
     setSavingShift(true);
     try {
       const [sh, sm] = shiftForm.startTime.split(':').map(Number);
@@ -582,6 +595,7 @@ export default function StaffAvailabilityPage() {
               <div className="divide-y divide-surface-100">
                 {entries.map(entry => {
                   const info = getShiftInfo(entry.shiftType);
+                  const hasExistingShift = existingShifts.some(s => s.workerId === entry.workerId && s.date === entry.date);
                   return (
                     <div key={entry.id} className="flex items-center justify-between py-3 gap-2">
                       <div className="flex items-center gap-3 min-w-0">
@@ -598,13 +612,17 @@ export default function StaffAvailabilityPage() {
                           </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => openShiftForm(entry)}
-                        className="btn-primary !py-1.5 !px-3 !text-xs flex items-center gap-1.5 flex-shrink-0"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        Assign Shift
-                      </button>
+                      {hasExistingShift ? (
+                        <span className="text-xs text-surface-400 bg-surface-100 px-2 py-1 rounded">Already scheduled</span>
+                      ) : (
+                        <button
+                          onClick={() => openShiftForm(entry)}
+                          className="btn-primary !py-1.5 !px-3 !text-xs flex items-center gap-1.5 flex-shrink-0"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Assign Shift
+                        </button>
+                      )}
                     </div>
                   );
                 })}
