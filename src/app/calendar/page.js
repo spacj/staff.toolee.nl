@@ -156,11 +156,25 @@ export default function CalendarPage() {
     if (!preview?.assignments.length) return;
     setScheduling(true);
     try {
-      await bulkCreateShifts(preview.assignments.map(s => ({ ...s, orgId })));
+      // Filter out assignments that would create duplicate shifts for the same worker on the same date
+      const existingWorkerDates = new Set(shifts.map(s => `${s.workerId}-${s.date}`));
+      const newAssignments = preview.assignments.filter(a => !existingWorkerDates.has(`${a.workerId}-${a.date}`));
+      
+      if (newAssignments.length === 0) {
+        toast.error('All shifts in this schedule already exist');
+        setScheduling(false);
+        return;
+      }
+      
+      if (newAssignments.length < preview.assignments.length) {
+        toast(`${preview.assignments.length - newAssignments.length} duplicate shifts skipped`, { icon: 'ℹ️' });
+      }
+      
+      await bulkCreateShifts(newAssignments.map(s => ({ ...s, orgId })));
       await reload();
       setShowAutoSchedule(false);
       setPreview(null);
-      toast.success(`Created ${preview.assignments.length} shifts!`);
+      toast.success(`Created ${newAssignments.length} shifts!`);
     } catch (err) { toast.error(err.message); }
     setScheduling(false);
   };
@@ -174,6 +188,14 @@ export default function CalendarPage() {
   const handleAddShift = async (e) => {
     e.preventDefault();
     if (!shiftForm.workerId || !shiftForm.date) { toast.error('Select a worker and date'); return; }
+    
+    // Check if worker already has a shift on this date
+    const existingShift = shifts.find(s => s.workerId === shiftForm.workerId && s.date === shiftForm.date);
+    if (existingShift) {
+      toast.error('This worker already has a shift on this date');
+      return;
+    }
+    
     setSaving(true);
     try {
       const worker = workers.find(w => w.id === shiftForm.workerId);
