@@ -318,7 +318,9 @@ export default function CalendarPage() {
           </div>
           {isManager && (
             <div className="flex gap-2">
-              <button onClick={() => openAddShift(selectedDate)} className="btn-secondary !px-3 sm:!px-5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Shift</span><span className="sm:hidden">Add</span></button>
+              {(!selectedDate || activeWorkers.length > shiftsForDate(selectedDate).length) && (
+                <button onClick={() => openAddShift(selectedDate)} className="btn-secondary !px-3 sm:!px-5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Shift</span><span className="sm:hidden">Add</span></button>
+              )}
               <button onClick={() => { setPreview(null); setShowAutoSchedule(true); }} className="btn-primary !px-3 sm:!px-5"><Wand2 className="w-4 h-4" /> <span className="hidden sm:inline">Auto-Schedule</span><span className="sm:hidden">Auto</span></button>
             </div>
           )}
@@ -359,7 +361,7 @@ export default function CalendarPage() {
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="section-title">{selectedDate}</h3>
-                  {isManager && <button onClick={() => openAddShift(selectedDate)} className="btn-secondary !py-1.5 !text-xs"><Plus className="w-3.5 h-3.5" /> Add</button>}
+                  {isManager && activeWorkers.length > shiftsForDate(selectedDate).length && <button onClick={() => openAddShift(selectedDate)} className="btn-secondary !py-1.5 !text-xs"><Plus className="w-3.5 h-3.5" /> Add</button>}
                 </div>
                 {shiftsForDate(selectedDate).length === 0 && permitsForDate(selectedDate).length === 0 && !isPublicHoliday && <p className="text-sm text-surface-400">No shifts or leaves scheduled.</p>}
                 <div className="space-y-2">
@@ -406,7 +408,7 @@ export default function CalendarPage() {
                           {p.workerName?.split(' ')[0]} — {p.type}
                         </div>
                       ))}
-                      {isManager && (
+                      {isManager && activeWorkers.length > dayShifts.length && (
                         <button onClick={() => openAddShift(ds)} className="w-full text-[10px] text-surface-400 hover:text-brand-600 py-1 rounded hover:bg-brand-50 transition-colors">+ Add</button>
                       )}
                     </div>
@@ -592,8 +594,11 @@ export default function CalendarPage() {
             <div><label className="label">Worker *</label>
               <select value={shiftForm.workerId} onChange={e => setShiftForm(f => ({ ...f, workerId: e.target.value }))} className="select-field" required>
                 <option value="">Select worker...</option>
-                {activeWorkers.map(w => <option key={w.id} value={w.id}>{w.firstName} {w.lastName} {w.shiftPreference && w.shiftPreference !== 'any' ? `(${w.shiftPreference})` : ''}</option>)}
+                {activeWorkers.filter(w => !shifts.some(s => s.workerId === w.id && s.date === shiftForm.date)).map(w => <option key={w.id} value={w.id}>{w.firstName} {w.lastName} {w.shiftPreference && w.shiftPreference !== 'any' ? `(${w.shiftPreference})` : ''}</option>)}
               </select>
+              {shiftForm.date && activeWorkers.some(w => shifts.some(s => s.workerId === w.id && s.date === shiftForm.date)) && (
+                <p className="text-xs text-amber-600 mt-1">Some workers already have shifts on this date and are hidden</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className="label">Date *</label><input type="date" value={shiftForm.date} onChange={e => setShiftForm(f => ({ ...f, date: e.target.value }))} className="input-field" required /></div>
