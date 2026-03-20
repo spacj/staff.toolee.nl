@@ -16,6 +16,7 @@ const C = {
   SUPPORT_TICKETS: 'supportTickets',
   KB_CATEGORIES: 'kbCategories', KB_ARTICLES: 'kbArticles',
   CHECKLIST_TEMPLATES: 'checklistTemplates', CHECKLIST_ASSIGNMENTS: 'checklistAssignments',
+  PUBLIC_CHECKLIST_ASSIGNMENTS: 'publicChecklistAssignments',
 };
 
 // ─── Helpers ──────────────────────────────────────────
@@ -782,5 +783,30 @@ export async function createQRChecklistAssignment(template, workerId, workerName
   });
   return { id, existing: false };
 }
+
+// ─── Public Checklist Assignments (external/unauthenticated users) ──
+// Schema: { templateId, templateTitle, orgId, shopId, shopName,
+//   publicName, sessionId, date, items: [{ id, text, required, checked, checkedAt, note }],
+//   status: 'pending'|'in-progress'|'completed', triggeredBy: 'qr_public',
+//   completedAt?, createdAt, updatedAt }
+
+export async function getPublicAssignments(filters = {}) {
+  const c = [];
+  if (filters.templateId) c.push(where('templateId', '==', filters.templateId));
+  if (filters.sessionId) c.push(where('sessionId', '==', filters.sessionId));
+  let results = await getAll(C.PUBLIC_CHECKLIST_ASSIGNMENTS, ...c);
+  if (filters.date) results = results.filter(r => r.date === filters.date);
+  results.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+  return results;
+}
+export const getPublicAssignment = (id) => get1(C.PUBLIC_CHECKLIST_ASSIGNMENTS, id);
+export const createPublicAssignment = (data) => add(C.PUBLIC_CHECKLIST_ASSIGNMENTS, {
+  ...data,
+  status: 'pending',
+  triggeredBy: 'qr_public',
+  date: data.date || new Date().toISOString().split('T')[0],
+});
+export const updatePublicAssignment = (id, data) => upd(C.PUBLIC_CHECKLIST_ASSIGNMENTS, id, data);
+export const deletePublicAssignment = (id) => del(C.PUBLIC_CHECKLIST_ASSIGNMENTS, id);
 
 export { C as COLLECTIONS };

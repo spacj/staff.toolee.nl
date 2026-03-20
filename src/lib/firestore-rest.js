@@ -131,3 +131,57 @@ export async function createDocument(collection, data) {
   }
   return true;
 }
+
+/**
+ * Get a single document by path (e.g. "checklistTemplates/abc123").
+ * Returns plain fields object or null.
+ */
+export async function restGet(path) {
+  const token = await getAccessToken();
+  const res = await fetch(`${FIRESTORE_BASE}/${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  const doc = await res.json();
+  if (!doc.fields) return null;
+  // Convert Firestore Value format back to JS
+  function fromFirestore(val) {
+    if (!val) return null;
+    if (val.stringValue !== undefined) return val.stringValue;
+    if (val.integerValue !== undefined) return parseInt(val.integerValue, 10);
+    if (val.doubleValue !== undefined) return parseFloat(val.doubleValue);
+    if (val.booleanValue !== undefined) return val.booleanValue;
+    if (val.nullValue !== undefined) return null;
+    if (val.arrayValue?.values) return val.arrayValue.values.map(fromFirestore);
+    if (val.mapValue?.fields) {
+      const obj = {};
+      for (const [k, v] of Object.entries(val.mapValue.fields)) obj[k] = fromFirestore(v);
+      return obj;
+    }
+    return null;
+  }
+  const obj = {};
+  for (const [k, v] of Object.entries(doc.fields)) obj[k] = fromFirestore(v);
+  return obj;
+}
+
+/**
+ * Add a document and return the full response (including name/id).
+ */
+export async function restAdd(collection, data) {
+  const token = await getAccessToken();
+  const fields = {};
+  for (const [k, v] of Object.entries(data)) {
+    fields[k] = toFirestoreValue(v);
+  }
+  const res = await fetch(`${FIRESTORE_BASE}/${collection}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Firestore restAdd failed (${res.status}): ${text}`);
+  }
+  return res.json();
+}

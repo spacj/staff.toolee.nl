@@ -13,7 +13,7 @@ import {
   ClipboardCheck, Plus, Trash2, Edit3, Copy, MoreVertical, Users, Store,
   Calendar, QrCode, Clock, CheckCircle2, Circle, AlertCircle, ChevronDown,
   ChevronRight, Play, Pause, BarChart3, Eye, X, GripVertical, RotateCcw,
-  Download, Send, Filter,
+  Download, Send, Filter, Globe, Building,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -318,6 +318,11 @@ export default function ChecklistsPage() {
                           )}>
                             {template.frequency === 'one-time' ? 'One-time' : template.frequency}
                           </span>
+                          {template.scope === 'public' && (
+                            <span className="badge bg-emerald-100 text-emerald-700">
+                              <Globe className="w-3 h-3 mr-0.5" /> Public
+                            </span>
+                          )}
                         </div>
                         {template.description && (
                           <p className="text-sm text-surface-500 mt-0.5 line-clamp-1">{template.description}</p>
@@ -326,10 +331,16 @@ export default function ChecklistsPage() {
                           <span className="flex items-center gap-1">
                             <CheckCircle2 className="w-3.5 h-3.5" /> {template.items?.length || 0} items
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Users className="w-3.5 h-3.5" />
-                            {template.assignedTo === 'all' ? 'All staff' : `${assignedWorkers.length} worker${assignedWorkers.length !== 1 ? 's' : ''}`}
-                          </span>
+                          {template.scope === 'public' ? (
+                            <span className="flex items-center gap-1 text-emerald-600">
+                              <Globe className="w-3.5 h-3.5" /> Anyone (public)
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3.5 h-3.5" />
+                              {template.assignedTo === 'all' ? 'All staff' : `${assignedWorkers.length} worker${assignedWorkers.length !== 1 ? 's' : ''}`}
+                            </span>
+                          )}
                           {shop && (
                             <span className="flex items-center gap-1">
                               <Store className="w-3.5 h-3.5" /> {shop.name}
@@ -349,16 +360,18 @@ export default function ChecklistsPage() {
 
                       {/* Actions */}
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        {template.frequency === 'qr' && (
+                        {(template.scope === 'public' || template.frequency === 'qr') && (
                           <button onClick={() => setShowQRModal(template)}
                             className="btn-icon" title="Show QR Code">
                             <QrCode className="w-4 h-4" />
                           </button>
                         )}
-                        <button onClick={() => setShowAssignModal(template)}
-                          className="btn-icon" title="Manual Assign">
-                          <Send className="w-4 h-4" />
-                        </button>
+                        {template.scope !== 'public' && (
+                          <button onClick={() => setShowAssignModal(template)}
+                            className="btn-icon" title="Manual Assign">
+                            <Send className="w-4 h-4" />
+                          </button>
+                        )}
                         <button onClick={() => setExpandedTemplate(isExpanded ? null : template.id)}
                           className="btn-icon" title="Details">
                           <ChevronDown className={cn('w-4 h-4 transition-transform', isExpanded && 'rotate-180')} />
@@ -572,8 +585,9 @@ function TemplateModal({ open, onClose, onSave, editing, workers, shops }) {
   const [dayOfWeek, setDayOfWeek] = useState('Monday');
   const [dayOfMonth, setDayOfMonth] = useState(1);
   const [shopId, setShopId] = useState('');
-  const [assignMode, setAssignMode] = useState('all'); // 'all' | 'specific'
+  const [assignMode, setAssignMode] = useState('all');
   const [selectedWorkers, setSelectedWorkers] = useState([]);
+  const [scope, setScope] = useState('shop'); // 'shop' | 'public'
   const [items, setItems] = useState([{ id: '1', text: '', required: false }]);
 
   useEffect(() => {
@@ -586,10 +600,12 @@ function TemplateModal({ open, onClose, onSave, editing, workers, shops }) {
       setShopId(editing.shopId || '');
       setAssignMode(editing.assignedTo === 'all' ? 'all' : 'specific');
       setSelectedWorkers(editing.assignedTo === 'all' ? [] : (editing.assignedTo || []));
+      setScope(editing.scope || 'shop');
       setItems(editing.items?.length ? editing.items : [{ id: '1', text: '', required: false }]);
     } else {
       setTitle(''); setDescription(''); setFrequency('daily'); setDayOfWeek('Monday');
       setDayOfMonth(1); setShopId(''); setAssignMode('all'); setSelectedWorkers([]);
+      setScope('shop');
       setItems([{ id: '1', text: '', required: false }]);
     }
   }, [editing, open]);
@@ -621,8 +637,9 @@ function TemplateModal({ open, onClose, onSave, editing, workers, shops }) {
       dayOfWeek: frequency === 'weekly' ? dayOfWeek : null,
       dayOfMonth: frequency === 'monthly' ? dayOfMonth : null,
       shopId: shopId || null,
-      assignedTo: assignMode === 'all' ? 'all' : selectedWorkers,
-      items: validItems.map((i, idx) => ({ id: i.id, text: i.text.trim(), required: i.required })),
+      assignedTo: scope === 'public' ? 'all' : (assignMode === 'all' ? 'all' : selectedWorkers),
+      scope,
+      items: validItems.map((i) => ({ id: i.id, text: i.text.trim(), required: i.required })),
     });
   }
 
@@ -639,6 +656,51 @@ function TemplateModal({ open, onClose, onSave, editing, workers, shops }) {
           <label className="label">Description (optional)</label>
           <input type="text" value={description} onChange={e => setDescription(e.target.value)}
             className="input-field" placeholder="Brief description of this checklist" />
+        </div>
+
+        {/* Scope */}
+        <div>
+          <label className="label">Who can complete this?</label>
+          <div className="grid grid-cols-2 gap-3">
+            <button type="button" onClick={() => setScope('shop')}
+              className={cn(
+                'flex items-center gap-3 p-4 rounded-xl border text-left transition-all',
+                scope === 'shop'
+                  ? 'border-brand-400 bg-brand-50 ring-2 ring-brand-500/20'
+                  : 'border-surface-200 bg-white hover:border-surface-300'
+              )}>
+              <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0',
+                scope === 'shop' ? 'bg-brand-100 text-brand-600' : 'bg-surface-100 text-surface-500')}>
+                <Building className="w-4 h-4" />
+              </div>
+              <div>
+                <p className={cn('text-sm font-semibold', scope === 'shop' ? 'text-brand-700' : 'text-surface-700')}>Staff only</p>
+                <p className="text-xs text-surface-400">For your team members</p>
+              </div>
+            </button>
+            <button type="button" onClick={() => setScope('public')}
+              className={cn(
+                'flex items-center gap-3 p-4 rounded-xl border text-left transition-all',
+                scope === 'public'
+                  ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-500/20'
+                  : 'border-surface-200 bg-white hover:border-surface-300'
+              )}>
+              <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0',
+                scope === 'public' ? 'bg-emerald-100 text-emerald-600' : 'bg-surface-100 text-surface-500')}>
+                <Globe className="w-4 h-4" />
+              </div>
+              <div>
+                <p className={cn('text-sm font-semibold', scope === 'public' ? 'text-emerald-700' : 'text-surface-700')}>Public</p>
+                <p className="text-xs text-surface-400">Anyone can scan & complete</p>
+              </div>
+            </button>
+          </div>
+          {scope === 'public' && (
+            <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1">
+              <Globe className="w-3 h-3" />
+              Public checklists show a QR code anyone can scan. Users enter their name to start.
+            </p>
+          )}
         </div>
 
         {/* Frequency */}
@@ -690,7 +752,7 @@ function TemplateModal({ open, onClose, onSave, editing, workers, shops }) {
         )}
 
         {/* Assignment */}
-        {frequency !== 'qr' && (
+        {frequency !== 'qr' && scope === 'shop' && (
           <div>
             <label className="label">Assign To</label>
             <div className="flex gap-2 mb-2">
@@ -815,12 +877,12 @@ function AssignModal({ open, onClose, template, workers, onAssign }) {
 function QRModal({ open, onClose, template }) {
   if (!template) return null;
 
-  // Build the QR URL: /checklist/scan?t=TEMPLATE_ID
+  const isPublic = template.scope === 'public';
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  const qrUrl = `${baseUrl}/checklist/scan?t=${template.id}`;
+  const qrUrl = isPublic
+    ? `${baseUrl}/checklist/start?t=${template.id}`
+    : `${baseUrl}/checklist/scan?t=${template.id}`;
 
-  // Generate QR as SVG using a simple algorithm (no external library needed)
-  // We'll display the URL and a canvas-based QR for printing
   return (
     <Modal open={open} onClose={onClose} title="QR Code" size="sm">
       <div className="text-center space-y-4">
@@ -829,7 +891,15 @@ function QRModal({ open, onClose, template }) {
         </div>
         <div>
           <p className="text-sm font-medium text-surface-700 mb-1">{template.title}</p>
-          <p className="text-xs text-surface-400">Workers scan this QR to start the checklist</p>
+          <div className="flex items-center justify-center gap-1.5">
+            {isPublic ? (
+              <span className="badge bg-emerald-100 text-emerald-700">
+                <Globe className="w-3 h-3 mr-1" /> Public — anyone can scan
+              </span>
+            ) : (
+              <span className="text-xs text-surface-400">Workers scan this QR to start the checklist</span>
+            )}
+          </div>
         </div>
         <div className="bg-surface-50 rounded-xl p-3">
           <p className="text-[11px] text-surface-400 mb-1">Direct URL</p>
@@ -842,7 +912,7 @@ function QRModal({ open, onClose, template }) {
           </button>
           <button onClick={() => {
             const printWindow = window.open('', '_blank');
-            printWindow.document.write(`<html><head><title>QR - ${template.title}</title><style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif}h2{margin-bottom:8px}p{color:#666;font-size:14px}</style></head><body><h2>${template.title}</h2><p>Scan to start checklist</p><div id="qr"></div><script>window.print()<\/script></body></html>`);
+            printWindow.document.write(`<html><head><title>QR - ${template.title}</title><style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif}h2{margin-bottom:8px}p{color:#666;font-size:14px}</style></head><body><h2>${template.title}</h2><p>${isPublic ? 'Scan with your phone camera' : 'Scan to start checklist'}</p><div id="qr"></div><script>window.print()<\/script></body></html>`);
             printWindow.document.close();
           }} className="btn-primary text-sm">
             <Download className="w-4 h-4" /> Print

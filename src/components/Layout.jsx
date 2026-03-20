@@ -11,7 +11,7 @@ import SubscriptionAlert from './SubscriptionAlert';
 import useStore from '@/lib/store';
 import { getWorkers, getShops, getShifts, getAttendance } from '@/lib/firestore';
 
-const PUBLIC_PATHS = ['/login', '/register', '/join', '/'];
+const PUBLIC_PATHS = ['/login', '/register', '/join', '/', '/public-checklist', '/checklist/start'];
 
 export default function Layout({ children }) {
   const { user, userProfile, loading, isManager, isWebmaster, orgId } = useAuth();

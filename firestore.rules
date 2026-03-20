@@ -183,6 +183,15 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
+    // Public Checklist Assignments: anyone can create (via server-side API), authenticated can read, managers can delete
+    // Public assignments are created server-side via API route so no client-side rules needed for create
+    match /publicChecklistAssignments/{id} {
+      allow read: if isAuth();
+      allow create: if true;  // Server-side validated via API route
+      allow update: if isAuth();
+      allow delete: if isManager();
+    }
+
     // Availability Settings: stored in organizations doc, only admins can update
     // This is part of the organizations collection, so we use the rule above
     // Rule: allow update on availabilitySettings field if isAdmin()
