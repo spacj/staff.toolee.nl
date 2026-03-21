@@ -48,6 +48,12 @@ function toFirestoreValue(val) {
   if (typeof val === 'string') return { stringValue: val };
   if (typeof val === 'number') return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
   if (typeof val === 'boolean') return { booleanValue: val };
+  if (Array.isArray(val)) return { arrayValue: { values: val.map(toFirestoreValue) } };
+  if (typeof val === 'object') {
+    const fields = {};
+    for (const [k, v] of Object.entries(val)) fields[k] = toFirestoreValue(v);
+    return { mapValue: { fields } };
+  }
   return { stringValue: String(val) };
 }
 

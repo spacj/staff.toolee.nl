@@ -56,9 +56,9 @@ export async function POST(req) {
             compositeFilter: {
               op: 'AND',
               filters: [
-                { fieldFilter: { field: { fieldPath: 'templateId' }, op: 'EQUAL', value: { stringValue: templateId } },
-                fieldFilter: { field: { fieldPath: 'sessionId' }, op: 'EQUAL', value: { stringValue: sessionId } },
-                fieldFilter: { field: { fieldPath: 'date' }, op: 'EQUAL', value: { stringValue: today } },
+                { fieldFilter: { field: { fieldPath: 'templateId' }, op: 'EQUAL', value: { stringValue: templateId } } },
+                { fieldFilter: { field: { fieldPath: 'sessionId' }, op: 'EQUAL', value: { stringValue: sessionId } } },
+                { fieldFilter: { field: { fieldPath: 'date' }, op: 'EQUAL', value: { stringValue: today } } },
               ]
             }
           },
