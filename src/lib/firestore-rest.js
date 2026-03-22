@@ -43,7 +43,7 @@ export async function getAccessToken() {
 }
 
 // Convert JS value to Firestore Value format
-function toFirestoreValue(val) {
+export function toFirestoreValue(val) {
   if (val === null || val === undefined) return { nullValue: null };
   if (typeof val === 'string') return { stringValue: val };
   if (typeof val === 'number') return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
