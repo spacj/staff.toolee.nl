@@ -2,7 +2,6 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@/utils/helpers';
-import { getPublicAssignment, getPublicAssignments, updatePublicAssignment } from '@/lib/firestore';
 import {
   CheckCircle2, Circle, ClipboardCheck, MessageSquare, Shield,
   Loader2, AlertCircle, CheckCircle,
@@ -34,15 +33,14 @@ function PublicChecklistContent() {
   async function loadAssignment() {
     setLoading(true);
     try {
-      if (assignmentId) {
-        const data = await getPublicAssignment(assignmentId);
-        if (!data) { setError('Checklist not found. It may have been removed.'); }
-        else setAssignment(data);
-      } else if (sessionId) {
-        const list = await getPublicAssignments({ sessionId });
-        if (list.length === 0) { setError('No checklist found for this session.'); }
-        else setAssignment(list[0]);
+      const params = assignmentId ? `id=${assignmentId}` : `sessionId=${sessionId}`;
+      const res = await fetch(`/api/public-checklist?${params}`);
+      const json = await res.json();
+      if (!res.ok || !json.data) {
+        setError(assignmentId ? 'Checklist not found. It may have been removed.' : 'No checklist found for this session.');
+        return;
       }
+      setAssignment(json.data);
     } catch {
       setError('Failed to load checklist. Please try again.');
     } finally {
@@ -61,12 +59,19 @@ function PublicChecklistContent() {
       const allDone = updatedItems.every(i => i.checked);
       let status = allDone ? 'completed' : updatedItems.some(i => i.checked) ? 'in-progress' : 'pending';
 
-      await updatePublicAssignment(assignment.id, {
-        items: updatedItems,
-        status,
-        ...(allDone ? { completedAt: new Date().toISOString() } : { completedAt: null }),
-        updatedAt: new Date().toISOString(),
+      const res = await fetch('/api/public-checklist', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: assignment.id,
+          items: updatedItems,
+          status,
+          completedAt: allDone ? new Date().toISOString() : '',
+          updatedAt: new Date().toISOString(),
+        }),
       });
+
+      if (!res.ok) throw new Error('Update failed');
 
       setAssignment(prev => ({
         ...prev,
@@ -86,10 +91,16 @@ function PublicChecklistContent() {
     try {
       const updatedItems = [...assignment.items];
       updatedItems[itemIndex].note = note;
-      await updatePublicAssignment(assignment.id, {
-        items: updatedItems,
-        updatedAt: new Date().toISOString(),
+      const res = await fetch('/api/public-checklist', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: assignment.id,
+          items: updatedItems,
+          updatedAt: new Date().toISOString(),
+        }),
       });
+      if (!res.ok) throw new Error('Update failed');
       setAssignment(prev => ({ ...prev, items: updatedItems }));
     } catch { toast.error('Failed to save note'); }
   }
