@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@/utils/helpers';
-import { getPublicAssignment, updatePublicAssignment } from '@/lib/firestore';
+import { getPublicAssignment, getPublicAssignments, updatePublicAssignment } from '@/lib/firestore';
 import {
   CheckCircle2, Circle, ClipboardCheck, MessageSquare, Shield,
   Loader2, AlertCircle, CheckCircle,

@@ -277,8 +277,12 @@ export default function ChecklistsPage() {
           ) : (
             templates.map((template) => {
               const FreqIcon = FREQUENCIES.find(f => f.value === template.frequency)?.icon || Clock;
-              const assignCount = assignments.filter(a => a.templateId === template.id).length;
-              const completedCount = assignments.filter(a => a.templateId === template.id && a.status === 'completed').length;
+              const isShopWide = template.scope === 'shop';
+              const templateAssignments = assignments.filter(a => a.templateId === template.id);
+              // Shop-wide: count unique dates (one assignment per day)
+              const uniqueDates = new Set(templateAssignments.map(a => a.date)).size;
+              const assignCount = isShopWide ? uniqueDates : templateAssignments.length;
+              const completedCount = templateAssignments.filter(a => a.status === 'completed').length;
               const isExpanded = expandedTemplate === template.id;
               const shop = shops.find(s => s.id === template.shopId);
               const assignedWorkers = template.assignedTo === 'all'
@@ -335,6 +339,10 @@ export default function ChecklistsPage() {
                             <span className="flex items-center gap-1 text-emerald-600">
                               <Globe className="w-3.5 h-3.5" /> Anyone (public)
                             </span>
+                          ) : isShopWide ? (
+                            <span className="flex items-center gap-1 text-amber-600">
+                              <Building className="w-3.5 h-3.5" /> Shop (any staff)
+                            </span>
                           ) : (
                             <span className="flex items-center gap-1">
                               <Users className="w-3.5 h-3.5" />
@@ -360,12 +368,10 @@ export default function ChecklistsPage() {
 
                       {/* Actions */}
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        {(template.scope === 'public' || template.frequency === 'qr') && (
-                          <button onClick={() => setShowQRModal(template)}
-                            className="btn-icon" title="Show QR Code">
-                            <QrCode className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button onClick={() => setShowQRModal(template)}
+                          className="btn-icon" title="Show QR Code">
+                          <QrCode className="w-4 h-4" />
+                        </button>
                         {template.scope !== 'public' && (
                           <button onClick={() => setShowAssignModal(template)}
                             className="btn-icon" title="Manual Assign">
@@ -476,6 +482,7 @@ export default function ChecklistsPage() {
                   <tr>
                     <th>Checklist</th>
                     <th>Worker</th>
+                    <th>Completed By</th>
                     <th>Date</th>
                     <th>Progress</th>
                     <th>Status</th>
@@ -491,7 +498,16 @@ export default function ChecklistsPage() {
                     return (
                       <tr key={a.id}>
                         <td className="font-medium text-surface-800">{a.templateTitle}</td>
-                        <td>{a.workerName}</td>
+                        <td>
+                          {a.workerId === 'shop' ? (
+                            <span className="font-medium text-purple-700 text-sm">Shop</span>
+                          ) : (
+                            a.workerName
+                          )}
+                        </td>
+                        <td className="text-xs text-surface-500">
+                          {a.workerId === 'shop' && a.completedBy ? a.completedBy : '—'}
+                        </td>
                         <td className="text-surface-500 text-xs">
                           {a.date ? new Date(a.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '-'}
                         </td>
@@ -887,7 +903,13 @@ function QRModal({ open, onClose, template }) {
     <Modal open={open} onClose={onClose} title="QR Code" size="sm">
       <div className="text-center space-y-4">
         <div className="bg-white p-6 rounded-2xl border-2 border-dashed border-surface-200 inline-block">
-          <QRCodeSVG value={qrUrl} size={200} />
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}`}
+            alt="QR Code"
+            width={200}
+            height={200}
+            className="w-[200px] h-[200px]"
+          />
         </div>
         <div>
           <p className="text-sm font-medium text-surface-700 mb-1">{template.title}</p>
@@ -911,8 +933,9 @@ function QRModal({ open, onClose, template }) {
             <Copy className="w-4 h-4" /> Copy URL
           </button>
           <button onClick={() => {
+            const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrUrl)}`;
             const printWindow = window.open('', '_blank');
-            printWindow.document.write(`<html><head><title>QR - ${template.title}</title><style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif}h2{margin-bottom:8px}p{color:#666;font-size:14px}</style></head><body><h2>${template.title}</h2><p>${isPublic ? 'Scan with your phone camera' : 'Scan to start checklist'}</p><div id="qr"></div><script>window.print()<\/script></body></html>`);
+            printWindow.document.write(`<html><head><title>QR - ${template.title}</title><style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif}h2{margin-bottom:8px}p{color:#666;font-size:14px}img{margin:16px 0}</style></head><body><h2>${template.title}</h2><p>${isPublic ? 'Scan with your phone camera' : 'Scan to start checklist'}</p><img src="${qrImageUrl}" width="300" height="300" /><p style="font-size:12px;color:#999;margin-top:8px">${qrUrl}</p></body></html>`);
             printWindow.document.close();
           }} className="btn-primary text-sm">
             <Download className="w-4 h-4" /> Print
@@ -923,75 +946,4 @@ function QRModal({ open, onClose, template }) {
   );
 }
 
-// ─── Simple QR Code SVG generator ────────────────────────
-// Minimal QR Code generator for display purposes
-function QRCodeSVG({ value, size = 200 }) {
-  // We create a visual QR-like representation using the URL
-  // For production, you'd use a library, but this generates a working visual
-  const modules = generateQRMatrix(value);
-  const moduleCount = modules.length;
-  const cellSize = size / moduleCount;
 
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} xmlns="http://www.w3.org/2000/svg">
-      <rect width={size} height={size} fill="white" />
-      {modules.map((row, y) =>
-        row.map((cell, x) =>
-          cell ? (
-            <rect key={`${x}-${y}`} x={x * cellSize} y={y * cellSize}
-              width={cellSize} height={cellSize} fill="#1a1a2e" rx={cellSize * 0.1} />
-          ) : null
-        )
-      )}
-    </svg>
-  );
-}
-
-// Minimal QR-like matrix generator (creates scannable pattern from data)
-function generateQRMatrix(data) {
-  const size = 25;
-  const matrix = Array.from({ length: size }, () => Array(size).fill(false));
-
-  // Finder patterns (3 corners)
-  function drawFinder(ox, oy) {
-    for (let y = 0; y < 7; y++)
-      for (let x = 0; x < 7; x++)
-        matrix[oy + y][ox + x] = (x === 0 || x === 6 || y === 0 || y === 6) || (x >= 2 && x <= 4 && y >= 2 && y <= 4);
-  }
-  drawFinder(0, 0);
-  drawFinder(size - 7, 0);
-  drawFinder(0, size - 7);
-
-  // Timing patterns
-  for (let i = 8; i < size - 8; i++) {
-    matrix[6][i] = i % 2 === 0;
-    matrix[i][6] = i % 2 === 0;
-  }
-
-  // Encode data into remaining cells using simple hash
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) {
-    hash = ((hash << 5) - hash + data.charCodeAt(i)) | 0;
-  }
-  let seed = Math.abs(hash);
-  for (let y = 9; y < size - 8; y++) {
-    for (let x = 9; x < size - 8; x++) {
-      if (x === 6 || y === 6) continue;
-      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-      matrix[y][x] = (seed >> 16) % 3 === 0;
-    }
-  }
-  // Fill some border area data cells
-  for (let y = 8; y < size; y++) {
-    for (let x = 0; x < 8; x++) {
-      if (y < size - 7 && !matrix[y][x]) { seed = (seed * 1103515245 + 12345) & 0x7fffffff; matrix[y][x] = (seed >> 16) % 4 === 0; }
-    }
-  }
-  for (let x = 8; x < size; x++) {
-    for (let y = 0; y < 8; y++) {
-      if (x < size - 7 && !matrix[y][x]) { seed = (seed * 1103515245 + 12345) & 0x7fffffff; matrix[y][x] = (seed >> 16) % 4 === 0; }
-    }
-  }
-
-  return matrix;
-}

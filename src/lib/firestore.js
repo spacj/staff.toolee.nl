@@ -707,11 +707,20 @@ export async function getChecklistAssignments(filters = {}) {
   if (filters.workerId) c.push(where('workerId', '==', filters.workerId));
   if (filters.templateId) c.push(where('templateId', '==', filters.templateId));
   let results = await getAll(C.CHECKLIST_ASSIGNMENTS, ...c);
+  // Include shop-wide assignments when fetching for a worker (scope=shop is shared)
+  if (filters.workerId && filters.orgId) {
+    const shopWide = await getAll(C.CHECKLIST_ASSIGNMENTS,
+      where('orgId', '==', filters.orgId),
+      where('workerId', '==', 'shop')
+    );
+    results = [...results, ...shopWide];
+  }
   // Client-side filtering and sorting
   if (filters.status) results = results.filter(r => r.status === filters.status);
   if (filters.date) results = results.filter(r => r.date === filters.date);
   if (filters.startDate) results = results.filter(r => r.date >= filters.startDate);
   if (filters.endDate) results = results.filter(r => r.date <= filters.endDate);
+  if (filters.scope) results = results.filter(r => r.scope === filters.scope);
   results.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
   return results;
 }
@@ -721,18 +730,52 @@ export const updateChecklistAssignment = (id, data) => upd(C.CHECKLIST_ASSIGNMEN
 export const deleteChecklistAssignment = (id) => del(C.CHECKLIST_ASSIGNMENTS, id);
 
 // Batch-generate assignments for a template (used by scheduled generation)
+// - Shop-wide (scope='shop'): creates ONE shared assignment for the whole shop
+// - Per-worker (scope='worker' or no scope): creates per-worker assignments
 export async function generateChecklistAssignments(template, workers, date) {
+  const today = date || new Date().toISOString().split('T')[0];
+  const isShopWide = template.scope === 'shop';
+
+  if (isShopWide) {
+    // One shared assignment for the whole shop
+    const existing = await getDocs(query(
+      collection(db, C.CHECKLIST_ASSIGNMENTS),
+      where('templateId', '==', template.id),
+      where('workerId', '==', 'shop'),
+      where('date', '==', today)
+    ));
+    if (!existing.empty) return [existing.docs[0].id];
+    const id = await add(C.CHECKLIST_ASSIGNMENTS, {
+      orgId: template.orgId,
+      templateId: template.id,
+      templateTitle: template.title,
+      workerId: 'shop',
+      workerName: 'Shop',
+      scope: 'shop',
+      date: today,
+      dueDate: today,
+      frequency: template.frequency,
+      shopId: template.shopId || '',
+      items: template.items.map(i => ({ ...i, checked: false, checkedAt: null, note: '', checkedBy: '' })),
+      status: 'pending',
+      triggeredBy: 'schedule',
+      completedBy: '',
+      completedAt: null,
+    });
+    return [id];
+  }
+
+  // Per-worker: create one assignment per target worker
   const targetWorkers = template.assignedTo === 'all'
     ? workers
     : workers.filter(w => (template.assignedTo || []).includes(w.id));
   const created = [];
   for (const worker of targetWorkers) {
-    // Check if assignment already exists for this template+worker+date
     const existing = await getDocs(query(
       collection(db, C.CHECKLIST_ASSIGNMENTS),
       where('templateId', '==', template.id),
       where('workerId', '==', worker.id),
-      where('date', '==', date)
+      where('date', '==', today)
     ));
     if (existing.empty) {
       const id = await add(C.CHECKLIST_ASSIGNMENTS, {
@@ -741,13 +784,16 @@ export async function generateChecklistAssignments(template, workers, date) {
         templateTitle: template.title,
         workerId: worker.id,
         workerName: `${worker.firstName} ${worker.lastName}`,
-        date,
-        dueDate: date,
+        scope: 'worker',
+        date: today,
+        dueDate: today,
         frequency: template.frequency,
         shopId: template.shopId || '',
-        items: template.items.map(i => ({ ...i, checked: false, checkedAt: null, note: '' })),
+        items: template.items.map(i => ({ ...i, checked: false, checkedAt: null, note: '', checkedBy: '' })),
         status: 'pending',
         triggeredBy: 'schedule',
+        completedBy: '',
+        completedAt: null,
       });
       created.push(id);
     }
@@ -756,32 +802,69 @@ export async function generateChecklistAssignments(template, workers, date) {
 }
 
 // Create assignment from QR scan
+// - Shop-wide: creates/fetches ONE shared shop assignment
+// - Per-worker: creates/fetches per-worker assignment
 export async function createQRChecklistAssignment(template, workerId, workerName) {
   const today = new Date().toISOString().split('T')[0];
-  // Check for existing today
+  const isShopWide = template.scope === 'shop';
+
+  if (isShopWide) {
+    // Shop-wide: look up or create one shared assignment
+    const existing = await getDocs(query(
+      collection(db, C.CHECKLIST_ASSIGNMENTS),
+      where('templateId', '==', template.id),
+      where('workerId', '==', 'shop'),
+      where('date', '==', today)
+    ));
+    if (!existing.empty) return { id: existing.docs[0].id, existing: true, isShopWide: true };
+    const id = await add(C.CHECKLIST_ASSIGNMENTS, {
+      orgId: template.orgId,
+      templateId: template.id,
+      templateTitle: template.title,
+      workerId: 'shop',
+      workerName: 'Shop',
+      scope: 'shop',
+      date: today,
+      dueDate: today,
+      frequency: 'qr',
+      shopId: template.shopId || '',
+      items: template.items.map(i => ({ ...i, checked: false, checkedAt: null, note: '', checkedBy: '' })),
+      status: 'pending',
+      triggeredBy: 'qr',
+      completedBy: '',
+      completedAt: null,
+      qrScannedAt: new Date().toISOString(),
+    });
+    return { id, existing: false, isShopWide: true };
+  }
+
+  // Per-worker: create per-worker assignment
   const existing = await getDocs(query(
     collection(db, C.CHECKLIST_ASSIGNMENTS),
     where('templateId', '==', template.id),
     where('workerId', '==', workerId),
     where('date', '==', today)
   ));
-  if (!existing.empty) return { id: existing.docs[0].id, existing: true };
+  if (!existing.empty) return { id: existing.docs[0].id, existing: true, isShopWide: false };
   const id = await add(C.CHECKLIST_ASSIGNMENTS, {
     orgId: template.orgId,
     templateId: template.id,
     templateTitle: template.title,
     workerId,
     workerName,
+    scope: 'worker',
     date: today,
     dueDate: today,
     frequency: 'qr',
     shopId: template.shopId || '',
-    items: template.items.map(i => ({ ...i, checked: false, checkedAt: null, note: '' })),
+    items: template.items.map(i => ({ ...i, checked: false, checkedAt: null, note: '', checkedBy: '' })),
     status: 'pending',
     triggeredBy: 'qr',
+    completedBy: '',
+    completedAt: null,
     qrScannedAt: new Date().toISOString(),
   });
-  return { id, existing: false };
+  return { id, existing: false, isShopWide: false };
 }
 
 // ─── Public Checklist Assignments (external/unauthenticated users) ──

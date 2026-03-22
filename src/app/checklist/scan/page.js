@@ -196,8 +196,10 @@ function ChecklistScanContent() {
     try {
       const updatedItems = [...assignment.items];
       const item = updatedItems[itemIndex];
-      item.checked = !item.checked;
-      item.checkedAt = item.checked ? new Date().toISOString() : null;
+      const wasChecked = !!item.checked;
+      item.checked = !wasChecked;
+      item.checkedAt = !wasChecked ? new Date().toISOString() : null;
+      item.checkedBy = !wasChecked ? workerName : '';
 
       const allDone = updatedItems.every(i => i.checked);
       const anyChecked = updatedItems.some(i => i.checked);
@@ -206,7 +208,7 @@ function ChecklistScanContent() {
       await updateChecklistAssignment(assignment.id, {
         items: updatedItems,
         status,
-        ...(allDone ? { completedAt: new Date().toISOString() } : { completedAt: null }),
+        ...(allDone ? { completedAt: new Date().toISOString(), completedBy: workerName } : { completedAt: null }),
       });
 
       setAssignment(prev => ({ ...prev, items: updatedItems, status, completedAt: allDone ? new Date().toISOString() : null }));

@@ -8,7 +8,7 @@ import {
 } from '@/lib/firestore';
 import {
   ClipboardCheck, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown,
-  ChevronRight, MessageSquare, QrCode, Calendar, Filter,
+  ChevronRight, MessageSquare, QrCode, Calendar, Filter, Building, Users,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -22,16 +22,27 @@ export default function MyChecklistsPage() {
   const [expandedId, setExpandedId] = useState(null);
   const [filterTab, setFilterTab] = useState('today'); // 'today' | 'pending' | 'completed' | 'all'
   const [workerId, setWorkerId] = useState(null);
+  const [workerName, setWorkerName] = useState('');
 
-  // Resolve worker ID (same pattern as time page)
-  const resolveWorkerId = useCallback(async () => {
-    if (userProfile?.workerId) return userProfile.workerId;
-    if (!orgId) return user?.uid;
+  // Resolve worker ID and name (same pattern as time page)
+  const resolveWorker = useCallback(async () => {
+    if (userProfile?.workerId) {
+      setWorkerName(userProfile.displayName || 'Unknown');
+      return userProfile.workerId;
+    }
+    if (!orgId) {
+      setWorkerName(userProfile?.displayName || user?.email || 'Unknown');
+      return user?.uid;
+    }
     try {
       const allWorkers = await getWorkers({ orgId });
       const match = allWorkers.find(w => w.email === user?.email);
-      if (match) return match.id;
+      if (match) {
+        setWorkerName(`${match.firstName} ${match.lastName}`);
+        return match.id;
+      }
     } catch {}
+    setWorkerName(userProfile?.displayName || user?.email || 'Unknown');
     return user?.uid;
   }, [userProfile, orgId, user]);
 
@@ -39,7 +50,7 @@ export default function MyChecklistsPage() {
     if (!orgId) return;
     setLoading(true);
     try {
-      const wId = await resolveWorkerId();
+      const wId = await resolveWorker();
       setWorkerId(wId);
       const all = await getChecklistAssignments({ orgId, workerId: wId });
       setAssignments(all);
@@ -48,7 +59,7 @@ export default function MyChecklistsPage() {
     } finally {
       setLoading(false);
     }
-  }, [orgId, resolveWorkerId]);
+  }, [orgId, resolveWorker]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -57,25 +68,27 @@ export default function MyChecklistsPage() {
     try {
       const updatedItems = [...assignment.items];
       const item = updatedItems[itemIndex];
-      item.checked = !item.checked;
-      item.checkedAt = item.checked ? new Date().toISOString() : null;
+      const wasChecked = !!item.checked;
+      item.checked = !wasChecked;
+      item.checkedAt = !wasChecked ? new Date().toISOString() : null;
+      // Track who checked it (for shop-wide)
+      item.checkedBy = !wasChecked ? workerName : '';
 
-      const allChecked = updatedItems.filter(i => i.required).every(i => i.checked);
-      const anyChecked = updatedItems.some(i => i.checked);
       const allDone = updatedItems.every(i => i.checked);
-
+      const anyChecked = updatedItems.some(i => i.checked);
       let status = assignment.status;
       if (allDone) status = 'completed';
       else if (anyChecked) status = 'in-progress';
       else status = 'pending';
 
-      await updateChecklistAssignment(assignment.id, {
+      const updates = {
         items: updatedItems,
         status,
-        ...(allDone ? { completedAt: new Date().toISOString() } : { completedAt: null }),
-      });
+        ...(allDone ? { completedAt: new Date().toISOString(), completedBy: workerName } : { completedAt: null }),
+      };
 
-      // Update local state
+      await updateChecklistAssignment(assignment.id, updates);
+
       setAssignments(prev => prev.map(a =>
         a.id === assignment.id
           ? { ...a, items: updatedItems, status, completedAt: allDone ? new Date().toISOString() : null }
@@ -221,12 +234,18 @@ export default function MyChecklistsPage() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className={cn('font-display font-semibold text-surface-800 truncate', isComplete && 'line-through text-surface-500')}>
                         {assignment.templateTitle}
                       </h3>
-                      {assignment.triggeredBy === 'qr' && (
-                        <QrCode className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+                      {assignment.scope === 'shop' ? (
+                        <span className="badge bg-emerald-100 text-emerald-700 text-[10px]">
+                          <Building className="w-2.5 h-2.5 mr-0.5" /> Shop
+                        </span>
+                      ) : (
+                        assignment.triggeredBy === 'qr' && (
+                          <QrCode className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+                        )
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-1">
@@ -263,6 +282,7 @@ export default function MyChecklistsPage() {
                               key={item.id || i}
                               item={item}
                               index={i}
+                              isShopWide={assignment.scope === 'shop'}
                               disabled={isComplete}
                               onToggle={() => handleToggleItem(assignment, i)}
                               onNote={(note) => handleAddNote(assignment, i, note)}
@@ -274,7 +294,7 @@ export default function MyChecklistsPage() {
                         {isComplete && assignment.completedAt && (
                           <div className="mt-3 pt-3 border-t border-surface-100 flex items-center gap-2 text-xs text-emerald-600">
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            Completed {new Date(assignment.completedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            Completed{assignment.completedBy ? ` by ${assignment.completedBy}` : ''} {new Date(assignment.completedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
                       </div>
@@ -291,7 +311,7 @@ export default function MyChecklistsPage() {
 }
 
 // ─── Individual Checklist Item ─────────────────────────
-function ChecklistItem({ item, index, disabled, onToggle, onNote }) {
+function ChecklistItem({ item, index, disabled, isShopWide, onToggle, onNote }) {
   const [showNote, setShowNote] = useState(false);
   const [noteText, setNoteText] = useState(item.note || '');
 
@@ -324,6 +344,7 @@ function ChecklistItem({ item, index, disabled, onToggle, onNote }) {
           )}
           {item.checkedAt && (
             <p className="text-[10px] text-surface-300 mt-0.5">
+              {isShopWide && item.checkedBy ? `${item.checkedBy} · ` : ''}
               {new Date(item.checkedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
             </p>
           )}
