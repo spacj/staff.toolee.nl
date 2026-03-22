@@ -44,6 +44,7 @@ export async function POST(req) {
     const tmplRes = await fetch(`${firestoreBase}/checklistTemplates/${templateId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    console.log('[public-checklist-assignment] Template fetch status:', tmplRes.status, 'for id:', templateId);
     if (tmplRes.status === 404) {
       return NextResponse.json({ error: 'Checklist not found', debug: templateId }, { status: 404 });
     }
@@ -59,7 +60,10 @@ export async function POST(req) {
     const template = {};
     for (const [k, v] of Object.entries(tmplDoc.fields)) template[k] = fromFirestore(v);
 
+    console.log('[public-checklist-assignment] Template fields:', JSON.stringify(Object.keys(template)), 'scope:', template.scope);
+
     if (template.scope !== 'public') {
+      console.log('[public-checklist-assignment] Template scope is:', template.scope, 'not "public"');
       return NextResponse.json({ error: 'This checklist is not publicly accessible' }, { status: 403 });
     }
     if (template.active === false) {
