@@ -2,7 +2,6 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/utils/helpers';
-import { getChecklistTemplate } from '@/lib/firestore';
 import {
   ClipboardCheck, User, Loader2, AlertCircle, QrCode, Shield,
   ArrowRight, MapPin,
@@ -33,11 +32,13 @@ function PublicScanContent() {
   async function loadTemplate() {
     setLoading(true);
     try {
-      const t = await getChecklistTemplate(templateId);
-      if (!t) { setError('Checklist not found.'); return; }
-      if (!t.active) { setError('This checklist is currently paused.'); return; }
-      if (t.scope !== 'public') { setError('This checklist is not available for public access.'); return; }
-      setTemplate(t);
+      const res = await fetch(`/api/public-template?id=${templateId}`);
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Checklist not found.');
+        return;
+      }
+      setTemplate(json.data);
     } catch {
       setError('Failed to load checklist.');
     } finally {
