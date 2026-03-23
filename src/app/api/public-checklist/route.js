@@ -65,8 +65,9 @@ export async function GET(req) {
     });
 
     const results = await res.json();
+    console.log('[GET public-checklist] sessionId:', sessionId, 'results count:', results.length, 'has doc:', !!results.find(r => r.document));
     const doc = results.find(r => r.document);
-    if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!doc) return NextResponse.json({ error: 'Not found', debug: { sessionId, count: results.length } }, { status: 404 });
 
     return NextResponse.json({ data: parseDoc(doc.document) });
   } catch (err) {
