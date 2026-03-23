@@ -111,6 +111,7 @@ export async function POST(req) {
         }
       })
     });
+    console.log('[public-checklist-assignment] Check existing status:', checkRes.status);
     const checkData = await checkRes.json();
     if (checkData.length > 0 && checkData[0].document) {
       const existingId = checkData[0].document.name.split('/').pop();
@@ -157,6 +158,7 @@ export async function POST(req) {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields }),
     });
+    console.log('[public-checklist-assignment] Create doc status:', docRes.status);
     if (!docRes.ok) {
       const text = await docRes.text();
       console.error('[public-checklist-assignment] Create error:', docRes.status, text);
