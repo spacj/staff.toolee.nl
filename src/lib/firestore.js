@@ -734,8 +734,7 @@ export const deleteChecklistAssignment = (id) => del(C.CHECKLIST_ASSIGNMENTS, id
 // - Shop-wide (scope='shop' OR assignedTo='all'): creates ONE shared assignment
 // - Per-worker (scope='worker' with specific workers): creates per-worker assignments
 export async function generateChecklistAssignments(template, workers, date) {
-  const today = date || new Date().toISOString().split('T')[0];
-  console.log('[generateChecklistAssignments] scope:', template.scope, 'assignedTo:', template.assignedTo, 'workers:', workers?.length, 'today:', today);
+  const today = date;
 
   // Public: one shared assignment for the day
   if (template.scope === 'public') {
@@ -745,7 +744,7 @@ export async function generateChecklistAssignments(template, workers, date) {
       where('scope', '==', 'public'),
       where('date', '==', today)
     ));
-    if (!existing.empty) { console.log('[generateChecklistAssignments] public existing found'); return [existing.docs[0].id]; }
+    if (!existing.empty) return [existing.docs[0].id];
     const id = await add(C.CHECKLIST_ASSIGNMENTS, {
       orgId: template.orgId,
       templateId: template.id,
@@ -763,7 +762,6 @@ export async function generateChecklistAssignments(template, workers, date) {
       completedBy: '',
       completedAt: null,
     });
-    console.log('[generateChecklistAssignments] created public id:', id);
     return [id];
   }
 
@@ -771,14 +769,13 @@ export async function generateChecklistAssignments(template, workers, date) {
   const isShopWide = template.scope === 'shop' || template.assignedTo === 'all';
 
   if (isShopWide) {
-    console.log('[generateChecklistAssignments] isShopWide=true, creating shared assignment');
     const existing = await getDocs(query(
       collection(db, C.CHECKLIST_ASSIGNMENTS),
       where('templateId', '==', template.id),
       where('workerId', '==', 'shop'),
       where('date', '==', today)
     ));
-    if (!existing.empty) { console.log('[generateChecklistAssignments] existing found, returning'); return [existing.docs[0].id]; }
+    if (!existing.empty) return [existing.docs[0].id];
     const id = await add(C.CHECKLIST_ASSIGNMENTS, {
       orgId: template.orgId,
       templateId: template.id,
@@ -796,13 +793,11 @@ export async function generateChecklistAssignments(template, workers, date) {
       completedBy: '',
       completedAt: null,
     });
-    console.log('[generateChecklistAssignments] created shared id:', id);
     return [id];
   }
 
   // Per-worker: create one assignment per specific worker
   const targetWorkerIds = template.assignedTo || [];
-  console.log('[generateChecklistAssignments] isShopWide=false, targetWorkerIds:', targetWorkerIds);
   const created = [];
   for (const workerId of targetWorkerIds) {
     const existing = await getDocs(query(
@@ -813,7 +808,7 @@ export async function generateChecklistAssignments(template, workers, date) {
     ));
     if (!existing.empty) continue;
     const worker = workers?.find(w => w.id === workerId);
-    if (!worker) { console.log('[generateChecklistAssignments] worker not found:', workerId); continue; }
+    if (!worker) continue;
     const id = await add(C.CHECKLIST_ASSIGNMENTS, {
       orgId: template.orgId,
       templateId: template.id,
@@ -832,9 +827,7 @@ export async function generateChecklistAssignments(template, workers, date) {
       completedAt: null,
     });
     created.push(id);
-    console.log('[generateChecklistAssignments] created per-worker id:', id);
   }
-  console.log('[generateChecklistAssignments] returning:', created);
   return created;
 }
 

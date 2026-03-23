@@ -12,8 +12,8 @@ import {
 import {
   ClipboardCheck, Plus, Trash2, Edit3, Copy, MoreVertical, Users, Store,
   Calendar, QrCode, Clock, CheckCircle2, Circle, AlertCircle, ChevronDown,
-  ChevronRight, Play, Pause, BarChart3, Eye, X, GripVertical, RotateCcw,
-  Download, Send, Filter, Globe, Building,
+  ChevronRight, Play, Pause, BarChart3, X,
+  Download, Send, Globe, Building,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -50,8 +50,6 @@ export default function ChecklistsPage() {
   const [showShopQRModal, setShowShopQRModal] = useState(null); // shop for shop QR
   const [viewDate, setViewDate] = useState(new Date()); // calendar view date
   const [expandedTemplate, setExpandedTemplate] = useState(null);
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterFrequency, setFilterFrequency] = useState('all');
   const [openDropdown, setOpenDropdown] = useState(null);
 
   const loadData = useCallback(async () => {
@@ -91,25 +89,21 @@ export default function ChecklistsPage() {
         toast.success('Checklist created');
 
         // Auto-generate today's assignment if applicable
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
-        const dow = today.toLocaleDateString('en-US', { weekday: 'long' });
-        const dom = today.getDate();
-        const todayStr2 = today.toISOString().split('T')[0];
+        const now = new Date();
+        const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
+        const dow = now.toLocaleDateString('en-US', { weekday: 'long' });
+        const dom = now.getDate();
 
         const applicable =
           data.frequency === 'daily' ||
           (data.frequency === 'weekly' && data.dayOfWeek === dow) ||
           (data.frequency === 'monthly' && data.dayOfMonth === dom) ||
           (data.frequency === 'specific-days' && data.specificDays?.includes(dow)) ||
-          (data.frequency === 'specific-dates' && data.specificDates?.includes(todayStr2));
+          (data.frequency === 'specific-dates' && data.specificDates?.includes(todayStr));
 
-        console.log('[handleSaveTemplate] applicable:', applicable, 'scope:', data.scope, 'frequency:', data.frequency, 'assignedTo:', data.assignedTo, 'workers.length:', workers.length);
         if (applicable && data.frequency !== 'qr') {
-          console.log('[handleSaveTemplate] generating assignment, workers:', workers.length);
           const templateWithId = { ...data, id: newTemplate };
           const ids = await generateChecklistAssignments(templateWithId, workers, todayStr);
-          console.log('[handleSaveTemplate] generated ids:', ids);
           if (ids.length > 0) {
             toast.success('Assignment generated for today');
           } else {
@@ -147,10 +141,10 @@ export default function ChecklistsPage() {
 
       // Auto-generate when reactivating a scheduled template
       if (activating && template.frequency !== 'qr' && template.frequency !== 'one-time' && template.scope !== 'public') {
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
-        const dow = today.toLocaleDateString('en-US', { weekday: 'long' });
-        const dom = today.getDate();
+        const now = new Date();
+        const todayStr = now.toLocaleDateString('en-CA');
+        const dow = now.toLocaleDateString('en-US', { weekday: 'long' });
+        const dom = now.getDate();
 
         const applicable =
           template.frequency === 'daily' ||
@@ -202,45 +196,12 @@ export default function ChecklistsPage() {
     }
   }
 
-  // ─── Generate today's assignments ───────────────────
-  async function handleGenerateToday() {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const dow = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-      const dom = new Date().getDate();
-      let count = 0;
-      for (const t of templates.filter(t => t.active)) {
-        if (t.frequency === 'daily') {
-          const ids = await generateChecklistAssignments(t, workers, today);
-          count += ids.length;
-        } else if (t.frequency === 'weekly' && t.dayOfWeek === dow) {
-          const ids = await generateChecklistAssignments(t, workers, today);
-          count += ids.length;
-        } else if (t.frequency === 'monthly' && t.dayOfMonth === dom) {
-          const ids = await generateChecklistAssignments(t, workers, today);
-          count += ids.length;
-        }
-      }
-      toast.success(`Generated ${count} assignment${count !== 1 ? 's' : ''} for today`);
-      loadData();
-    } catch (err) {
-      toast.error('Failed to generate assignments');
-    }
-  }
-
   // ─── Stats ──────────────────────────────────────────
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local timezone
   const todayAssignments = assignments.filter(a => a.date === today);
   const completedToday = todayAssignments.filter(a => a.status === 'completed').length;
   const pendingToday = todayAssignments.filter(a => a.status === 'pending' || a.status === 'in-progress').length;
   const overdueCount = assignments.filter(a => a.status !== 'completed' && a.dueDate < today).length;
-
-  // ─── Filtered assignments ───────────────────────────
-  const filteredAssignments = assignments.filter(a => {
-    if (filterStatus !== 'all' && a.status !== filterStatus) return false;
-    if (filterFrequency !== 'all' && a.frequency !== filterFrequency) return false;
-    return true;
-  });
 
   if (loading) {
     return (
@@ -311,11 +272,6 @@ export default function ChecklistsPage() {
           className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all',
             tab === 'templates' ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-500 hover:text-surface-700')}>
           Templates ({templates.length})
-        </button>
-        <button onClick={() => setTab('assignments')}
-          className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all',
-            tab === 'assignments' ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-500 hover:text-surface-700')}>
-          Assignments ({assignments.length})
         </button>
         <button onClick={() => setTab('calendar')}
           className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all',
@@ -507,111 +463,6 @@ export default function ChecklistsPage() {
       )}
 
       {/* ─── Assignments Tab ────────────────────────── */}
-      {tab === 'assignments' && (
-        <div>
-          {/* Filters */}
-          <div className="flex items-center gap-2 mb-4 flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <Filter className="w-4 h-4 text-surface-400" />
-              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="select-field py-1.5 text-xs w-auto">
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="in-progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="overdue">Overdue</option>
-              </select>
-            </div>
-            <select value={filterFrequency} onChange={e => setFilterFrequency(e.target.value)} className="select-field py-1.5 text-xs w-auto">
-              <option value="all">All Types</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="one-time">One-time</option>
-              <option value="qr">QR Triggered</option>
-            </select>
-          </div>
-
-          {filteredAssignments.length === 0 ? (
-            <div className="card p-12 text-center">
-              <ClipboardCheck className="w-12 h-12 text-surface-300 mx-auto mb-3" />
-              <h3 className="text-lg font-display font-semibold text-surface-700">No assignments</h3>
-              <p className="text-sm text-surface-500 mt-1">
-                {assignments.length === 0 ? 'Generate today\'s assignments or manually assign checklists to workers.' : 'No assignments match current filters.'}
-              </p>
-            </div>
-          ) : (
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Checklist</th>
-                    <th>Worker</th>
-                    <th>Completed By</th>
-                    <th>Date</th>
-                    <th>Progress</th>
-                    <th>Status</th>
-                    <th>Type</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredAssignments.slice(0, 50).map(a => {
-                    const checkedCount = (a.items || []).filter(i => i.checked).length;
-                    const totalItems = (a.items || []).length;
-                    const pct = totalItems ? Math.round((checkedCount / totalItems) * 100) : 0;
-                    const isOverdue = a.status !== 'completed' && a.dueDate < today;
-                    return (
-                      <tr key={a.id}>
-                        <td className="font-medium text-surface-800">{a.templateTitle}</td>
-                        <td>
-                          {a.workerId === 'shop' ? (
-                            <span className="font-medium text-purple-700 text-sm">Shop</span>
-                          ) : (
-                            a.workerName
-                          )}
-                        </td>
-                        <td className="text-xs text-surface-500">
-                          {a.workerId === 'shop' && a.completedBy ? a.completedBy : '—'}
-                        </td>
-                        <td className="text-surface-500 text-xs">
-                          {a.date ? new Date(a.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '-'}
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            <div className="w-16 h-1.5 bg-surface-100 rounded-full overflow-hidden">
-                              <div className={cn('h-full rounded-full transition-all',
-                                pct === 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-brand-500' : 'bg-surface-200'
-                              )} style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="text-xs text-surface-500">{checkedCount}/{totalItems}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <span className={cn('badge',
-                            a.status === 'completed' ? 'bg-emerald-100 text-emerald-700'
-                              : isOverdue ? 'bg-danger-50 text-danger-600'
-                              : a.status === 'in-progress' ? 'bg-brand-100 text-brand-700'
-                              : 'bg-surface-100 text-surface-600'
-                          )}>
-                            {isOverdue ? 'Overdue' : a.status}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={cn('text-xs',
-                            a.triggeredBy === 'qr' ? 'text-purple-600' : 'text-surface-400'
-                          )}>
-                            {a.triggeredBy === 'qr' ? 'QR' : a.frequency}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ─── Calendar Tab ──────────────────────────────── */}
       {tab === 'calendar' && (
         <CalendarView assignments={assignments} templates={templates} viewDate={viewDate} setViewDate={setViewDate} />
@@ -1152,10 +1003,10 @@ function CalendarView({ assignments, templates, viewDate, setViewDate }) {
   function isSelected(day) {
     if (!selectedDate) return false;
     const d = new Date(year, month, day);
-    return d.toISOString().split('T')[0] === selectedDate;
+    return d.toLocaleDateString('en-CA') === selectedDate;
   }
 
-  const selectedDateStr = selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+  const selectedDateStr = selectedDate ? new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
   const selectedAssignments = selectedDate ? getAssignmentsForDate(selectedDate) : [];
 
   const weeks = [];
@@ -1200,7 +1051,7 @@ function CalendarView({ assignments, templates, viewDate, setViewDate }) {
       <div className="grid grid-cols-7 gap-1 mb-6">
         {weeks.flat().map((day, idx) => {
           if (!day) return <div key={`empty-${idx}`} />;
-          const dateStr = new Date(year, month, day).toISOString().split('T')[0];
+          const dateStr = new Date(year, month, day).toLocaleDateString('en-CA'); // YYYY-MM-DD local timezone
           const dayAssignments = getAssignmentsForDate(dateStr);
           const completed = dayAssignments.filter(a => a.status === 'completed').length;
           const total = dayAssignments.length;
