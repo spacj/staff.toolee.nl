@@ -104,7 +104,7 @@ export default function ChecklistsPage() {
           (data.frequency === 'specific-days' && data.specificDays?.includes(dow)) ||
           (data.frequency === 'specific-dates' && data.specificDates?.includes(todayStr2));
 
-        if (applicable && data.scope === 'shop' && data.frequency !== 'qr') {
+        if (applicable && data.scope !== 'public' && data.scope !== 'qr' && data.frequency !== 'qr') {
           const targetWorkers = data.assignedTo === 'all'
             ? workers
             : workers.filter(w => data.assignedTo.includes(w.id));
@@ -143,7 +143,7 @@ export default function ChecklistsPage() {
       toast.success(template.active ? 'Checklist paused' : 'Checklist activated');
 
       // Auto-generate when reactivating a scheduled template
-      if (activating && template.frequency !== 'qr' && template.frequency !== 'one-time' && template.scope === 'shop') {
+      if (activating && template.frequency !== 'qr' && template.frequency !== 'one-time' && template.scope !== 'public') {
         const today = new Date();
         const todayStr = today.toISOString().split('T')[0];
         const dow = today.toLocaleDateString('en-US', { weekday: 'long' });
@@ -406,9 +406,9 @@ export default function ChecklistsPage() {
                               <Building className="w-3.5 h-3.5" /> Shop (any staff)
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1">
-                              <Users className="w-3.5 h-3.5" />
-                              {template.assignedTo === 'all' ? 'All staff' : `${assignedWorkers.length} worker${assignedWorkers.length !== 1 ? 's' : ''}`}
+                            <span className="flex items-center gap-1 text-blue-600">
+                              <Users className="w-3.5 h-3.5" /> Per worker
+                              {template.assignedTo !== 'all' && template.assignedTo ? ` (${template.assignedTo.length})` : ''}
                             </span>
                           )}
                           {shop && (
@@ -726,6 +726,8 @@ function TemplateModal({ open, onClose, onSave, editing, workers, shops }) {
     if (frequency === 'specific-dates' && specificDates.length === 0) {
       toast.error('Add at least one date'); return;
     }
+    // Derive scope: 'public' stays public; 'shop' = shared assignment (all staff); 'worker' = per-worker
+    const effectiveScope = scope === 'public' ? 'public' : (assignMode === 'all' ? 'shop' : 'worker');
     onSave({
       title: title.trim(),
       description: description.trim(),
@@ -735,8 +737,8 @@ function TemplateModal({ open, onClose, onSave, editing, workers, shops }) {
       specificDays: frequency === 'specific-days' ? specificDays : null,
       specificDates: frequency === 'specific-dates' ? specificDates : null,
       shopId: shopId || null,
-      assignedTo: scope === 'public' ? 'all' : (assignMode === 'all' ? 'all' : selectedWorkers),
-      scope,
+      assignedTo: effectiveScope === 'public' ? 'all' : (assignMode === 'all' ? 'all' : selectedWorkers),
+      scope: effectiveScope,
       items: validItems.map((i) => ({ id: i.id, text: i.text.trim(), required: i.required })),
     });
   }
@@ -904,16 +906,25 @@ function TemplateModal({ open, onClose, onSave, editing, workers, shops }) {
                 Specific workers
               </button>
             </div>
-            {assignMode === 'specific' && (
-              <div className="max-h-40 overflow-y-auto border border-surface-200 rounded-xl p-2 space-y-1">
-                {workers.map(w => (
-                  <label key={w.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-50 cursor-pointer">
-                    <input type="checkbox" checked={selectedWorkers.includes(w.id)}
-                      onChange={() => toggleWorker(w.id)}
-                      className="w-4 h-4 rounded border-surface-300 text-brand-600 focus:ring-brand-500" />
-                    <span className="text-sm text-surface-700">{w.firstName} {w.lastName}</span>
-                  </label>
-                ))}
+            {assignMode === 'all' ? (
+              <p className="text-xs text-surface-500 bg-surface-50 rounded-lg px-3 py-2">
+                <span className="font-medium text-brand-600">Shared checklist</span> — one assignment shared by all staff, visible in Shop QR. Any worker can complete it.
+              </p>
+            ) : (
+              <div>
+                <p className="text-xs text-surface-500 bg-surface-50 rounded-lg px-3 py-2 mb-2">
+                  <span className="font-medium text-blue-600">Per-worker checklist</span> — each selected worker gets their own assignment, visible only in their "My Checklists".
+                </p>
+                <div className="max-h-40 overflow-y-auto border border-surface-200 rounded-xl p-2 space-y-1">
+                  {workers.map(w => (
+                    <label key={w.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-50 cursor-pointer">
+                      <input type="checkbox" checked={selectedWorkers.includes(w.id)}
+                        onChange={() => toggleWorker(w.id)}
+                        className="w-4 h-4 rounded border-surface-300 text-brand-600 focus:ring-brand-500" />
+                      <span className="text-sm text-surface-700">{w.firstName} {w.lastName}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             )}
           </div>
