@@ -113,6 +113,7 @@ export async function POST(req) {
     });
     console.log('[public-checklist-assignment] Check existing status:', checkRes.status);
     const checkData = await checkRes.json();
+    console.log('[public-checklist-assignment] Check existing count:', checkData.length, 'has doc:', !!checkData.find(r => r.document));
     if (checkData.length > 0 && checkData[0].document) {
       const existingId = checkData[0].document.name.split('/').pop();
       return NextResponse.json({
@@ -158,13 +159,13 @@ export async function POST(req) {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields }),
     });
-    console.log('[public-checklist-assignment] Create doc status:', docRes.status);
+    const docBody = await docRes.text();
+    console.log('[public-checklist-assignment] Create doc status:', docRes.status, 'body:', docBody.slice(0, 200));
     if (!docRes.ok) {
-      const text = await docRes.text();
-      console.error('[public-checklist-assignment] Create error:', docRes.status, text);
+      console.error('[public-checklist-assignment] Create error:', docRes.status, docBody);
       return NextResponse.json({ error: 'Failed to create assignment' }, { status: 500 });
     }
-    const doc = await docRes.json();
+    const doc = JSON.parse(docBody);
     const id = doc.name?.split('/').pop() || '';
 
     return NextResponse.json({
