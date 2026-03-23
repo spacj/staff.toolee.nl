@@ -730,14 +730,15 @@ export const updateChecklistAssignment = (id, data) => upd(C.CHECKLIST_ASSIGNMEN
 export const deleteChecklistAssignment = (id) => del(C.CHECKLIST_ASSIGNMENTS, id);
 
 // Batch-generate assignments for a template (used by scheduled generation)
-// - Shop-wide (scope='shop'): creates ONE shared assignment for the whole shop
-// - Per-worker (scope='worker' or no scope): creates per-worker assignments
+// - Shop-wide (scope='shop' OR assignedTo='all'): creates ONE shared assignment
+// - Per-worker (scope='worker' with specific workers): creates per-worker assignments
 export async function generateChecklistAssignments(template, workers, date) {
   const today = date || new Date().toISOString().split('T')[0];
-  const isShopWide = template.scope === 'shop';
+
+  // Shop-wide: one shared assignment (scope='shop' OR assignedTo='all')
+  const isShopWide = template.scope === 'shop' || template.assignedTo === 'all';
 
   if (isShopWide) {
-    // One shared assignment for the whole shop
     const existing = await getDocs(query(
       collection(db, C.CHECKLIST_ASSIGNMENTS),
       where('templateId', '==', template.id),
@@ -756,7 +757,7 @@ export async function generateChecklistAssignments(template, workers, date) {
       dueDate: today,
       frequency: template.frequency,
       shopId: template.shopId || '',
-      items: template.items.map(i => ({ ...i, checked: false, checkedAt: null, note: '', checkedBy: '' })),
+      items: (template.items || []).map(i => ({ ...i, checked: false, checkedAt: null, note: '', checkedBy: '' })),
       status: 'pending',
       triggeredBy: 'schedule',
       completedBy: '',
@@ -765,38 +766,37 @@ export async function generateChecklistAssignments(template, workers, date) {
     return [id];
   }
 
-  // Per-worker: create one assignment per target worker
-  const targetWorkers = template.assignedTo === 'all'
-    ? workers
-    : workers.filter(w => (template.assignedTo || []).includes(w.id));
+  // Per-worker: create one assignment per specific worker
+  const targetWorkerIds = template.assignedTo || [];
   const created = [];
-  for (const worker of targetWorkers) {
+  for (const workerId of targetWorkerIds) {
     const existing = await getDocs(query(
       collection(db, C.CHECKLIST_ASSIGNMENTS),
       where('templateId', '==', template.id),
-      where('workerId', '==', worker.id),
+      where('workerId', '==', workerId),
       where('date', '==', today)
     ));
-    if (existing.empty) {
-      const id = await add(C.CHECKLIST_ASSIGNMENTS, {
-        orgId: template.orgId,
-        templateId: template.id,
-        templateTitle: template.title,
-        workerId: worker.id,
-        workerName: `${worker.firstName} ${worker.lastName}`,
-        scope: 'worker',
-        date: today,
-        dueDate: today,
-        frequency: template.frequency,
-        shopId: template.shopId || '',
-        items: template.items.map(i => ({ ...i, checked: false, checkedAt: null, note: '', checkedBy: '' })),
-        status: 'pending',
-        triggeredBy: 'schedule',
-        completedBy: '',
-        completedAt: null,
-      });
-      created.push(id);
-    }
+    if (!existing.empty) continue;
+    const worker = workers.find(w => w.id === workerId);
+    if (!worker) continue;
+    const id = await add(C.CHECKLIST_ASSIGNMENTS, {
+      orgId: template.orgId,
+      templateId: template.id,
+      templateTitle: template.title,
+      workerId,
+      workerName: `${worker.firstName} ${worker.lastName}`,
+      scope: 'worker',
+      date: today,
+      dueDate: today,
+      frequency: template.frequency,
+      shopId: template.shopId || '',
+      items: (template.items || []).map(i => ({ ...i, checked: false, checkedAt: null, note: '', checkedBy: '' })),
+      status: 'pending',
+      triggeredBy: 'schedule',
+      completedBy: '',
+      completedAt: null,
+    });
+    created.push(id);
   }
   return created;
 }

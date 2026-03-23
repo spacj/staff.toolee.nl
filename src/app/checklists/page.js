@@ -104,13 +104,13 @@ export default function ChecklistsPage() {
           (data.frequency === 'specific-days' && data.specificDays?.includes(dow)) ||
           (data.frequency === 'specific-dates' && data.specificDates?.includes(todayStr2));
 
-        if (applicable && data.scope !== 'public' && data.scope !== 'qr' && data.frequency !== 'qr') {
-          const targetWorkers = data.assignedTo === 'all'
-            ? workers
-            : workers.filter(w => data.assignedTo.includes(w.id));
-          if (targetWorkers.length > 0) {
-            await generateChecklistAssignments({ ...data, id: newTemplate }, targetWorkers, todayStr);
-            toast.success(`${targetWorkers.length} assignment${targetWorkers.length !== 1 ? 's' : ''} generated for today`);
+        if (applicable && data.scope !== 'public' && data.frequency !== 'qr') {
+          const templateWithId = { ...data, id: newTemplate };
+          const ids = await generateChecklistAssignments(templateWithId, workers, todayStr);
+          if (ids.length > 0) {
+            toast.success('Assignment generated for today');
+          } else {
+            toast('Assignment for today already exists');
           }
         }
       }
@@ -157,12 +157,11 @@ export default function ChecklistsPage() {
           (template.frequency === 'specific-dates' && template.specificDates?.includes(todayStr));
 
         if (applicable) {
-          const targetWorkers = template.assignedTo === 'all'
-            ? workers
-            : workers.filter(w => template.assignedTo?.includes(w.id));
-          if (targetWorkers.length > 0) {
-            await generateChecklistAssignments({ ...template, id: template.id }, targetWorkers, todayStr);
-            toast.success(`Generated ${targetWorkers.length} assignment${targetWorkers.length !== 1 ? 's' : ''} for today`);
+          const ids = await generateChecklistAssignments(template, workers, todayStr);
+          if (ids.length > 0) {
+            toast.success('Assignment generated for today');
+          } else {
+            toast('Assignment for today already exists');
           }
         }
       }
