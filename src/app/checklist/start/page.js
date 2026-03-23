@@ -61,8 +61,8 @@ function PublicScanContent() {
         alert(data.error || 'Failed to start checklist');
         return;
       }
-      // Redirect to the public checklist with the session ID
-      router.push(`/public-checklist?s=${data.sessionId}`);
+      // Redirect to the public checklist with the document ID
+      router.push(`/public-checklist?id=${data.id}&s=${data.sessionId}`);
     } catch {
       alert('Failed to start. Please try again.');
     } finally {

@@ -40,11 +40,23 @@ export async function GET(req) {
     const base = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`;
 
     if (id) {
-      const doc = await restGet(`/publicChecklistAssignments/${id}`);
-      if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-      return NextResponse.json({ data: doc });
+      // Direct document fetch by ID — most reliable
+      const docRes = await fetch(`${base}/${id}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      console.log('[GET public-checklist] Direct fetch by id:', id, 'status:', docRes.status);
+      if (docRes.status === 404) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      if (!docRes.ok) {
+        const text = await docRes.text();
+        console.error('[GET public-checklist] Direct fetch error:', docRes.status, text);
+        return NextResponse.json({ error: 'Failed to load' }, { status: 500 });
+      }
+      const doc = await docRes.json();
+      if (!doc.fields) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      return NextResponse.json({ data: parseDoc(doc) });
     }
 
+    // Fallback: query by sessionId
     const res = await fetch(base, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -65,7 +77,6 @@ export async function GET(req) {
     });
 
     const results = await res.json();
-    console.log('[GET public-checklist] sessionId:', sessionId, 'results count:', results.length, 'has doc:', !!results.find(r => r.document));
     const doc = results.find(r => r.document);
     if (!doc) return NextResponse.json({ error: 'Not found', debug: { sessionId, count: results.length } }, { status: 404 });
 
