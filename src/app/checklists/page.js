@@ -22,6 +22,8 @@ const FREQUENCIES = [
   { value: 'daily', label: 'Daily', desc: 'Every day', icon: Clock },
   { value: 'weekly', label: 'Weekly', desc: 'Specific day each week', icon: Calendar },
   { value: 'monthly', label: 'Monthly', desc: 'Specific day each month', icon: Calendar },
+  { value: 'specific-days', label: 'Days', desc: 'Selected days each week', icon: Calendar },
+  { value: 'specific-dates', label: 'Dates', desc: 'Specific dates', icon: Calendar },
   { value: 'one-time', label: 'One-time', desc: 'Assign once manually', icon: Send },
   { value: 'qr', label: 'QR Code', desc: 'Triggered by scanning', icon: QrCode },
 ];
@@ -39,12 +41,14 @@ export default function ChecklistsPage() {
   const [loading, setLoading] = useState(true);
 
   // UI
-  const [tab, setTab] = useState('templates'); // 'templates' | 'assignments'
+  const [tab, setTab] = useState('templates'); // 'templates' | 'assignments' | 'calendar'
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const [showAssignModal, setShowAssignModal] = useState(null); // template to assign
   const [showQRModal, setShowQRModal] = useState(null); // template for QR
+  const [showShopQRModal, setShowShopQRModal] = useState(null); // shop for shop QR
+  const [viewDate, setViewDate] = useState(new Date()); // calendar view date
   const [expandedTemplate, setExpandedTemplate] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterFrequency, setFilterFrequency] = useState('all');
@@ -80,11 +84,35 @@ export default function ChecklistsPage() {
         await updateChecklistTemplate(editingTemplate.id, data);
         toast.success('Checklist updated');
       } else {
-        await createChecklistTemplate({
+        const newTemplate = await createChecklistTemplate({
           ...data, orgId, createdBy: user.uid,
           createdByName: userProfile?.displayName || 'Unknown',
         });
         toast.success('Checklist created');
+
+        // Auto-generate today's assignment if applicable
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        const dow = today.toLocaleDateString('en-US', { weekday: 'long' });
+        const dom = today.getDate();
+        const todayStr2 = today.toISOString().split('T')[0];
+
+        const applicable =
+          data.frequency === 'daily' ||
+          (data.frequency === 'weekly' && data.dayOfWeek === dow) ||
+          (data.frequency === 'monthly' && data.dayOfMonth === dom) ||
+          (data.frequency === 'specific-days' && data.specificDays?.includes(dow)) ||
+          (data.frequency === 'specific-dates' && data.specificDates?.includes(todayStr2));
+
+        if (applicable && data.scope === 'shop' && data.frequency !== 'qr') {
+          const targetWorkers = data.assignedTo === 'all'
+            ? workers
+            : workers.filter(w => data.assignedTo.includes(w.id));
+          if (targetWorkers.length > 0) {
+            await generateChecklistAssignments({ ...data, id: newTemplate }, targetWorkers, todayStr);
+            toast.success(`${targetWorkers.length} assignment${targetWorkers.length !== 1 ? 's' : ''} generated for today`);
+          }
+        }
       }
       setShowTemplateModal(false);
       setEditingTemplate(null);
@@ -110,8 +138,34 @@ export default function ChecklistsPage() {
 
   async function handleToggleActive(template) {
     try {
+      const activating = !template.active;
       await updateChecklistTemplate(template.id, { active: !template.active });
       toast.success(template.active ? 'Checklist paused' : 'Checklist activated');
+
+      // Auto-generate when reactivating a scheduled template
+      if (activating && template.frequency !== 'qr' && template.frequency !== 'one-time' && template.scope === 'shop') {
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        const dow = today.toLocaleDateString('en-US', { weekday: 'long' });
+        const dom = today.getDate();
+
+        const applicable =
+          template.frequency === 'daily' ||
+          (template.frequency === 'weekly' && template.dayOfWeek === dow) ||
+          (template.frequency === 'monthly' && template.dayOfMonth === dom) ||
+          (template.frequency === 'specific-days' && template.specificDays?.includes(dow)) ||
+          (template.frequency === 'specific-dates' && template.specificDates?.includes(todayStr));
+
+        if (applicable) {
+          const targetWorkers = template.assignedTo === 'all'
+            ? workers
+            : workers.filter(w => template.assignedTo?.includes(w.id));
+          if (targetWorkers.length > 0) {
+            await generateChecklistAssignments({ ...template, id: template.id }, targetWorkers, todayStr);
+            toast.success(`Generated ${targetWorkers.length} assignment${targetWorkers.length !== 1 ? 's' : ''} for today`);
+          }
+        }
+      }
       loadData();
     } catch { toast.error('Failed to update'); }
   }
@@ -217,9 +271,11 @@ export default function ChecklistsPage() {
           <p className="text-sm text-surface-500 mt-0.5">Create and manage operational checklists for your team</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleGenerateToday} className="btn-secondary text-xs sm:text-sm">
-            <RotateCcw className="w-4 h-4" /> Generate Today
-          </button>
+          {shops.length > 0 && (
+            <button onClick={() => setShowShopQRModal(shops[0])} className="btn-secondary text-xs sm:text-sm">
+              <Building className="w-4 h-4" /> Shop QR
+            </button>
+          )}
           <button onClick={() => { setEditingTemplate(null); setShowTemplateModal(true); }}
             className="btn-primary text-xs sm:text-sm">
             <Plus className="w-4 h-4" /> New Checklist
@@ -258,6 +314,12 @@ export default function ChecklistsPage() {
           className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all',
             tab === 'assignments' ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-500 hover:text-surface-700')}>
           Assignments ({assignments.length})
+        </button>
+        <button onClick={() => setTab('calendar')}
+          className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all',
+            tab === 'calendar' ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-500 hover:text-surface-700')}>
+          <span className="hidden sm:inline">Calendar</span>
+          <span className="sm:hidden">Cal</span>
         </button>
       </div>
 
@@ -548,6 +610,11 @@ export default function ChecklistsPage() {
         </div>
       )}
 
+      {/* ─── Calendar Tab ──────────────────────────────── */}
+      {tab === 'calendar' && (
+        <CalendarView assignments={assignments} templates={templates} viewDate={viewDate} setViewDate={setViewDate} />
+      )}
+
       {/* ─── Template Modal ───────────────────────────── */}
       <TemplateModal
         open={showTemplateModal}
@@ -566,6 +633,9 @@ export default function ChecklistsPage() {
         workers={workers}
         onAssign={handleManualAssign}
       />
+
+      {/* ─── Shop QR Modal ────────────────────────────── */}
+      <ShopQRModal open={!!showShopQRModal} onClose={() => setShowShopQRModal(null)} shop={showShopQRModal} />
 
       {/* ─── QR Code Modal ────────────────────────────── */}
       <QRModal
@@ -600,6 +670,8 @@ function TemplateModal({ open, onClose, onSave, editing, workers, shops }) {
   const [frequency, setFrequency] = useState('daily');
   const [dayOfWeek, setDayOfWeek] = useState('Monday');
   const [dayOfMonth, setDayOfMonth] = useState(1);
+  const [specificDays, setSpecificDays] = useState([]);
+  const [specificDates, setSpecificDates] = useState([]);
   const [shopId, setShopId] = useState('');
   const [assignMode, setAssignMode] = useState('all');
   const [selectedWorkers, setSelectedWorkers] = useState([]);
@@ -613,6 +685,8 @@ function TemplateModal({ open, onClose, onSave, editing, workers, shops }) {
       setFrequency(editing.frequency || 'daily');
       setDayOfWeek(editing.dayOfWeek || 'Monday');
       setDayOfMonth(editing.dayOfMonth || 1);
+      setSpecificDays(editing.specificDays || []);
+      setSpecificDates(editing.specificDates || []);
       setShopId(editing.shopId || '');
       setAssignMode(editing.assignedTo === 'all' ? 'all' : 'specific');
       setSelectedWorkers(editing.assignedTo === 'all' ? [] : (editing.assignedTo || []));
@@ -620,7 +694,7 @@ function TemplateModal({ open, onClose, onSave, editing, workers, shops }) {
       setItems(editing.items?.length ? editing.items : [{ id: '1', text: '', required: false }]);
     } else {
       setTitle(''); setDescription(''); setFrequency('daily'); setDayOfWeek('Monday');
-      setDayOfMonth(1); setShopId(''); setAssignMode('all'); setSelectedWorkers([]);
+      setDayOfMonth(1); setSpecificDays([]); setSpecificDates([]); setShopId(''); setAssignMode('all'); setSelectedWorkers([]);
       setScope('shop');
       setItems([{ id: '1', text: '', required: false }]);
     }
@@ -646,12 +720,20 @@ function TemplateModal({ open, onClose, onSave, editing, workers, shops }) {
     if (!title.trim()) { toast.error('Title is required'); return; }
     const validItems = items.filter(i => i.text.trim());
     if (validItems.length === 0) { toast.error('Add at least one checklist item'); return; }
+    if (frequency === 'specific-days' && specificDays.length === 0) {
+      toast.error('Select at least one day'); return;
+    }
+    if (frequency === 'specific-dates' && specificDates.length === 0) {
+      toast.error('Add at least one date'); return;
+    }
     onSave({
       title: title.trim(),
       description: description.trim(),
       frequency,
       dayOfWeek: frequency === 'weekly' ? dayOfWeek : null,
       dayOfMonth: frequency === 'monthly' ? dayOfMonth : null,
+      specificDays: frequency === 'specific-days' ? specificDays : null,
+      specificDates: frequency === 'specific-dates' ? specificDates : null,
       shopId: shopId || null,
       assignedTo: scope === 'public' ? 'all' : (assignMode === 'all' ? 'all' : selectedWorkers),
       scope,
@@ -753,6 +835,45 @@ function TemplateModal({ open, onClose, onSave, editing, workers, shops }) {
             <select value={dayOfMonth} onChange={e => setDayOfMonth(Number(e.target.value))} className="select-field">
               {Array.from({ length: 28 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
             </select>
+          </div>
+        )}
+        {frequency === 'specific-days' && (
+          <div>
+            <label className="label">Days of Week</label>
+            <div className="flex flex-wrap gap-2">
+              {DAYS_OF_WEEK.map(d => (
+                <button key={d} type="button" onClick={() => setSpecificDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])}
+                  className={cn('px-3 py-1.5 rounded-lg text-xs font-medium border transition-all',
+                    specificDays.includes(d) ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-surface-200 bg-white text-surface-600 hover:border-surface-300'
+                  )}>
+                  {d.slice(0, 2)}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-surface-400 mt-1">{specificDays.length > 0 ? `${specificDays.length} day${specificDays.length !== 1 ? 's' : ''} selected` : 'Select days above'}</p>
+          </div>
+        )}
+        {frequency === 'specific-dates' && (
+          <div>
+            <label className="label">Specific Dates</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {specificDates.map(d => (
+                <span key={d} className="inline-flex items-center gap-1 px-2 py-1 bg-brand-50 border border-brand-200 rounded-lg text-xs text-brand-700">
+                  {new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                  <button type="button" onClick={() => setSpecificDates(prev => prev.filter(x => x !== d))} className="text-brand-400 hover:text-brand-600">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <input type="date" onChange={e => {
+              const val = e.target.value;
+              if (val && !specificDates.includes(val)) {
+                setSpecificDates(prev => [...prev, val].sort());
+              }
+              e.target.value = '';
+            }} className="input-field text-sm" />
+            <p className="text-[11px] text-surface-400 mt-1">{specificDates.length} date{specificDates.length !== 1 ? 's' : ''} selected</p>
           </div>
         )}
 
@@ -946,4 +1067,212 @@ function QRModal({ open, onClose, template }) {
   );
 }
 
+// ─── Shop QR Modal ──────────────────────────────────────
+function ShopQRModal({ open, onClose, shop }) {
+  if (!shop) return null;
 
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const qrUrl = `${baseUrl}/shop-checklists/${shop.id}`;
+
+  return (
+    <Modal open={!!open} onClose={onClose} title="Shop QR Code" size="sm">
+      <div className="text-center space-y-4">
+        <p className="text-sm font-medium text-surface-700">{shop.name}</p>
+        <div className="bg-white p-6 rounded-2xl border-2 border-dashed border-surface-200 inline-block">
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}`}
+            alt="Shop QR Code"
+            width={200}
+            height={200}
+            className="w-[200px] h-[200px]"
+          />
+        </div>
+        <p className="text-xs text-surface-500">Scan to see today's checklists for this location</p>
+        <div className="bg-surface-50 rounded-xl p-3">
+          <p className="text-[11px] text-surface-400 mb-1">Direct URL</p>
+          <p className="text-xs text-surface-600 font-mono break-all">{qrUrl}</p>
+        </div>
+        <div className="flex justify-center gap-2">
+          <button onClick={() => { navigator.clipboard.writeText(qrUrl); toast.success('URL copied!'); }}
+            className="btn-secondary text-sm">
+            <Copy className="w-4 h-4" /> Copy URL
+          </button>
+          <button onClick={() => {
+            const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrUrl)}`;
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`<html><head><title>QR - ${shop.name}</title><style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif}h2{margin-bottom:8px}p{color:#666;font-size:14px}img{margin:16px 0}</style></head><body><h2>${shop.name}</h2><p>Scan to see today's checklists</p><img src="${qrImageUrl}" width="300" height="300" /><p style="font-size:12px;color:#999;margin-top:8px">${qrUrl}</p></body></html>`);
+            printWindow.document.close();
+          }} className="btn-primary text-sm">
+            <Download className="w-4 h-4" /> Print
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Calendar View ──────────────────────────────────────
+function CalendarView({ assignments, templates, viewDate, setViewDate }) {
+  const today = new Date();
+  const [selectedDate, setSelectedDate] = useState(null);
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const adjustedFirstDay = firstDay === 0 ? 6 : firstDay - 1;
+
+  const prevMonth = () => setViewDate(new Date(year, month - 1, 1));
+  const nextMonth = () => setViewDate(new Date(year, month + 1, 1));
+
+  const dayLabels = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
+
+  function getAssignmentsForDate(dateStr) {
+    return assignments.filter(a => a.date === dateStr);
+  }
+
+  function isToday(day) {
+    return day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+  }
+
+  function isSelected(day) {
+    if (!selectedDate) return false;
+    const d = new Date(year, month, day);
+    return d.toISOString().split('T')[0] === selectedDate;
+  }
+
+  const selectedDateStr = selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+  const selectedAssignments = selectedDate ? getAssignmentsForDate(selectedDate) : [];
+
+  const weeks = [];
+  let day = 1 - adjustedFirstDay;
+  for (let w = 0; w < 6; w++) {
+    const week = [];
+    for (let d = 0; d < 7; d++) {
+      if (day < 1 || day > daysInMonth) {
+        week.push(null);
+      } else {
+        week.push(day);
+      }
+      day++;
+    }
+    if (day > daysInMonth && week.every(d => d === null)) break;
+    weeks.push(week);
+  }
+
+  return (
+    <div>
+      {/* Month navigation */}
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={prevMonth} className="btn-icon">
+          <ChevronRight className="w-4 h-4 rotate-180" />
+        </button>
+        <h2 className="text-base font-display font-semibold text-surface-800 capitalize">
+          {viewDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}
+        </h2>
+        <button onClick={nextMonth} className="btn-icon">
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Day labels */}
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {dayLabels.map(d => (
+          <div key={d} className="text-center text-[10px] font-medium text-surface-400 py-1">{d}</div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-1 mb-6">
+        {weeks.flat().map((day, idx) => {
+          if (!day) return <div key={`empty-${idx}`} />;
+          const dateStr = new Date(year, month, day).toISOString().split('T')[0];
+          const dayAssignments = getAssignmentsForDate(dateStr);
+          const completed = dayAssignments.filter(a => a.status === 'completed').length;
+          const total = dayAssignments.length;
+
+          return (
+            <button
+              key={day}
+              onClick={() => setSelectedDate(selectedDate === dateStr ? null : dateStr)}
+              className={cn(
+                'relative flex flex-col items-center justify-center rounded-xl py-2 text-xs transition-all min-h-[52px]',
+                isToday(day) ? 'ring-2 ring-brand-400' : '',
+                isSelected(day) ? 'bg-brand-50 border border-brand-300' : 'hover:bg-surface-50 border border-transparent',
+                total === 0 ? 'text-surface-300' : 'text-surface-700 font-medium'
+              )}>
+              <span className={cn(
+                'w-7 h-7 flex items-center justify-center rounded-full',
+                isToday(day) && 'bg-brand-500 text-white'
+              )}>
+                {day}
+              </span>
+              {total > 0 && (
+                <div className={cn('mt-0.5 w-1.5 h-1.5 rounded-full',
+                  completed === total ? 'bg-emerald-500' : completed > 0 ? 'bg-amber-400' : 'bg-surface-300'
+                )} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Selected day details */}
+      {selectedDate && (
+        <div>
+          <h3 className="text-sm font-semibold text-surface-700 mb-3">{selectedDateStr}</h3>
+          {selectedAssignments.length === 0 ? (
+            <p className="text-sm text-surface-400">No checklists for this day.</p>
+          ) : (
+            <div className="space-y-2">
+              {selectedAssignments.map(a => {
+                const checked = (a.items || []).filter(i => i.checked).length;
+                const total = (a.items || []).length;
+                const pct = total ? Math.round(checked / total * 100) : 0;
+                const template = templates.find(t => t.id === a.templateId);
+
+                return (
+                  <div key={a.id} className="card p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {a.status === 'completed' ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        ) : a.status === 'in-progress' ? (
+                          <AlertCircle className="w-4 h-4 text-brand-500" />
+                        ) : (
+                          <Circle className="w-4 h-4 text-surface-300" />
+                        )}
+                        <span className="text-sm font-medium text-surface-700">{a.templateTitle}</span>
+                        {a.scope === 'shop' && (
+                          <span className="badge bg-emerald-100 text-emerald-700 text-[10px]">Shop</span>
+                        )}
+                        {a.triggeredBy === 'qr_public' && (
+                          <span className="badge bg-emerald-50 text-emerald-600 text-[10px]">Public</span>
+                        )}
+                      </div>
+                      <span className="text-xs text-surface-400">
+                        {a.workerId === 'shop' ? 'Shop' : a.workerName || ''}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-surface-100 rounded-full overflow-hidden">
+                        <div className={cn('h-full rounded-full', pct === 100 ? 'bg-emerald-500' : 'bg-brand-500')}
+                          style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-[10px] text-surface-400">{checked}/{total}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!selectedDate && (
+        <p className="text-xs text-surface-400 text-center mt-2">Tap a date to see its checklists</p>
+      )}
+    </div>
+  );
+}
