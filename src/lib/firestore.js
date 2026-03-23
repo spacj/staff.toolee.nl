@@ -734,18 +734,20 @@ export const deleteChecklistAssignment = (id) => del(C.CHECKLIST_ASSIGNMENTS, id
 // - Per-worker (scope='worker' with specific workers): creates per-worker assignments
 export async function generateChecklistAssignments(template, workers, date) {
   const today = date || new Date().toISOString().split('T')[0];
+  console.log('[generateChecklistAssignments] template.scope:', template.scope, 'assignedTo:', template.assignedTo, 'workers:', workers?.length, 'today:', today);
 
   // Shop-wide: one shared assignment (scope='shop' OR assignedTo='all')
   const isShopWide = template.scope === 'shop' || template.assignedTo === 'all';
 
   if (isShopWide) {
+    console.log('[generateChecklistAssignments] isShopWide=true, creating shared assignment');
     const existing = await getDocs(query(
       collection(db, C.CHECKLIST_ASSIGNMENTS),
       where('templateId', '==', template.id),
       where('workerId', '==', 'shop'),
       where('date', '==', today)
     ));
-    if (!existing.empty) return [existing.docs[0].id];
+    if (!existing.empty) { console.log('[generateChecklistAssignments] existing found, returning'); return [existing.docs[0].id]; }
     const id = await add(C.CHECKLIST_ASSIGNMENTS, {
       orgId: template.orgId,
       templateId: template.id,
@@ -763,11 +765,13 @@ export async function generateChecklistAssignments(template, workers, date) {
       completedBy: '',
       completedAt: null,
     });
+    console.log('[generateChecklistAssignments] created shared id:', id);
     return [id];
   }
 
   // Per-worker: create one assignment per specific worker
   const targetWorkerIds = template.assignedTo || [];
+  console.log('[generateChecklistAssignments] isShopWide=false, targetWorkerIds:', targetWorkerIds);
   const created = [];
   for (const workerId of targetWorkerIds) {
     const existing = await getDocs(query(
@@ -777,8 +781,8 @@ export async function generateChecklistAssignments(template, workers, date) {
       where('date', '==', today)
     ));
     if (!existing.empty) continue;
-    const worker = workers.find(w => w.id === workerId);
-    if (!worker) continue;
+    const worker = workers?.find(w => w.id === workerId);
+    if (!worker) { console.log('[generateChecklistAssignments] worker not found:', workerId); continue; }
     const id = await add(C.CHECKLIST_ASSIGNMENTS, {
       orgId: template.orgId,
       templateId: template.id,
@@ -797,7 +801,9 @@ export async function generateChecklistAssignments(template, workers, date) {
       completedAt: null,
     });
     created.push(id);
+    console.log('[generateChecklistAssignments] created per-worker id:', id);
   }
+  console.log('[generateChecklistAssignments] returning:', created);
   return created;
 }
 
