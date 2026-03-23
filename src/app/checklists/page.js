@@ -105,7 +105,7 @@ export default function ChecklistsPage() {
           (data.frequency === 'specific-dates' && data.specificDates?.includes(todayStr2));
 
         console.log('[handleSaveTemplate] applicable:', applicable, 'scope:', data.scope, 'frequency:', data.frequency, 'assignedTo:', data.assignedTo, 'workers.length:', workers.length);
-        if (applicable && data.scope !== 'public' && data.frequency !== 'qr') {
+        if (applicable && data.frequency !== 'qr') {
           console.log('[handleSaveTemplate] generating assignment, workers:', workers.length);
           const templateWithId = { ...data, id: newTemplate };
           const ids = await generateChecklistAssignments(templateWithId, workers, todayStr);

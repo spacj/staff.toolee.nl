@@ -730,11 +730,42 @@ export const updateChecklistAssignment = (id, data) => upd(C.CHECKLIST_ASSIGNMEN
 export const deleteChecklistAssignment = (id) => del(C.CHECKLIST_ASSIGNMENTS, id);
 
 // Batch-generate assignments for a template (used by scheduled generation)
+// - Public (scope='public'): creates one shared assignment for the day
 // - Shop-wide (scope='shop' OR assignedTo='all'): creates ONE shared assignment
 // - Per-worker (scope='worker' with specific workers): creates per-worker assignments
 export async function generateChecklistAssignments(template, workers, date) {
   const today = date || new Date().toISOString().split('T')[0];
-  console.log('[generateChecklistAssignments] template.scope:', template.scope, 'assignedTo:', template.assignedTo, 'workers:', workers?.length, 'today:', today);
+  console.log('[generateChecklistAssignments] scope:', template.scope, 'assignedTo:', template.assignedTo, 'workers:', workers?.length, 'today:', today);
+
+  // Public: one shared assignment for the day
+  if (template.scope === 'public') {
+    const existing = await getDocs(query(
+      collection(db, C.CHECKLIST_ASSIGNMENTS),
+      where('templateId', '==', template.id),
+      where('scope', '==', 'public'),
+      where('date', '==', today)
+    ));
+    if (!existing.empty) { console.log('[generateChecklistAssignments] public existing found'); return [existing.docs[0].id]; }
+    const id = await add(C.CHECKLIST_ASSIGNMENTS, {
+      orgId: template.orgId,
+      templateId: template.id,
+      templateTitle: template.title,
+      workerId: 'shop',
+      workerName: 'Public',
+      scope: 'public',
+      date: today,
+      dueDate: today,
+      frequency: template.frequency,
+      shopId: template.shopId || '',
+      items: (template.items || []).map(i => ({ ...i, checked: false, checkedAt: null, note: '', checkedBy: '' })),
+      status: 'pending',
+      triggeredBy: 'schedule',
+      completedBy: '',
+      completedAt: null,
+    });
+    console.log('[generateChecklistAssignments] created public id:', id);
+    return [id];
+  }
 
   // Shop-wide: one shared assignment (scope='shop' OR assignedTo='all')
   const isShopWide = template.scope === 'shop' || template.assignedTo === 'all';
