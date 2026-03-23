@@ -103,7 +103,9 @@ export default function ChecklistsPage() {
 
         if (applicable && data.frequency !== 'qr') {
           const templateWithId = { ...data, id: newTemplate };
+          console.log('[DEBUG] Generating with date:', todayStr, 'now:', new Date().toLocaleDateString('en-CA'));
           const ids = await generateChecklistAssignments(templateWithId, workers, todayStr);
+          console.log('[DEBUG] Generated ids:', ids);
           if (ids.length > 0) {
             toast.success('Assignment generated for today');
           } else {
@@ -979,6 +981,7 @@ function ShopQRModal({ open, onClose, shop }) {
 function CalendarView({ assignments, templates, viewDate, setViewDate }) {
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState(null);
+  console.log('[CAL] Mounted. Assignments:', assignments.length, 'dates:', assignments.map(a => a.date));
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -1055,6 +1058,7 @@ function CalendarView({ assignments, templates, viewDate, setViewDate }) {
           const dayAssignments = getAssignmentsForDate(dateStr);
           const completed = dayAssignments.filter(a => a.status === 'completed').length;
           const total = dayAssignments.length;
+          if (total > 0) console.log('[CAL] dateStr:', dateStr, 'assignments:', dayAssignments.map(a => ({ id: a.id, date: a.date, title: a.templateTitle })));
 
           return (
             <button
