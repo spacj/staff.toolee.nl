@@ -103,14 +103,22 @@ export default function ChecklistsPage() {
 
         if (applicable && data.frequency !== 'qr') {
           const templateWithId = { ...data, id: newTemplate };
-          console.log('[DEBUG] Generating with date:', todayStr, 'now:', new Date().toLocaleDateString('en-CA'));
-          const ids = await generateChecklistAssignments(templateWithId, workers, todayStr);
-          console.log('[DEBUG] Generated ids:', ids);
-          if (ids.length > 0) {
-            toast.success('Assignment generated for today');
-          } else {
-            toast('Assignment for today already exists');
+          console.log('[DEBUG] Generating with date:', todayStr, 'scope:', data.scope, 'frequency:', data.frequency);
+          console.log('[DEBUG] Template withId:', JSON.stringify({ scope: templateWithId.scope, frequency: templateWithId.frequency, items: templateWithId.items?.length }));
+          try {
+            const ids = await generateChecklistAssignments(templateWithId, workers, todayStr);
+            console.log('[DEBUG] Generated ids:', ids);
+            if (ids.length > 0) {
+              toast.success('Assignment generated for today');
+            } else {
+              toast('Assignment for today already exists');
+            }
+          } catch (err) {
+            console.error('[DEBUG] Error generating:', err);
+            toast.error('Failed to generate assignment: ' + err.message);
           }
+        } else {
+          console.log('[DEBUG] NOT applicable. frequency:', data.frequency, 'scope:', data.scope);
         }
       }
       setShowTemplateModal(false);
