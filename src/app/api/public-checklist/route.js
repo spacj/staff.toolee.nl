@@ -37,11 +37,12 @@ export async function GET(req) {
     }
 
     const accessToken = await getAccessToken();
-    const base = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`;
+    const firestoreBase = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+    const queryBase = `${firestoreBase}:runQuery`;
 
     if (id) {
       // Direct document fetch by ID — most reliable
-      const docRes = await fetch(`${base}/${id}`, {
+      const docRes = await fetch(`${firestoreBase}/publicChecklistAssignments/${id}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       console.log('[GET public-checklist] Direct fetch by id:', id, 'status:', docRes.status);
@@ -57,7 +58,7 @@ export async function GET(req) {
     }
 
     // Fallback: query by sessionId
-    const res = await fetch(base, {
+    const res = await fetch(queryBase, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
