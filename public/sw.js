@@ -8,7 +8,7 @@ const STATIC_ASSETS = [
 ];
 
 const FIREBASE_DOMAINS = [
-  'firestore.googleapis.com',
+  'firbasestorage.googleapis.com',
   'firebasestorage.googleapis.com',
 ];
 
@@ -105,22 +105,49 @@ async function networkFirst(request) {
 }
 
 self.addEventListener('push', (event) => {
-  if (!event.data) return;
+  let data = {
+    title: 'StaffHub',
+    body: 'You have a new notification',
+    icon: '/icons/icon.svg',
+    badge: '/favicon.svg',
+    url: '/',
+  };
 
-  const data = event.data.json();
+  try {
+    if (event.data) {
+      const payload = event.data.json();
+      data = {
+        title: payload.notification?.title || payload.title || data.title,
+        body: payload.notification?.body || payload.body || data.body,
+        icon: payload.notification?.icon || payload.icon || data.icon,
+        badge: payload.badge || data.badge,
+        url: payload.data?.url || payload.url || data.url,
+        actions: payload.actions || [],
+        tag: payload.tag || 'staffhub-notification',
+        requireInteraction: payload.requireInteraction || false,
+        ...payload.data,
+      };
+    }
+  } catch (e) {
+    console.error('Error parsing push data:', e);
+  }
+
   const options = {
-    body: data.body || data.message || 'New notification',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
-    vibrate: [100, 50, 100],
+    body: data.body,
+    icon: data.icon,
+    badge: data.badge,
+    vibrate: [100, 50, 100, 50, 100],
+    tag: data.tag,
+    requireInteraction: data.requireInteraction,
     data: {
-      url: data.url || '/',
+      url: data.url,
+      date: new Date().toISOString(),
     },
-    actions: data.actions || [],
+    actions: data.actions,
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'StaffHub', options)
+    self.registration.showNotification(data.title, options)
   );
 });
 
@@ -128,18 +155,27 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const url = event.notification.data?.url || '/';
+  
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url === url && 'focus' in client) {
-          return client.focus();
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.focus();
+          if (url !== '/') {
+            client.navigate(url);
+          }
+          return;
         }
       }
       if (self.clients.openWindow) {
-        return self.clients.openWindow(url);
+        self.clients.openWindow(url);
       }
     })
   );
+});
+
+self.addEventListener('notificationclose', (event) => {
+  console.log('Notification closed:', event.notification.tag);
 });
 
 self.addEventListener('sync', (event) => {

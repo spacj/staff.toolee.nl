@@ -4,19 +4,22 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { updateUserProfile, getReferrals, getOrganization, getPublicHolidays, savePublicHolidays, getInvites, getAvailabilitySettings, saveAvailabilitySettings } from '@/lib/firestore';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { ROLE_LABELS, cn, getInitials, generateAvatarColor } from '@/utils/helpers';
 import toast from 'react-hot-toast';
 import {
   User, Bell, Palette, Shield, Save, Camera,
   Mail, Phone, Building, MapPin, Globe, Clock,
   ChevronRight, ToggleLeft, ToggleRight, AlertCircle,
-  Key, LogOut, Trash2, CheckCircle, Link2, Users, X, QrCode, Download
+  Key, LogOut, Trash2, CheckCircle, Link2, Users, X, QrCode, Download,
+  BellRing, BellOff
 } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user, userProfile, role, signOut, linkGoogleAccount, organization, isAdmin, orgId } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(false);
+  const { permission, isEnabled, requestPermission, disableNotifications } = usePushNotifications(user);
   const [profile, setProfile] = useState({
     displayName: '',
     email: '',
@@ -322,8 +325,52 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div>
+<div>
                   <h3 className="text-sm font-semibold text-surface-600 uppercase tracking-wide mb-2">Push Notifications</h3>
+                  <div className="bg-surface-50 rounded-xl p-4 mb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {isEnabled ? (
+                          <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                            <BellRing className="w-5 h-5 text-emerald-600" />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-surface-200 flex items-center justify-center">
+                            <BellOff className="w-5 h-5 text-surface-500" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-surface-800">
+                            {permission === 'denied' ? 'Notifications Blocked' : isEnabled ? 'Notifications Enabled' : 'Enable Push Notifications'}
+                          </p>
+                          <p className="text-xs text-surface-500">
+                            {permission === 'denied' 
+                              ? 'Enable in browser settings to receive alerts'
+                              : isEnabled 
+                                ? 'You will receive push notifications on this device'
+                                : 'Get real-time alerts for shifts, schedules, and more'}
+                          </p>
+                        </div>
+                      </div>
+                      {permission !== 'denied' && (
+                        isEnabled ? (
+                          <button
+                            onClick={disableNotifications}
+                            className="btn-secondary !py-2 !px-4 text-sm"
+                          >
+                            Disable
+                          </button>
+                        ) : (
+                          <button
+                            onClick={requestPermission}
+                            className="btn-primary !py-2 !px-4 text-sm"
+                          >
+                            Enable
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
                   <div className="divide-y divide-surface-100">
                     <ToggleSwitch
                       enabled={notifications.pushNewShifts}
