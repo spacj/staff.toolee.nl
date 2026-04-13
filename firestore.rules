@@ -192,11 +192,11 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
-    // Stock Items: all auth read (workers view stock), managers+ create/update/delete
+    // Stock Items: all auth read (workers view stock), all auth create/update (workers add items/update stock), managers+ delete
     match /stockItems/{id} {
       allow read: if isAuth();
-      allow create: if isManager();
-      allow update: if isManager();
+      allow create: if isAuth();
+      allow update: if isAuth();
       allow delete: if isManager();
     }
 
@@ -205,6 +205,12 @@ service cloud.firestore {
       allow read: if isAuth();
       allow create: if isAuth();
       allow update: if isManager();
+    }
+
+    // Stock Logs: all auth read (managers view activity), all auth create (workers/managers log changes)
+    match /stockLogs/{id} {
+      allow read: if isAuth();
+      allow create: if isAuth();
     }
 
     // Availability Settings: stored in organizations doc, only admins can update
