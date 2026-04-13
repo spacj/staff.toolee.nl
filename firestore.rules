@@ -192,6 +192,21 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
+    // Stock Items: all auth read (workers view stock), managers+ create/update/delete
+    match /stockItems/{id} {
+      allow read: if isAuth();
+      allow create: if isManager();
+      allow update: if isManager();
+      allow delete: if isManager();
+    }
+
+    // Stock Requests: all auth read/create (workers submit requests), managers+ update (review)
+    match /stockRequests/{id} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isManager();
+    }
+
     // Availability Settings: stored in organizations doc, only admins can update
     // This is part of the organizations collection, so we use the rule above
     // Rule: allow update on availabilitySettings field if isAdmin()

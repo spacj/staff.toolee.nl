@@ -7,16 +7,17 @@ import { db } from './firebase';
 import { getTier, calculateCost, FREE_WORKER_LIMIT } from './pricing';
 
 const C = {
-  USERS: 'users', ORGANIZATIONS: 'organizations', WORKERS: 'workers', SHOPS: 'shops', 
-  SHIFT_TEMPLATES: 'shiftTemplates', SHIFTS: 'shifts', SHIFT_PREFERENCES: 'shiftPreferences', 
+  USERS: 'users', ORGANIZATIONS: 'organizations', WORKERS: 'workers', SHOPS: 'shops',
+  SHIFT_TEMPLATES: 'shiftTemplates', SHIFTS: 'shifts', SHIFT_PREFERENCES: 'shiftPreferences',
   ATTENDANCE: 'attendance', PERMITS: 'permits', PAYMENTS: 'payments', NOTIFICATIONS: 'notifications',
-  ACTIVITY_LOG: 'activityLog', INVITES: 'invites', REFERRALS: 'referrals', 
+  ACTIVITY_LOG: 'activityLog', INVITES: 'invites', REFERRALS: 'referrals',
   CORRECTION_REQUESTS: 'correctionRequests', MESSAGES: 'messages', STAFF_AVAILABILITY: 'staffAvailability',
   WEBMASTER_REFERRAL_CODES: 'webmasterReferralCodes', WEBMASTER_EARNINGS: 'webmasterEarnings',
   SUPPORT_TICKETS: 'supportTickets',
   KB_CATEGORIES: 'kbCategories', KB_ARTICLES: 'kbArticles',
   CHECKLIST_TEMPLATES: 'checklistTemplates', CHECKLIST_ASSIGNMENTS: 'checklistAssignments',
   PUBLIC_CHECKLIST_ASSIGNMENTS: 'publicChecklistAssignments',
+  STOCK_ITEMS: 'stockItems', STOCK_REQUESTS: 'stockRequests',
 };
 
 // ─── Helpers ──────────────────────────────────────────
@@ -650,6 +651,7 @@ export async function addSupportTicketReply(ticketId, reply) {
   return upd(C.SUPPORT_TICKETS, ticketId, { replies, updatedAt: ts() });
 }
 
+<<<<<<< Updated upstream
 // ─── Knowledge Base ──────────────────────────────────
 // Categories: { orgId, name, icon, color, order, createdBy, createdAt, updatedAt }
 // Articles:   { orgId, categoryId, title, content, tags[], pinned, order, createdBy, createdByName, createdAt, updatedAt }
@@ -921,5 +923,58 @@ export const createPublicAssignment = (data) => add(C.PUBLIC_CHECKLIST_ASSIGNMEN
 });
 export const updatePublicAssignment = (id, data) => upd(C.PUBLIC_CHECKLIST_ASSIGNMENTS, id, data);
 export const deletePublicAssignment = (id) => del(C.PUBLIC_CHECKLIST_ASSIGNMENTS, id);
+
+// ─── Stock Management ─────────────────────────────────
+// stockItems schema: { orgId, shopId?, name, description?, category?, unit, quantity, minimumQuantity,
+//                      sku?, createdBy, createdByName, createdAt, updatedAt }
+// stockRequests schema: { orgId, shopId?, itemId?, itemName, requestedBy, requestedByName,
+//                         requestedByRole, workerId?, quantity, reason, status: 'pending'|'approved'|'rejected'|'fulfilled',
+//                         urgent, adminNotes?, reviewedBy?, reviewedAt?, createdAt, updatedAt }
+
+export async function getStockItems(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  let results = await getAll(C.STOCK_ITEMS, ...c);
+  if (filters.shopId) results = results.filter(i => !i.shopId || i.shopId === filters.shopId);
+  if (filters.belowMinimum) results = results.filter(i => i.minimumQuantity > 0 && i.quantity < i.minimumQuantity);
+  results.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  return results;
+}
+export const createStockItem = (data) => add(C.STOCK_ITEMS, data);
+export const updateStockItem = (id, data) => upd(C.STOCK_ITEMS, id, data);
+export const deleteStockItem = (id) => del(C.STOCK_ITEMS, id);
+
+export async function adjustStockQuantity(itemId, newQuantity) {
+  await upd(C.STOCK_ITEMS, itemId, { quantity: newQuantity });
+  const item = await get1(C.STOCK_ITEMS, itemId);
+  if (item && item.minimumQuantity > 0 && newQuantity < item.minimumQuantity) {
+    await notifyManagers(item.orgId, {
+      type: 'stock_low',
+      title: `Low Stock: ${item.name}`,
+      message: `${item.name} is below the minimum stock level (${newQuantity} ${item.unit} left, minimum: ${item.minimumQuantity} ${item.unit}).`,
+      link: '/stock',
+    });
+  }
+}
+
+export async function getStockRequests(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  let results = await getAll(C.STOCK_REQUESTS, ...c);
+  if (filters.requestedBy) results = results.filter(r => r.requestedBy === filters.requestedBy);
+  if (filters.status) results = results.filter(r => r.status === filters.status);
+  results.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+  if (filters.limit) results = results.slice(0, filters.limit);
+  return results;
+}
+export const createStockRequest = (data) => add(C.STOCK_REQUESTS, { ...data, status: 'pending' });
+export async function reviewStockRequest(id, status, reviewedBy, adminNotes = '') {
+  await upd(C.STOCK_REQUESTS, id, {
+    status,
+    reviewedBy,
+    reviewedAt: new Date().toISOString(),
+    adminNotes,
+  });
+}
 
 export { C as COLLECTIONS };

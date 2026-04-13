@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
-import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle, CalendarCheck, Globe, Building2, DollarSign, Tag, Inbox, BookOpen, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle, CalendarCheck, Globe, Building2, DollarSign, Tag, Inbox, BookOpen, ClipboardCheck, Package } from 'lucide-react';
 
 export default function Sidebar({ mobile, onClose }) {
   const pathname = usePathname();
@@ -27,6 +27,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/attendance', icon: Clock, label: 'Attendance' },
     { href: '/checklists', icon: ClipboardCheck, label: 'Checklists' },
     { href: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
+    { href: '/stock', icon: Package, label: 'Stock' },
     { href: '/costs', icon: CreditCard, label: 'Costs & Billing' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
@@ -42,6 +43,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/attendance', icon: Clock, label: 'Attendance' },
     { href: '/checklists', icon: ClipboardCheck, label: 'Checklists' },
     { href: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
+    { href: '/stock', icon: Package, label: 'Stock' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 
@@ -53,6 +55,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/availability', icon: CalendarCheck, label: 'My Availability' },
     { href: '/my-checklists', icon: ClipboardCheck, label: 'My Checklists' },
     { href: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
+    { href: '/stock', icon: Package, label: 'Stock' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 
