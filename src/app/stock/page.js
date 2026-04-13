@@ -631,25 +631,24 @@ export default function StockPage() {
                 <label className="block text-sm font-medium text-surface-700 mb-1">Item Name *</label>
                 <input className="input-field w-full" placeholder="e.g. Printer Paper" value={itemForm.name} onChange={e => setItemForm(f => ({ ...f, name: e.target.value }))} />
               </div>
-              <div>
+              <div className="col-span-2">
                 <label className="block text-sm font-medium text-surface-700 mb-1">Category</label>
+                <select className="select-field w-full mb-2" value={itemForm.category} onChange={e => setItemForm(f => ({ ...f, category: e.target.value }))}>
+                  <option value="">Select category</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
                 <div className="flex gap-2">
-                  <select className="select-field flex-1" value={itemForm.category} onChange={e => setItemForm(f => ({ ...f, category: e.target.value }))}>
-                    <option value="">Select category</option>
-                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  <div className="flex gap-1">
-                    <input
-                      className="input-field w-28"
-                      placeholder="New..."
-                      value={newCategory}
-                      onChange={e => setNewCategory(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCategory())}
-                    />
-                    <button type="button" onClick={addCategory} className="btn-secondary px-3" title="Add category">
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
+                  <input
+                    className="input-field flex-1"
+                    placeholder="New category name..."
+                    value={newCategory}
+                    onChange={e => setNewCategory(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCategory())}
+                  />
+                  <button type="button" onClick={addCategory} className="btn-secondary px-4 flex-shrink-0" title="Add category">
+                    <Plus className="w-4 h-4" />
+                    <span className="ml-1 hidden sm:inline">Add</span>
+                  </button>
                 </div>
               </div>
               <div>

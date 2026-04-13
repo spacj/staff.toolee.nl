@@ -46,6 +46,9 @@ module.exports = {
         slideRight: { from: { opacity: 0, transform: 'translateX(-12px)' }, to: { opacity: 1, transform: 'translateX(0)' } },
         pulseSoft: { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.7 } },
       },
+      padding: {
+        'safe': 'env(safe-area-inset-bottom)',
+      },
     },
   },
   plugins: [],
