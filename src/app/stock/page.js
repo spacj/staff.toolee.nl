@@ -526,7 +526,7 @@ export default function StockPage() {
 
       {/* ── Add / Edit Item Modal ── */}
       {itemModal !== null && (
-        <Modal onClose={() => setItemModal(null)} title={itemModal === 'add' ? 'Add Stock Item' : 'Edit Stock Item'}>
+        <Modal open={true} onClose={() => setItemModal(null)} title={itemModal === 'add' ? 'Add Stock Item' : 'Edit Stock Item'}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
@@ -577,7 +577,7 @@ export default function StockPage() {
 
       {/* ── Adjust Quantity Modal ── */}
       {adjustModal && (
-        <Modal onClose={() => setAdjustModal(null)} title={`Update Stock: ${adjustModal.name}`}>
+        <Modal open={true} onClose={() => setAdjustModal(null)} title={`Update Stock: ${adjustModal.name}`}>
           <div className="space-y-4">
             <p className="text-sm text-surface-500">Current stock: <strong>{adjustModal.quantity} {adjustModal.unit}</strong>{adjustModal.minimumQuantity > 0 ? ` · Minimum: ${adjustModal.minimumQuantity} ${adjustModal.unit}` : ''}</p>
             <div>
@@ -625,7 +625,7 @@ export default function StockPage() {
 
       {/* ── Request Item Modal ── */}
       {requestModal && (
-        <Modal onClose={() => setRequestModal(false)} title="Request Item">
+        <Modal open={true} onClose={() => setRequestModal(false)} title="Request Item">
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-surface-700 mb-1">Item Name *</label>
@@ -679,7 +679,7 @@ export default function StockPage() {
 
       {/* ── Review Request Modal ── */}
       {reviewModal && (
-        <Modal onClose={() => setReviewModal(null)} title="Review Stock Request">
+        <Modal open={true} onClose={() => setReviewModal(null)} title="Review Stock Request">
           <div className="space-y-4">
             <div className="bg-surface-50 rounded-xl p-4 space-y-1.5">
               <div className="flex items-center gap-2">
@@ -717,7 +717,7 @@ export default function StockPage() {
 
       {/* ── Delete Confirm Modal ── */}
       {deleteConfirm && (
-        <Modal onClose={() => setDeleteConfirm(null)} title="Delete Item">
+        <Modal open={true} onClose={() => setDeleteConfirm(null)} title="Delete Item">
           <div className="space-y-4">
             <p className="text-surface-600">Are you sure you want to remove <strong>{deleteConfirm.name}</strong> from stock? This cannot be undone.</p>
             <div className="flex justify-end gap-3 pt-2 border-t border-surface-100">
