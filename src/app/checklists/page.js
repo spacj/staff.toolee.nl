@@ -8,12 +8,13 @@ import {
   getChecklistTemplates, createChecklistTemplate, updateChecklistTemplate, deleteChecklistTemplate,
   getChecklistAssignments, generateChecklistAssignments, deleteChecklistAssignment,
   getWorkers, getShops,
+  getChecklistHistoryRealtime,
 } from '@/lib/firestore';
 import {
   ClipboardCheck, Plus, Trash2, Edit3, Copy, MoreVertical, Users, Store,
   Calendar, QrCode, Clock, CheckCircle2, Circle, AlertCircle, ChevronDown,
   ChevronRight, Play, Pause, BarChart3, X,
-  Download, Send, Globe, Building,
+  Download, Send, Globe, Building, History, Search, Filter,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -34,14 +35,17 @@ export default function ChecklistsPage() {
   const { orgId, isManager, isAdmin, user, userProfile } = useAuth();
   const canEdit = isManager || isAdmin;
 
-  const [templates, setTemplates] = useState([]);
+const [templates, setTemplates] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [shops, setShops] = useState([]);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // UI
-  const [tab, setTab] = useState('templates'); // 'templates' | 'assignments' | 'calendar'
+  const [tab, setTab] = useState('templates'); // 'templates' | 'calendar' | 'history'
+  const [historyFilter, setHistoryFilter] = useState({ templateId: '', workerId: '', dateFrom: '', dateTo: '' });
+  const [expandedHistory, setExpandedHistory] = useState(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
@@ -74,6 +78,12 @@ export default function ChecklistsPage() {
   }, [orgId]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    if (!orgId || !canEdit) return;
+    const unsubscribe = getChecklistHistoryRealtime(orgId, setHistory);
+    return () => unsubscribe();
+  }, [orgId, canEdit]);
 
   // ─── Template CRUD ──────────────────────────────────
   async function handleSaveTemplate(data) {
@@ -276,7 +286,7 @@ export default function ChecklistsPage() {
         </div>
       </div>
 
-      {/* Tabs */}
+{/* Tabs */}
       <div className="flex gap-1 p-1 bg-surface-100 rounded-xl mb-5 w-fit">
         <button onClick={() => setTab('templates')}
           className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all',
@@ -288,6 +298,15 @@ export default function ChecklistsPage() {
             tab === 'calendar' ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-500 hover:text-surface-700')}>
           <span className="hidden sm:inline">Calendar</span>
           <span className="sm:hidden">Cal</span>
+        </button>
+        <button onClick={() => setTab('history')}
+          className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all',
+            tab === 'history' ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-500 hover:text-surface-700')}>
+          <span className="hidden sm:inline">History</span>
+          <span className="sm:hidden">Hist</span>
+          {history.length > 0 && (
+            <span className="ml-1.5 bg-emerald-100 text-emerald-700 text-xs px-1.5 py-0.5 rounded-full">{history.length}</span>
+          )}
         </button>
       </div>
 
@@ -473,9 +492,23 @@ export default function ChecklistsPage() {
       )}
 
       {/* ─── Assignments Tab ────────────────────────── */}
-      {/* ─── Calendar Tab ──────────────────────────────── */}
+{/* ─── Calendar Tab ──────────────────────────────── */}
       {tab === 'calendar' && (
         <CalendarView assignments={assignments} templates={templates} viewDate={viewDate} setViewDate={setViewDate} />
+      )}
+
+      {/* ─── History Tab ─────────────────────────────── */}
+      {tab === 'history' && (
+        <HistoryView
+          history={history}
+          templates={templates}
+          workers={workers}
+          shops={shops}
+          filter={historyFilter}
+          setFilter={setHistoryFilter}
+          expandedId={expandedHistory}
+          setExpandedId={setExpandedHistory}
+        />
       )}
 
       {/* ─── Template Modal ───────────────────────────── */}
@@ -1152,3 +1185,231 @@ function CalendarView({ assignments, templates, viewDate, setViewDate }) {
     </div>
   );
 }
+
+// ─── History View ──────────────────────────────────────────
+function HistoryView({ history, templates, workers, shops, filter, setFilter, expandedId, setExpandedId }) {
+  const filteredHistory = history.filter(h => {
+    if (filter.templateId && h.templateId !== filter.templateId) return false;
+    if (filter.workerId && h.workerId !== filter.workerId) return false;
+    if (filter.dateFrom && h.date < filter.dateFrom) return false;
+    if (filter.dateTo && h.date > filter.dateTo) return false;
+    return true;
+  });
+
+  const groupedByDate = filteredHistory.reduce((acc, item) => {
+    const date = item.date || 'Unknown';
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(item);
+    return acc;
+  }, {});
+
+  const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
+
+  const stats = {
+    total: filteredHistory.length,
+    thisWeek: filteredHistory.filter(h => {
+      const date = new Date(h.date);
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return date >= weekAgo;
+    }).length,
+    thisMonth: filteredHistory.filter(h => {
+      const date = new Date(h.date);
+      const monthAgo = new Date();
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      return date >= monthAgo;
+    }).length,
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="stat-card">
+          <span className="text-[11px] font-medium text-surface-400 uppercase tracking-wider">Total</span>
+          <span className="text-2xl font-display font-bold text-surface-900">{stats.total}</span>
+        </div>
+        <div className="stat-card">
+          <span className="text-[11px] font-medium text-surface-400 uppercase tracking-wider">This Week</span>
+          <span className="text-2xl font-display font-bold text-brand-600">{stats.thisWeek}</span>
+        </div>
+        <div className="stat-card">
+          <span className="text-[11px] font-medium text-surface-400 uppercase tracking-wider">This Month</span>
+          <span className="text-2xl font-display font-bold text-emerald-600">{stats.thisMonth}</span>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="card p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter className="w-4 h-4 text-surface-400" />
+          <span className="text-sm font-medium text-surface-700">Filters</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label className="text-xs text-surface-500 mb-1 block">Template</label>
+            <select
+              className="select-field w-full text-sm"
+              value={filter.templateId}
+              onChange={e => setFilter(f => ({ ...f, templateId: e.target.value }))}
+            >
+              <option value="">All templates</option>
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>{t.title}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-surface-500 mb-1 block">Worker</label>
+            <select
+              className="select-field w-full text-sm"
+              value={filter.workerId}
+              onChange={e => setFilter(f => ({ ...f, workerId: e.target.value }))}
+            >
+              <option value="">All workers</option>
+              <option value="shop">Shop (shared)</option>
+              {workers.map(w => (
+                <option key={w.id} value={w.id}>{w.firstName} {w.lastName}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-surface-500 mb-1 block">From</label>
+            <input
+              type="date"
+              className="input-field w-full text-sm"
+              value={filter.dateFrom}
+              onChange={e => setFilter(f => ({ ...f, dateFrom: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-surface-500 mb-1 block">To</label>
+            <input
+              type="date"
+              className="input-field w-full text-sm"
+              value={filter.dateTo}
+              onChange={e => setFilter(f => ({ ...f, dateTo: e.target.value }))}
+            />
+          </div>
+        </div>
+        {(filter.templateId || filter.workerId || filter.dateFrom || filter.dateTo) && (
+          <button
+            onClick={() => setFilter({ templateId: '', workerId: '', dateFrom: '', dateTo: '' })}
+            className="mt-3 text-xs text-brand-600 hover:text-brand-700 font-medium"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      {/* History List */}
+      {sortedDates.length === 0 ? (
+        <div className="card p-12 text-center">
+          <History className="w-12 h-12 text-surface-300 mx-auto mb-3" />
+          <p className="text-surface-500 font-medium">No completed checklists yet</p>
+          <p className="text-sm text-surface-400 mt-1">Completed checklists will appear here</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {sortedDates.map(date => {
+            const items = groupedByDate[date];
+            const dateObj = new Date(date + 'T12:00:00');
+            const isToday = date === new Date().toLocaleDateString('en-CA');
+            const isYesterday = date === new Date(Date.now() - 86400000).toLocaleDateString('en-CA');
+            
+            return (
+              <div key={date}>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-sm font-semibold text-surface-700">
+                    {isToday ? 'Today' : isYesterday ? 'Yesterday' : dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </h3>
+                  <span className="text-xs text-surface-400">({items.length})</span>
+                </div>
+                <div className="space-y-2">
+                  {items.map(item => {
+                    const isExpanded = expandedId === item.id;
+                    const template = templates.find(t => t.id === item.templateId);
+                    const worker = workers.find(w => w.id === item.workerId);
+                    const shop = shops.find(s => s.id === item.shopId);
+                    
+                    return (
+                      <div key={item.id} className="card p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                              <CheckCircle2 className="w-5 h-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-surface-900 truncate">{item.templateTitle}</p>
+                              <div className="flex items-center gap-2 text-xs text-surface-500 flex-wrap">
+                                <span>{item.workerName || 'Unknown'}</span>
+                                {shop && <span>· {shop.name}</span>}
+                                <span>· {item.completedItems}/{item.totalItems} items</span>
+                                {item.requiredItems > 0 && (
+                                  <span className="text-danger-500">· {item.requiredItems} required</span>
+                                )}
+                                <span>· Completed {item.completedAt ? new Date(item.completedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                            className="btn-icon flex-shrink-0"
+                          >
+                            <ChevronDown className={cn('w-4 h-4 transition-transform', isExpanded && 'rotate-180')} />
+                          </button>
+                        </div>
+                        
+                        {isExpanded && (
+                          <div className="mt-3 pt-3 border-t border-surface-100">
+                            <div className="space-y-1.5">
+                              {(item.items || []).map((checkItem, idx) => (
+                                <div key={idx} className={cn(
+                                  'flex items-center gap-2 text-sm p-2 rounded-lg',
+                                  checkItem.checked ? 'bg-emerald-50' : 'bg-surface-50'
+                                )}>
+                                  {checkItem.checked ? (
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                                  ) : (
+                                    <Circle className="w-4 h-4 text-surface-300 flex-shrink-0" />
+                                  )}
+                                  <span className={cn(
+                                    'flex-1',
+                                    checkItem.checked ? 'text-surface-700' : 'text-surface-400 line-through'
+                                  )}>
+                                    {checkItem.text}
+                                  </span>
+                                  {checkItem.required && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-danger-50 text-danger-600 font-medium">Required</span>
+                                  )}
+                                  {checkItem.checked && checkItem.checkedBy && (
+                                    <span className="text-[10px] text-surface-400">
+                                      by {checkItem.checkedBy}
+                                    </span>
+                                  )}
+                                  {checkItem.note && (
+                                    <span className="text-[10px] text-surface-500 italic">"{checkItem.note}"</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            {item.triggeredBy && (
+                              <div className="mt-2 text-xs text-surface-400">
+                                Triggered by: {item.triggeredBy === 'qr' ? 'QR scan' : item.triggeredBy === 'qr_public' ? 'Public QR' : item.triggeredBy === 'manual' ? 'Manual assignment' : 'Schedule'}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+

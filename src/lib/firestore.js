@@ -16,7 +16,7 @@ const C = {
   SUPPORT_TICKETS: 'supportTickets',
   KB_CATEGORIES: 'kbCategories', KB_ARTICLES: 'kbArticles',
   CHECKLIST_TEMPLATES: 'checklistTemplates', CHECKLIST_ASSIGNMENTS: 'checklistAssignments',
-  PUBLIC_CHECKLIST_ASSIGNMENTS: 'publicChecklistAssignments',
+  CHECKLIST_HISTORY: 'checklistHistory', PUBLIC_CHECKLIST_ASSIGNMENTS: 'publicChecklistAssignments',
   STOCK_ITEMS: 'stockItems', STOCK_REQUESTS: 'stockRequests', STOCK_LOGS: 'stockLogs',
 };
 
@@ -727,7 +727,15 @@ export async function getChecklistAssignments(filters = {}) {
 }
 export const getChecklistAssignment = (id) => get1(C.CHECKLIST_ASSIGNMENTS, id);
 export const createChecklistAssignment = (data) => add(C.CHECKLIST_ASSIGNMENTS, { ...data, status: data.status || 'pending' });
-export const updateChecklistAssignment = (id, data) => upd(C.CHECKLIST_ASSIGNMENTS, id, data);
+export async function updateChecklistAssignment(id, data) {
+  await upd(C.CHECKLIST_ASSIGNMENTS, id, data);
+  if (data.status === 'completed') {
+    const assignment = await get1(C.CHECKLIST_ASSIGNMENTS, id);
+    if (assignment && assignment.status === 'completed') {
+      await moveToChecklistHistory(assignment);
+    }
+  }
+}
 export const deleteChecklistAssignment = (id) => del(C.CHECKLIST_ASSIGNMENTS, id);
 
 // Batch-generate assignments for a template (used by scheduled generation)
@@ -896,6 +904,80 @@ export async function createQRChecklistAssignment(template, workerId, workerName
     qrScannedAt: new Date().toISOString(),
   });
   return { id, existing: false, isShopWide: false };
+}
+
+// ─── Checklist History ─────────────────────────────────────
+// Stores completed assignments for audit/history tracking
+// Schema: { orgId, templateId, templateTitle, workerId, workerName, scope, date,
+//   completedAt, completedBy, triggeredBy, shopId, items, totalItems, requiredItems,
+//   completedItems, createdAt }
+
+export async function moveToChecklistHistory(assignment) {
+  if (!assignment || assignment.status !== 'completed') return null;
+  
+  const completedItems = (assignment.items || []).filter(i => i.checked).length;
+  const requiredItems = (assignment.items || []).filter(i => i.required).length;
+  
+  const historyEntry = {
+    orgId: assignment.orgId,
+    templateId: assignment.templateId,
+    templateTitle: assignment.templateTitle,
+    workerId: assignment.workerId,
+    workerName: assignment.workerName,
+    scope: assignment.scope,
+    date: assignment.date,
+    completedAt: assignment.completedAt,
+    completedBy: assignment.completedBy,
+    triggeredBy: assignment.triggeredBy,
+    shopId: assignment.shopId || '',
+    items: assignment.items,
+    totalItems: (assignment.items || []).length,
+    requiredItems,
+    completedItems,
+    createdAt: assignment.createdAt,
+    originalAssignmentId: assignment.id,
+  };
+  
+  return add(C.CHECKLIST_HISTORY, historyEntry);
+}
+
+export async function getChecklistHistory(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  if (filters.workerId) c.push(where('workerId', '==', filters.workerId));
+  if (filters.templateId) c.push(where('templateId', '==', filters.templateId));
+  if (filters.date) c.push(where('date', '==', filters.date));
+  if (filters.startDate) c.push(where('date', '>=', filters.startDate));
+  if (filters.endDate) c.push(where('date', '<=', filters.endDate));
+  c.push(orderBy('completedAt', 'desc'));
+  if (filters.limit) c.push(limit(filters.limit));
+  
+  return serAll(await getDocs(query(collection(db, C.CHECKLIST_HISTORY), ...c)));
+}
+
+export function getChecklistHistoryRealtime(orgId, callback, filters = {}) {
+  const c = [where('orgId', '==', orgId)];
+  if (filters.templateId) c.push(where('templateId', '==', filters.templateId));
+  if (filters.workerId) c.push(where('workerId', '==', filters.workerId));
+  if (filters.startDate) c.push(where('date', '>=', filters.startDate));
+  if (filters.endDate) c.push(where('date', '<=', filters.endDate));
+  c.push(orderBy('completedAt', 'desc'));
+  
+  return onSnapshot(query(collection(db, C.CHECKLIST_HISTORY), ...c), (snap) => {
+    callback(snap.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        completedAt: data.completedAt?.toDate?.()?.toISOString() || data.completedAt,
+        createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
+      };
+    }));
+  });
+}
+
+export async function deleteChecklistHistoryEntry(id) {
+  return del(C.CHECKLIST_HISTORY, id);
 }
 
 // ─── Public Checklist Assignments (external/unauthenticated users) ──

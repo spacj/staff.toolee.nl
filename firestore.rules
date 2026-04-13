@@ -192,6 +192,12 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
+    // Checklist History: managers/admins can read, system creates entries (workers complete checklists -> moved to history)
+    match /checklistHistory/{id} {
+      allow read: if isManager();
+      allow create: if isAuth();
+    }
+
     // Stock Items: all auth read (workers view stock), all auth create/update (workers add items/update stock), managers+ delete
     match /stockItems/{id} {
       allow read: if isAuth();
