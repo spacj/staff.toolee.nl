@@ -1,0 +1,49 @@
+{
+  "name": "StaffHub - Staff Management Platform",
+  "short_name": "StaffHub",
+  "description": "Manage your team, shifts, costs, checklists, and stock all in one place.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4c6ef5",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.svg",
+      "sizes": "180x180",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/dashboard",
+      "description": "View your dashboard"
+    },
+    {
+      "name": "My Checklists",
+      "url": "/my-checklists",
+      "description": "View your assigned checklists"
+    },
+    {
+      "name": "Time Tracking",
+      "url": "/time",
+      "description": "Track your work hours"
+    }
+  ]
+}
