@@ -7,7 +7,7 @@ import { PRICE_PER_WORKER, PRICE_PER_SHOP, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_
 import { createSupportTicket } from '@/lib/firestore';
 import Modal from '@/components/Modal';
 import toast from 'react-hot-toast';
-import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ExternalLink, HelpCircle, Send, Loader2, Building2, Users as UsersIcon, Mail, Phone } from 'lucide-react';
+import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ExternalLink, HelpCircle, Send, Loader2, Building2, Users as UsersIcon, Mail, Phone, Menu, X } from 'lucide-react';
 
 const features = [
   { icon: Store, title: 'Multi-Shop Management', desc: 'Manage multiple locations from one dashboard with separate schedules and staff.', color: 'from-brand-500 to-brand-600' },
@@ -291,6 +291,7 @@ export default function HomePage() {
   const { user, userProfile, loading, isWebmaster } = useAuth();
   const router = useRouter();
   const [showSalesModal, setShowSalesModal] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && user && userProfile) {
@@ -298,60 +299,136 @@ export default function HomePage() {
     }
   }, [user, userProfile, loading, isWebmaster, router]);
 
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileMenuOpen]);
+
   if (loading || (user && userProfile)) return <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50/30" />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50/30">
       {/* Navigation */}
-      <nav className="fixed top-0 inset-x-0 z-50 bg-white/70 backdrop-blur-xl border-b border-slate-200/60">
+      <nav className="fixed top-0 inset-x-0 z-50 bg-white/90 backdrop-blur-xl border-b border-slate-200/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-lg shadow-brand-500/30">
+          <Link href="/" className="flex items-center gap-2.5" onClick={() => setMobileMenuOpen(false)}>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-lg shadow-brand-500/30">
               <Shield className="w-5 h-5 text-white" />
             </div>
             <div className="flex flex-col">
-              <span className="text-lg font-display font-bold text-slate-900 tracking-tight leading-none">StaffHub</span>
-              <span className="text-[10px] text-slate-400 font-medium tracking-wide">by toolee.nl</span>
+              <span className="text-base sm:text-lg font-display font-bold text-slate-900 tracking-tight leading-none">StaffHub</span>
+              <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium tracking-wide hidden sm:block">by toolee.nl</span>
             </div>
           </Link>
-          <div className="flex items-center gap-4">
-            <a href="#contact" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2">Contact</a>
-            <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2">Sign In</Link>
-            <Link href="/register" className="btn-primary !py-2.5 !px-6 !text-sm !shadow-lg !shadow-brand-500/30">Get Started</Link>
+
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center gap-1">
+            <a href="#contact" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2 rounded-lg hover:bg-slate-100">Contact</a>
+            <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2 rounded-lg hover:bg-slate-100">Sign In</Link>
+            <Link href="/register" className="btn-primary !py-2 !px-5 !text-sm !shadow-lg !shadow-brand-500/30 ml-2">Get Started</Link>
           </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 transition-colors"
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
+
+        {/* Mobile Menu Overlay */}
+        {mobileMenuOpen && (
+          <div className="md:hidden fixed inset-0 top-16 bg-white/95 backdrop-blur-xl z-40 flex flex-col">
+            <div className="flex-1 overflow-y-auto px-6 py-8">
+              <div className="space-y-2">
+                <a
+                  href="#features"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block text-lg font-medium text-slate-700 py-3 px-4 rounded-xl hover:bg-slate-50"
+                >
+                  Features
+                </a>
+                <a
+                  href="#pricing"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block text-lg font-medium text-slate-700 py-3 px-4 rounded-xl hover:bg-slate-50"
+                >
+                  Pricing
+                </a>
+                <a
+                  href="#contact"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block text-lg font-medium text-slate-700 py-3 px-4 rounded-xl hover:bg-slate-50"
+                >
+                  Contact
+                </a>
+              </div>
+
+              <div className="border-t border-slate-200 my-6" />
+
+              <div className="space-y-3">
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block w-full text-center py-3.5 px-4 rounded-xl text-sm font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/register"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block w-full text-center py-3.5 px-4 rounded-xl text-sm font-semibold bg-gradient-to-b from-brand-500 to-brand-600 text-white hover:from-brand-600 hover:to-brand-700 transition-colors shadow-lg shadow-brand-500/30"
+                >
+                  Get Started Free
+                </Link>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-slate-100">
+                <p className="text-xs text-slate-400 text-center">
+                  Free for up to {FREE_WORKER_LIMIT} workers • No credit card required
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
 
-      {/* Hero Section */}
-      <section className="pt-32 pb-24 px-4 sm:px-6 relative overflow-hidden">
+{/* Hero Section */}
+      <section className="pt-28 sm:pt-32 pb-16 sm:pb-24 px-4 sm:px-6 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-20 left-1/4 w-[500px] h-[500px] bg-brand-200/40 rounded-full blur-3xl" />
-          <div className="absolute top-40 right-1/4 w-[400px] h-[400px] bg-purple-200/30 rounded-full blur-3xl" />
-          <div className="absolute -bottom-20 left-1/3 w-[300px] h-[300px] bg-emerald-200/20 rounded-full blur-3xl" />
+          <div className="absolute top-20 left-1/4 w-[400px] h-[400px] sm:w-[500px] sm:h-[500px] bg-brand-200/40 rounded-full blur-3xl" />
+          <div className="absolute top-40 right-1/4 w-[300px] h-[300px] sm:w-[400px] sm:h-[400px] bg-purple-200/30 rounded-full blur-3xl" />
+          <div className="absolute -bottom-20 left-1/3 w-[200px] h-[200px] sm:w-[300px] sm:h-[300px] bg-emerald-200/20 rounded-full blur-3xl" />
         </div>
         <div className="max-w-5xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 bg-white border border-brand-200 text-brand-700 text-sm font-medium px-5 py-2.5 rounded-full mb-8 shadow-sm">
-            <Sparkles className="w-4 h-4" /> AI-Powered Scheduling Now Available
+          <div className="inline-flex items-center gap-2 bg-white border border-brand-200 text-brand-700 text-xs sm:text-sm font-medium px-4 sm:px-5 py-2 sm:py-2.5 rounded-full mb-6 sm:mb-8 shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> AI-Powered Scheduling Now Available
           </div>
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-display font-bold text-slate-900 leading-[1.1] mb-6 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-display font-bold text-slate-900 leading-[1.1] mb-4 sm:mb-6 tracking-tight">
             The smarter way to<br />
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-600 via-brand-500 to-purple-500">manage your staff</span>
           </h1>
-          <p className="text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto mb-12 leading-relaxed">
+          <p className="text-base sm:text-lg md:text-xl text-slate-600 max-w-3xl mx-auto mb-8 sm:mb-12 leading-relaxed px-2">
             Schedule shifts effortlessly, track attendance in real-time, manage leave requests, and control labor costs — all from one beautifully designed platform.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <Link href="/register" className="btn-primary !py-4 !px-10 !text-base !shadow-xl !shadow-brand-500/30 hover:!shadow-2xl hover:!shadow-brand-500/40 hover:!-translate-y-1 transition-all">
-              Start Your Free Trial <ArrowRight className="w-5 h-5" />
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-6 sm:mb-8">
+            <Link href="/register" className="btn-primary !py-3.5 sm:!py-4 !px-8 sm:!px-10 !text-sm sm:!text-base !shadow-xl !shadow-brand-500/30 hover:!shadow-2xl hover:!shadow-brand-500/40 hover:!-translate-y-1 transition-all w-full sm:w-auto">
+              Start Free Trial <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </Link>
-            <a href="#pricing" className="btn-secondary !py-4 !px-10 !text-base group">
-              View Pricing <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            <a href="#pricing" className="btn-secondary !py-3.5 sm:!py-4 !px-8 sm:!px-10 !text-sm sm:!text-base group w-full sm:w-auto text-center">
+              View Pricing <ChevronRight className="w-4 h-4" />
             </a>
           </div>
-          <div className="flex items-center justify-center gap-6 text-sm text-slate-500">
-            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> Free for up to {FREE_WORKER_LIMIT} workers</span>
-            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> No credit card required</span>
-            <span className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> Cancel anytime</span>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-xs sm:text-sm text-slate-500 px-4">
+            <span className="flex items-center gap-1.5 sm:gap-2"><Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" /> Free for up to {FREE_WORKER_LIMIT} workers</span>
+            <span className="flex items-center gap-1.5 sm:gap-2"><Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" /> No credit card required</span>
+            <span className="flex items-center gap-1.5 sm:gap-2"><Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" /> Cancel anytime</span>
           </div>
         </div>
       </section>
@@ -369,21 +446,21 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section className="py-24 px-4 sm:px-6">
+{/* Features Grid */}
+      <section id="features" className="py-16 sm:py-24 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-sm font-semibold text-brand-600 uppercase tracking-wider mb-3">Features</p>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-slate-900 mb-4">Everything you need to manage your team</h2>
-            <p className="text-lg text-slate-600 max-w-2xl mx-auto">From smart scheduling to cost analytics — all the tools in one powerful platform.</p>
+<div className="text-center mb-10 sm:mb-16">
+            <p className="text-xs sm:text-sm font-semibold text-brand-600 uppercase tracking-wider mb-2 sm:mb-3">Features</p>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-display font-bold text-slate-900 mb-3 sm:mb-4">Everything you need to manage your team</h2>
+            <p className="text-sm sm:text-lg text-slate-600 max-w-2xl mx-auto">From smart scheduling to cost analytics — all the tools in one powerful platform.</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {features.map((f) => (
-              <div key={f.title} className="bg-white rounded-2xl border border-slate-200/80 p-7 hover:shadow-xl hover:border-slate-300/80 hover:-translate-y-1 transition-all duration-300 group">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${f.color} flex items-center justify-center mb-5 shadow-lg`}>
-                  <f.icon className="w-6 h-6 text-white" />
+              <div key={f.title} className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-7 hover:shadow-xl hover:border-slate-300/80 hover:-translate-y-1 transition-all duration-300 group">
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${f.color} flex items-center justify-center mb-4 sm:mb-5 shadow-lg`}>
+                  <f.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <h3 className="text-lg font-display font-semibold text-slate-900 mb-2">{f.title}</h3>
+                <h3 className="text-base sm:text-lg font-display font-semibold text-slate-900 mb-2">{f.title}</h3>
                 <p className="text-sm text-slate-600 leading-relaxed">{f.desc}</p>
               </div>
             ))}
@@ -471,20 +548,20 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-24 px-4 sm:px-6">
+{/* CTA Section */}
+      <section className="py-16 sm:py-24 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto">
-          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 rounded-3xl p-12 sm:p-16 relative overflow-hidden shadow-2xl">
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 rounded-2xl sm:rounded-3xl p-8 sm:p-12 md:p-16 relative overflow-hidden shadow-2xl">
             <div className="absolute inset-0 opacity-30">
-              <div className="absolute -top-20 -right-20 w-80 h-80 bg-brand-400 rounded-full blur-3xl" />
-              <div className="absolute -bottom-10 -left-10 w-60 h-60 bg-purple-400 rounded-full blur-3xl" />
+              <div className="absolute -top-20 -right-20 w-60 sm:w-80 h-60 sm:h-80 bg-brand-400 rounded-full blur-3xl" />
+              <div className="absolute -bottom-10 -left-10 w-40 sm:w-60 h-40 sm:h-60 bg-purple-400 rounded-full blur-3xl" />
             </div>
             <div className="relative z-10 text-center">
-              <Zap className="w-12 h-12 text-brand-400 mx-auto mb-6" />
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-white mb-5">Ready to simplify your operations?</h2>
-              <p className="text-white/70 mb-10 max-w-xl mx-auto text-lg">Join businesses using StaffHub to save time, reduce errors, and keep their team happy.</p>
-              <Link href="/register" className="inline-flex items-center gap-2 bg-white text-slate-900 font-semibold px-10 py-4 rounded-xl hover:bg-brand-50 transition-all shadow-xl hover:-translate-y-1">
-                Get Started for Free <ArrowRight className="w-5 h-5" />
+              <Zap className="w-10 h-10 sm:w-12 sm:h-12 text-brand-400 mx-auto mb-4 sm:mb-6" />
+              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-display font-bold text-white mb-4 sm:mb-5">Ready to simplify your operations?</h2>
+              <p className="text-white/70 mb-8 sm:mb-10 max-w-xl mx-auto text-sm sm:text-lg">Join businesses using StaffHub to save time, reduce errors, and keep their team happy.</p>
+              <Link href="/register" className="inline-flex items-center gap-2 bg-white text-slate-900 font-semibold px-8 sm:px-10 py-3 sm:py-4 rounded-xl hover:bg-brand-50 transition-all shadow-xl hover:-translate-y-1 text-sm sm:text-base">
+                Get Started for Free <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
               </Link>
             </div>
           </div>
