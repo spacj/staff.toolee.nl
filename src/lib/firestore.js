@@ -651,7 +651,6 @@ export async function addSupportTicketReply(ticketId, reply) {
   return upd(C.SUPPORT_TICKETS, ticketId, { replies, updatedAt: ts() });
 }
 
-<<<<<<< Updated upstream
 // ─── Knowledge Base ──────────────────────────────────
 // Categories: { orgId, name, icon, color, order, createdBy, createdAt, updatedAt }
 // Articles:   { orgId, categoryId, title, content, tags[], pinned, order, createdBy, createdByName, createdAt, updatedAt }
