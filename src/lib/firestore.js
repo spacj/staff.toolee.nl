@@ -17,7 +17,7 @@ const C = {
   KB_CATEGORIES: 'kbCategories', KB_ARTICLES: 'kbArticles',
   CHECKLIST_TEMPLATES: 'checklistTemplates', CHECKLIST_ASSIGNMENTS: 'checklistAssignments',
   PUBLIC_CHECKLIST_ASSIGNMENTS: 'publicChecklistAssignments',
-  STOCK_ITEMS: 'stockItems', STOCK_REQUESTS: 'stockRequests',
+  STOCK_ITEMS: 'stockItems', STOCK_REQUESTS: 'stockRequests', STOCK_LOGS: 'stockLogs',
 };
 
 // ─── Helpers ──────────────────────────────────────────
@@ -929,6 +929,20 @@ export const deletePublicAssignment = (id) => del(C.PUBLIC_CHECKLIST_ASSIGNMENTS
 // stockRequests schema: { orgId, shopId?, itemId?, itemName, requestedBy, requestedByName,
 //                         requestedByRole, workerId?, quantity, reason, status: 'pending'|'approved'|'rejected'|'fulfilled',
 //                         urgent, adminNotes?, reviewedBy?, reviewedAt?, createdAt, updatedAt }
+// stockLogs schema: { orgId, itemId, itemName, previousQuantity, newQuantity, change, type, updatedBy, updatedByName, createdAt }
+
+export async function getStockCategories(orgId) {
+  const org = await get1(C.ORGANIZATIONS, orgId);
+  return org?.stockCategories || [];
+}
+
+export async function addStockCategory(orgId, category) {
+  const org = await get1(C.ORGANIZATIONS, orgId);
+  const current = org?.stockCategories || [];
+  if (!current.includes(category)) {
+    await upd(C.ORGANIZATIONS, orgId, { stockCategories: [...current, category] });
+  }
+}
 
 export async function getStockItems(filters = {}) {
   const c = [];
@@ -939,14 +953,116 @@ export async function getStockItems(filters = {}) {
   results.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   return results;
 }
-export const createStockItem = (data) => add(C.STOCK_ITEMS, data);
-export const updateStockItem = (id, data) => upd(C.STOCK_ITEMS, id, data);
-export const deleteStockItem = (id) => del(C.STOCK_ITEMS, id);
 
-export async function adjustStockQuantity(itemId, newQuantity) {
-  await upd(C.STOCK_ITEMS, itemId, { quantity: newQuantity });
+async function createStockLog(data) {
+  return add(C.STOCK_LOGS, { ...data, createdAt: ts() });
+}
+
+export function getStockLogsRealtime(orgId, callback) {
+  const q = query(
+    collection(db, C.STOCK_LOGS),
+    where('orgId', '==', orgId),
+    orderBy('createdAt', 'desc')
+  );
+  return onSnapshot(q, (snap) => {
+    const logs = snap.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
+      };
+    });
+    callback(logs);
+  });
+}
+
+export async function getStockLogs(orgId, filters = {}) {
+  const c = [where('orgId', '==', orgId)];
+  if (filters.itemId) c.push(where('itemId', '==', filters.itemId));
+  if (filters.type) c.push(where('type', '==', filters.type));
+  if (filters.updatedBy) c.push(where('updatedBy', '==', filters.updatedBy));
+  c.push(orderBy('createdAt', 'desc'));
+  if (filters.limit) c.push(limit(filters.limit));
+  return serAll(await getDocs(query(collection(db, C.STOCK_LOGS), ...c)));
+}
+
+export async function createStockItem(data, userProfile = {}) {
+  const id = await add(C.STOCK_ITEMS, data);
+  await createStockLog({
+    orgId: data.orgId,
+    itemId: id,
+    itemName: data.name,
+    previousQuantity: 0,
+    newQuantity: data.quantity || 0,
+    change: data.quantity || 0,
+    type: 'created',
+    updatedBy: userProfile.uid || data.createdBy || '',
+    updatedByName: userProfile.displayName || data.createdByName || '',
+  });
+  return id;
+}
+
+export async function updateStockItem(id, data, userProfile = {}) {
+  const oldItem = await get1(C.STOCK_ITEMS, id);
+  await upd(C.STOCK_ITEMS, id, data);
+  if (oldItem && data.quantity !== undefined && data.quantity !== oldItem.quantity) {
+    const change = data.quantity - oldItem.quantity;
+    await createStockLog({
+      orgId: oldItem.orgId,
+      itemId: id,
+      itemName: data.name || oldItem.name,
+      previousQuantity: oldItem.quantity,
+      newQuantity: data.quantity,
+      change: change,
+      type: 'edited',
+      updatedBy: userProfile.uid || '',
+      updatedByName: userProfile.displayName || '',
+    });
+  }
+}
+
+export async function deleteStockItem(id, userProfile = {}) {
+  const item = await get1(C.STOCK_ITEMS, id);
+  if (item) {
+    await createStockLog({
+      orgId: item.orgId,
+      itemId: id,
+      itemName: item.name,
+      previousQuantity: item.quantity,
+      newQuantity: 0,
+      change: -item.quantity,
+      type: 'deleted',
+      updatedBy: userProfile.uid || '',
+      updatedByName: userProfile.displayName || '',
+    });
+  }
+  await del(C.STOCK_ITEMS, id);
+}
+
+export async function adjustStockQuantity(itemId, newQuantity, userProfile = {}) {
   const item = await get1(C.STOCK_ITEMS, itemId);
-  if (item && item.minimumQuantity > 0 && newQuantity < item.minimumQuantity) {
+  if (!item) return;
+  
+  const previousQuantity = item.quantity;
+  const change = newQuantity - previousQuantity;
+  const type = change > 0 ? 'add' : change < 0 ? 'remove' : 'set';
+  
+  await upd(C.STOCK_ITEMS, itemId, { quantity: newQuantity });
+  
+  await createStockLog({
+    orgId: item.orgId,
+    itemId: itemId,
+    itemName: item.name,
+    previousQuantity,
+    newQuantity,
+    change,
+    type,
+    updatedBy: userProfile.uid || '',
+    updatedByName: userProfile.displayName || '',
+  });
+  
+  if (item.minimumQuantity > 0 && newQuantity < item.minimumQuantity) {
     await notifyManagers(item.orgId, {
       type: 'stock_low',
       title: `Low Stock: ${item.name}`,

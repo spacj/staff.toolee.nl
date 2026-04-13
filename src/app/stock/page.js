@@ -6,7 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   getStockItems, createStockItem, updateStockItem, deleteStockItem, adjustStockQuantity,
   getStockRequests, createStockRequest, reviewStockRequest,
-  notifyManagers, notifyWorker, getWorkers,
+  notifyManagers, notifyWorker, getWorkers, getStockLogsRealtime,
+  getStockCategories, addStockCategory,
 } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
 import {
@@ -15,7 +16,6 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const CATEGORIES = ['Food & Beverage', 'Cleaning', 'Office', 'Equipment', 'Packaging', 'Safety', 'Other'];
 const UNITS = ['pcs', 'kg', 'g', 'L', 'mL', 'box', 'pack', 'roll', 'pair', 'set'];
 
 const STATUS_CONFIG = {
@@ -40,7 +40,7 @@ function StockBadge({ item }) {
   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />In stock</span>;
 }
 
-const emptyItemForm = { name: '', description: '', category: 'Other', unit: 'pcs', quantity: 0, minimumQuantity: 0, sku: '' };
+const emptyItemForm = { name: '', description: '', category: '', unit: 'pcs', quantity: 0, minimumQuantity: 0, sku: '' };
 const emptyRequestForm = { itemId: '', itemName: '', quantity: 1, reason: '', urgent: false };
 
 export default function StockPage() {
@@ -50,15 +50,19 @@ export default function StockPage() {
   const [items, setItems] = useState([]);
   const [requests, setRequests] = useState([]);
   const [workers, setWorkers] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [requestStatusFilter, setRequestStatusFilter] = useState('all');
+  const [logFilter, setLogFilter] = useState('all');
 
   // Item modal
   const [itemModal, setItemModal] = useState(null); // null | 'add' | item object (edit)
   const [itemForm, setItemForm] = useState(emptyItemForm);
   const [savingItem, setSavingItem] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
 
   // Adjust quantity modal
   const [adjustModal, setAdjustModal] = useState(null); // item object
@@ -85,14 +89,16 @@ export default function StockPage() {
     if (!orgId) return;
     setLoading(true);
     try {
-      const [itemsData, requestsData, workersData] = await Promise.all([
+      const [itemsData, requestsData, workersData, categoriesData] = await Promise.all([
         getStockItems({ orgId }),
         getStockRequests({ orgId }),
         canManage ? getWorkers({ orgId }) : Promise.resolve([]),
+        getStockCategories(orgId),
       ]);
       setItems(itemsData);
       setRequests(requestsData);
       setWorkers(workersData);
+      setCategories(categoriesData);
     } catch (e) {
       toast.error('Failed to load stock data');
     } finally {
@@ -101,6 +107,12 @@ export default function StockPage() {
   };
 
   useEffect(() => { load(); }, [orgId]);
+
+  useEffect(() => {
+    if (!orgId || !canManage) return;
+    const unsubscribe = getStockLogsRealtime(orgId, setLogs);
+    return () => unsubscribe();
+  }, [orgId, canManage]);
 
   // ─── Derived data ────────────────────────────────────
   const alertItems = items.filter(i => stockStatus(i) === 'low' || stockStatus(i) === 'out');
@@ -123,13 +135,33 @@ export default function StockPage() {
   };
 
   // ─── Item CRUD ───────────────────────────────────────
+  const addCategory = async () => {
+    if (!newCategory.trim()) return;
+    const trimmed = newCategory.trim();
+    if (categories.includes(trimmed)) {
+      toast.error('Category already exists');
+      return;
+    }
+    try {
+      await addStockCategory(orgId, trimmed);
+      setCategories([...categories, trimmed]);
+      setItemForm(f => ({ ...f, category: trimmed }));
+      setNewCategory('');
+      toast.success('Category added');
+    } catch {
+      toast.error('Failed to add category');
+    }
+  };
+
   const openAddItem = () => {
     setItemForm(emptyItemForm);
+    setNewCategory('');
     setItemModal('add');
   };
 
   const openEditItem = (item) => {
-    setItemForm({ name: item.name, description: item.description || '', category: item.category || 'Other', unit: item.unit || 'pcs', quantity: item.quantity, minimumQuantity: item.minimumQuantity || 0, sku: item.sku || '' });
+    setItemForm({ name: item.name, description: item.description || '', category: item.category || '', unit: item.unit || 'pcs', quantity: item.quantity, minimumQuantity: item.minimumQuantity || 0, sku: item.sku || '' });
+    setNewCategory('');
     setItemModal(item);
   };
 
@@ -150,10 +182,10 @@ export default function StockPage() {
         createdByName: userProfile?.displayName || '',
       };
       if (itemModal === 'add') {
-        await createStockItem(data);
+        await createStockItem(data, userProfile);
         toast.success('Item added');
       } else {
-        await updateStockItem(itemModal.id, { name: data.name, description: data.description, category: data.category, unit: data.unit, quantity: data.quantity, minimumQuantity: data.minimumQuantity, sku: data.sku });
+        await updateStockItem(itemModal.id, { name: data.name, description: data.description, category: data.category, unit: data.unit, quantity: data.quantity, minimumQuantity: data.minimumQuantity, sku: data.sku }, userProfile);
         toast.success('Item updated');
       }
       setItemModal(null);
@@ -168,7 +200,7 @@ export default function StockPage() {
   const confirmDelete = async () => {
     if (!deleteConfirm) return;
     try {
-      await deleteStockItem(deleteConfirm.id);
+      await deleteStockItem(deleteConfirm.id, userProfile);
       toast.success('Item removed');
       setDeleteConfirm(null);
       load();
@@ -181,7 +213,7 @@ export default function StockPage() {
   const openAdjust = (item) => {
     setAdjustModal(item);
     setAdjustQty(item.quantity);
-    setAdjustMode('set');
+    setAdjustMode(canManage ? 'set' : 'subtract');
   };
 
   const saveAdjust = async () => {
@@ -193,7 +225,7 @@ export default function StockPage() {
       else if (adjustMode === 'add') newQty = adjustModal.quantity + Number(adjustQty);
       else newQty = Math.max(0, adjustModal.quantity - Number(adjustQty));
 
-      await adjustStockQuantity(adjustModal.id, newQty);
+      await adjustStockQuantity(adjustModal.id, newQty, userProfile);
       toast.success('Stock updated');
       setAdjustModal(null);
       load();
@@ -290,28 +322,26 @@ export default function StockPage() {
           <div>
             <h1 className="page-title">Stock Management</h1>
             <p className="text-sm text-surface-500 mt-0.5">
-              {canManage ? 'Manage inventory, set minimum levels, and review requests' : 'View stock levels and submit item requests'}
+              {canManage ? 'Manage inventory, track stock changes, and review requests' : 'Track stock levels, update quantities, and request items'}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={load} className="btn-ghost p-2 rounded-lg" title="Refresh">
               <RefreshCw className="w-4 h-4" />
             </button>
-            {canManage && (
-              <button onClick={openAddItem} className="btn-primary flex items-center gap-2">
-                <Plus className="w-4 h-4" /> Add Item
-              </button>
-            )}
+            <button onClick={openAddItem} className="btn-primary flex items-center gap-2">
+              <Plus className="w-4 h-4" /> {canManage ? 'Add Item' : 'Add Item'}
+            </button>
             {!canManage && (
-              <button onClick={() => openRequest()} className="btn-primary flex items-center gap-2">
-                <Plus className="w-4 h-4" /> Request Item
+              <button onClick={() => openRequest()} className="btn-secondary flex items-center gap-2">
+                <ClipboardList className="w-4 h-4" /> Request Item
               </button>
             )}
           </div>
         </div>
 
         {/* Alert banner — low/out of stock items */}
-        {canManage && alertItems.length > 0 && (
+        {alertItems.length > 0 && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
@@ -335,6 +365,7 @@ export default function StockPage() {
           {[
             { id: 'items', label: 'Items', count: items.length },
             { id: 'requests', label: canManage ? 'Requests' : 'My Requests', count: canManage ? pendingRequests.length : myRequests.filter(r => r.status === 'pending').length },
+            ...(canManage ? [{ id: 'logs', label: 'Activity', count: 0 }] : []),
           ].map(t => (
             <button
               key={t.id}
@@ -372,7 +403,7 @@ export default function StockPage() {
               </div>
               <select className="select-field sm:w-48" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
                 <option value="all">All categories</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 
@@ -380,7 +411,7 @@ export default function StockPage() {
               <div className="card text-center py-16">
                 <Package className="w-10 h-10 text-surface-300 mx-auto mb-3" />
                 <p className="text-surface-500 font-medium">{items.length === 0 ? 'No stock items yet' : 'No items match your filters'}</p>
-                {canManage && items.length === 0 && (
+                {items.length === 0 && (
                   <button onClick={openAddItem} className="btn-primary mt-4 inline-flex items-center gap-2">
                     <Plus className="w-4 h-4" /> Add your first item
                   </button>
@@ -423,11 +454,11 @@ export default function StockPage() {
                       )}
 
                       <div className="flex items-center gap-2 pt-1">
+                        <button onClick={() => openAdjust(item)} className="btn-secondary text-xs px-3 py-1.5 flex-1 flex items-center justify-center gap-1.5">
+                          <RefreshCw className="w-3.5 h-3.5" /> Update Stock
+                        </button>
                         {canManage && (
                           <>
-                            <button onClick={() => openAdjust(item)} className="btn-secondary text-xs px-3 py-1.5 flex-1 flex items-center justify-center gap-1.5">
-                              <RefreshCw className="w-3.5 h-3.5" /> Update Stock
-                            </button>
                             <button onClick={() => openEditItem(item)} className="btn-icon" title="Edit item">
                               <Pencil className="w-4 h-4" />
                             </button>
@@ -437,8 +468,8 @@ export default function StockPage() {
                           </>
                         )}
                         {!canManage && (
-                          <button onClick={() => openRequest(item)} className="btn-secondary text-xs px-3 py-1.5 w-full flex items-center justify-center gap-1.5">
-                            <ClipboardList className="w-3.5 h-3.5" /> Request Item
+                          <button onClick={() => openRequest(item)} className="btn-icon" title="Request item">
+                            <ClipboardList className="w-4 h-4" />
                           </button>
                         )}
                       </div>
@@ -522,6 +553,73 @@ export default function StockPage() {
             )}
           </div>
         )}
+
+        {/* ── Activity Tab ── */}
+        {tab === 'logs' && canManage && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <select className="select-field w-44" value={logFilter} onChange={e => setLogFilter(e.target.value)}>
+                <option value="all">All actions</option>
+                <option value="add">Added stock</option>
+                <option value="remove">Removed stock</option>
+                <option value="edited">Edited</option>
+                <option value="created">Created</option>
+                <option value="deleted">Deleted</option>
+              </select>
+              <span className="text-xs text-surface-400">Updates in real-time</span>
+            </div>
+
+            {logs.length === 0 ? (
+              <div className="card text-center py-16">
+                <RefreshCw className="w-10 h-10 text-surface-300 mx-auto mb-3" />
+                <p className="text-surface-500 font-medium">No activity recorded yet</p>
+                <p className="text-sm text-surface-400 mt-1">Stock changes will appear here</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {(logFilter === 'all' ? logs : logs.filter(l => l.type === logFilter)).map(log => (
+                  <div key={log.id} className="card p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className={cn(
+                          'w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0',
+                          log.type === 'add' ? 'bg-emerald-100 text-emerald-600' :
+                          log.type === 'remove' ? 'bg-red-100 text-red-600' :
+                          log.type === 'edited' ? 'bg-blue-100 text-blue-600' :
+                          log.type === 'created' ? 'bg-purple-100 text-purple-600' :
+                          'bg-gray-100 text-gray-600'
+                        )}>
+                          {log.type === 'add' ? '+' : log.type === 'remove' ? '−' : log.type === 'edited' ? '✎' : log.type === 'created' ? '★' : '×'}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-surface-900">
+                            <span className="truncate">{log.itemName}</span>
+                            <span className={cn(
+                              'ml-2 text-sm font-semibold',
+                              log.change > 0 ? 'text-emerald-600' : log.change < 0 ? 'text-red-600' : 'text-surface-500'
+                            )}>
+                              {log.change > 0 ? `+${log.change}` : log.change}
+                            </span>
+                          </p>
+                          <p className="text-xs text-surface-500">
+                            {log.type === 'add' ? 'Added stock' : log.type === 'remove' ? 'Removed stock' : log.type === 'edited' ? 'Edited item' : log.type === 'created' ? 'Created item' : 'Deleted item'}
+                            {' · '}{log.updatedByName || 'Unknown'}
+                            {' · '}{log.createdAt ? new Date(log.createdAt).toLocaleString() : 'Just now'}
+                          </p>
+                          {log.previousQuantity !== undefined && (
+                            <p className="text-xs text-surface-400">
+                              {log.previousQuantity} → {log.newQuantity}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Add / Edit Item Modal ── */}
@@ -535,9 +633,24 @@ export default function StockPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-surface-700 mb-1">Category</label>
-                <select className="select-field w-full" value={itemForm.category} onChange={e => setItemForm(f => ({ ...f, category: e.target.value }))}>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <div className="flex gap-2">
+                  <select className="select-field flex-1" value={itemForm.category} onChange={e => setItemForm(f => ({ ...f, category: e.target.value }))}>
+                    <option value="">Select category</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <div className="flex gap-1">
+                    <input
+                      className="input-field w-28"
+                      placeholder="New..."
+                      value={newCategory}
+                      onChange={e => setNewCategory(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCategory())}
+                    />
+                    <button type="button" onClick={addCategory} className="btn-secondary px-3" title="Add category">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-surface-700 mb-1">Unit</label>
@@ -583,11 +696,14 @@ export default function StockPage() {
             <div>
               <label className="block text-sm font-medium text-surface-700 mb-2">Adjustment type</label>
               <div className="flex gap-2">
-                {[
+                {(canManage ? [
                   { id: 'set', label: 'Set to exact value' },
                   { id: 'add', label: 'Add stock' },
                   { id: 'subtract', label: 'Remove stock' },
-                ].map(m => (
+                ] : [
+                  { id: 'add', label: 'Add stock' },
+                  { id: 'subtract', label: 'Remove stock' },
+                ]).map(m => (
                   <button
                     key={m.id}
                     onClick={() => { setAdjustMode(m.id); setAdjustQty(m.id === 'set' ? adjustModal.quantity : 0); }}
