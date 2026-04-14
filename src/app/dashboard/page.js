@@ -3,10 +3,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
-import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog, getCorrectionRequests, getMessages, updatePermit, reviewCorrectionRequest, notifyWorker } from '@/lib/firestore';
+import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog, getCorrectionRequests, getMessages, updatePermit, reviewCorrectionRequest, notifyWorker, getStockItems } from '@/lib/firestore';
 import { calculateCost, formatCurrency } from '@/lib/pricing';
 import { cn } from '@/utils/helpers';
-import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3, MessageCircle, AlertTriangle, XCircle } from 'lucide-react';
+import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3, MessageCircle, AlertTriangle, XCircle, Package, TrendingDown } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const [activity, setActivity] = useState([]);
   const [corrections, setCorrections] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [stockItems, setStockItems] = useState([]);
   const [loadingAction, setLoadingAction] = useState(null);
 
   // Quick approve/deny handlers
@@ -87,7 +88,17 @@ export default function DashboardPage() {
     getAttendance({ orgId, startDate: today, endDate: today, limit: 50 }).then(setAttendance);
     getPermits({ orgId, status: 'pending', limit: 10 }).then(setPermits);
     getActivityLog(8).then(setActivity);
+    getStockItems({ orgId }).then(setStockItems).catch(() => setStockItems([]));
   }, [orgId]);
+
+  const lowStockItems = useMemo(
+    () => stockItems.filter(i => i.minimumQuantity > 0 && i.quantity > 0 && i.quantity < i.minimumQuantity),
+    [stockItems]
+  );
+  const outOfStockItems = useMemo(
+    () => stockItems.filter(i => i.minimumQuantity > 0 && i.quantity === 0),
+    [stockItems]
+  );
 
   // Fetch manager-specific notifications
   useEffect(() => {
@@ -175,6 +186,45 @@ export default function DashboardPage() {
             <p className="text-white/60 mt-1">Here's what's happening today</p>
           </div>
         </div>
+
+        {/* Urgent Stock Banner */}
+        {(outOfStockItems.length > 0 || lowStockItems.length > 0) && (
+          <div className={cn(
+            'rounded-2xl p-4 sm:p-5 border-2 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4',
+            outOfStockItems.length > 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
+          )}>
+            <div className={cn(
+              'w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0',
+              outOfStockItems.length > 0 ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
+            )}>
+              {outOfStockItems.length > 0 ? <AlertTriangle className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={cn('text-sm sm:text-base font-semibold', outOfStockItems.length > 0 ? 'text-red-900' : 'text-amber-900')}>
+                {outOfStockItems.length > 0 && `${outOfStockItems.length} item${outOfStockItems.length > 1 ? 's' : ''} out of stock`}
+                {outOfStockItems.length > 0 && lowStockItems.length > 0 && ' · '}
+                {lowStockItems.length > 0 && `${lowStockItems.length} low stock`}
+              </p>
+              <p className={cn('text-xs sm:text-sm mt-0.5 truncate', outOfStockItems.length > 0 ? 'text-red-700' : 'text-amber-700')}>
+                {[...outOfStockItems, ...lowStockItems].slice(0, 4).map(i => i.name).join(', ')}
+                {stockItems.length > 4 ? '…' : ''}
+              </p>
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              <Link href="/stock" className="btn-secondary text-xs sm:text-sm px-3 py-2 flex items-center gap-1.5 whitespace-nowrap">
+                <Package className="w-4 h-4" /> View stock
+              </Link>
+              {outOfStockItems.length > 0 && (
+                <Link
+                  href="/stock?tab=requests&auto=1"
+                  className="text-xs sm:text-sm px-3 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  Create requests <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-stagger">

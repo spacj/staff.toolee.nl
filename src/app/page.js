@@ -344,55 +344,62 @@ export default function HomePage() {
 
         {/* Mobile Menu Overlay */}
         {mobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 top-16 bg-white/95 backdrop-blur-xl z-40 flex flex-col">
-            <div className="flex-1 overflow-y-auto px-6 py-8">
-              <div className="space-y-2">
-                <a
-                  href="#features"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-lg font-medium text-slate-700 py-3 px-4 rounded-xl hover:bg-slate-50"
-                >
-                  Features
-                </a>
-                <a
-                  href="#pricing"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-lg font-medium text-slate-700 py-3 px-4 rounded-xl hover:bg-slate-50"
-                >
-                  Pricing
-                </a>
-                <a
-                  href="#contact"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-lg font-medium text-slate-700 py-3 px-4 rounded-xl hover:bg-slate-50"
-                >
-                  Contact
-                </a>
+          <div
+            className="md:hidden fixed inset-0 top-16 bg-gradient-to-b from-white via-white to-brand-50/40 backdrop-blur-xl z-40 flex flex-col"
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          >
+            <div className="flex-1 overflow-y-auto px-5 py-6" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 24px)' }}>
+              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold px-2 mb-2">Explore</p>
+              <div className="space-y-1.5">
+                {[
+                  { href: '#features', icon: Sparkles, label: 'Features', desc: 'What StaffHub can do' },
+                  { href: '#pricing', icon: BarChart3, label: 'Pricing', desc: 'Simple per-worker plans' },
+                  { href: '#contact', icon: Mail, label: 'Contact', desc: 'Get in touch with our team' },
+                ].map(item => (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-4 py-3 px-3 rounded-2xl hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200/60 transition-all active:scale-[0.98]"
+                  >
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 flex items-center justify-center flex-shrink-0">
+                      <item.icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-base font-semibold text-slate-900 leading-tight">{item.label}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{item.desc}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                  </a>
+                ))}
               </div>
 
-              <div className="border-t border-slate-200 my-6" />
-
+              <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold px-2 mt-8 mb-2">Account</p>
               <div className="space-y-3">
-                <Link
-                  href="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block w-full text-center py-3.5 px-4 rounded-xl text-sm font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-                >
-                  Sign In
-                </Link>
                 <Link
                   href="/register"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block w-full text-center py-3.5 px-4 rounded-xl text-sm font-semibold bg-gradient-to-b from-brand-500 to-brand-600 text-white hover:from-brand-600 hover:to-brand-700 transition-colors shadow-lg shadow-brand-500/30"
+                  className="flex items-center justify-center gap-2 w-full py-4 px-4 rounded-2xl text-[15px] font-semibold bg-gradient-to-b from-brand-500 to-brand-600 text-white shadow-lg shadow-brand-500/30 active:scale-[0.98] transition-transform"
                 >
-                  Get Started Free
+                  Get Started Free <ArrowRight className="w-4 h-4" />
+                </Link>
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 w-full py-3.5 px-4 rounded-2xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-[0.98] transition-all"
+                >
+                  Sign In
                 </Link>
               </div>
 
-              <div className="mt-8 pt-6 border-t border-slate-100">
-                <p className="text-xs text-slate-400 text-center">
-                  Free for up to {FREE_WORKER_LIMIT} workers • No credit card required
-                </p>
+              <div className="mt-8 rounded-2xl bg-white border border-slate-200/70 p-4 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Free for up to {FREE_WORKER_LIMIT} workers</p>
+                  <p className="text-xs text-slate-500 mt-0.5">No credit card required — upgrade anytime.</p>
+                </div>
               </div>
             </div>
           </div>
