@@ -1154,6 +1154,54 @@ export async function adjustStockQuantity(itemId, newQuantity, userProfile = {})
   }
 }
 
+export async function openStockUnit(itemId, userProfile = {}) {
+  const item = await get1(C.STOCK_ITEMS, itemId);
+  if (!item) return;
+  if ((item.quantity || 0) <= 0) throw new Error('No sealed units available');
+  const previousQuantity = item.quantity;
+  const newQuantity = previousQuantity - 1;
+  const newInUse = (item.inUseQuantity || 0) + 1;
+  await upd(C.STOCK_ITEMS, itemId, { quantity: newQuantity, inUseQuantity: newInUse });
+  await createStockLog({
+    orgId: item.orgId,
+    itemId,
+    itemName: item.name,
+    previousQuantity,
+    newQuantity,
+    change: -1,
+    type: 'opened',
+    updatedBy: userProfile.uid || '',
+    updatedByName: userProfile.displayName || '',
+  });
+  if (item.minimumQuantity > 0 && newQuantity < item.minimumQuantity) {
+    await notifyManagers(item.orgId, {
+      type: 'stock_low',
+      title: `Low Stock: ${item.name}`,
+      message: `${item.name} is below the minimum stock level (${newQuantity} ${item.unit} left, minimum: ${item.minimumQuantity} ${item.unit}).`,
+      link: '/stock',
+    });
+  }
+}
+
+export async function finishStockUnit(itemId, userProfile = {}) {
+  const item = await get1(C.STOCK_ITEMS, itemId);
+  if (!item) return;
+  if ((item.inUseQuantity || 0) <= 0) throw new Error('No units currently in use');
+  const newInUse = item.inUseQuantity - 1;
+  await upd(C.STOCK_ITEMS, itemId, { inUseQuantity: newInUse });
+  await createStockLog({
+    orgId: item.orgId,
+    itemId,
+    itemName: item.name,
+    previousQuantity: item.quantity,
+    newQuantity: item.quantity,
+    change: 0,
+    type: 'finished',
+    updatedBy: userProfile.uid || '',
+    updatedByName: userProfile.displayName || '',
+  });
+}
+
 export async function getStockRequests(filters = {}) {
   const c = [];
   if (filters.orgId) c.push(where('orgId', '==', filters.orgId));

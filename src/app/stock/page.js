@@ -6,6 +6,7 @@ import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getStockItems, createStockItem, updateStockItem, deleteStockItem, adjustStockQuantity,
+  openStockUnit, finishStockUnit,
   getStockRequests, createStockRequest, reviewStockRequest,
   notifyManagers, notifyWorker, getWorkers, getStockLogsRealtime,
   getStockCategories, addStockCategory,
@@ -14,7 +15,7 @@ import { cn } from '@/utils/helpers';
 import {
   Package, Plus, Pencil, Trash2, AlertTriangle, CheckCircle, XCircle,
   ChevronDown, ChevronUp, Minus, ClipboardList, Bell, Search, Filter, RefreshCw,
-  Download, FileText, FileSpreadsheet, TrendingDown, Boxes,
+  Download, FileText, FileSpreadsheet, TrendingDown, Boxes, PackageOpen, CheckCircle2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -174,6 +175,26 @@ function StockPageInner() {
   const [deleteConfirm, setDeleteConfirm] = useState(null); // item object
 
   const canManage = isAdmin || isManager;
+
+  const handleOpenUnit = async (item) => {
+    try {
+      await openStockUnit(item.id, { uid: user?.uid, displayName: userProfile?.displayName || userProfile?.name || '' });
+      toast.success(`Opened 1 ${item.unit || 'unit'} of ${item.name}`);
+      await load();
+    } catch (e) {
+      toast.error(e.message || 'Failed to open unit');
+    }
+  };
+
+  const handleFinishUnit = async (item) => {
+    try {
+      await finishStockUnit(item.id, { uid: user?.uid, displayName: userProfile?.displayName || userProfile?.name || '' });
+      toast.success(`Finished 1 ${item.unit || 'unit'} of ${item.name}`);
+      await load();
+    } catch (e) {
+      toast.error(e.message || 'Failed to finish unit');
+    }
+  };
 
   const openAlertModal = () => {
     const missing = items.filter(i => stockStatus(i) !== 'ok');
@@ -548,10 +569,14 @@ function StockPageInner() {
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <div className="card p-3 sm:p-4">
             <div className="flex items-center gap-2 text-xs text-surface-500 font-medium"><Boxes className="w-3.5 h-3.5" />Total items</div>
             <p className="text-xl sm:text-2xl font-bold text-surface-900 mt-1">{items.length}</p>
+          </div>
+          <div className="card p-3 sm:p-4">
+            <div className="flex items-center gap-2 text-xs text-sky-600 font-medium"><PackageOpen className="w-3.5 h-3.5" />In use</div>
+            <p className="text-xl sm:text-2xl font-bold text-sky-600 mt-1">{items.reduce((n, i) => n + (i.inUseQuantity || 0), 0)}</p>
           </div>
           <div className="card p-3 sm:p-4">
             <div className="flex items-center gap-2 text-xs text-amber-600 font-medium"><TrendingDown className="w-3.5 h-3.5" />Low stock</div>
@@ -741,6 +766,20 @@ function StockPageInner() {
                         <StockBadge item={item} />
                       </div>
 
+                      {(item.inUseQuantity || 0) > 0 && (
+                        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-700">
+                          <PackageOpen className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span className="text-xs font-semibold">{item.inUseQuantity} in use</span>
+                          <button
+                            onClick={() => handleFinishUnit(item)}
+                            className="ml-auto text-[11px] font-semibold px-2 py-0.5 rounded bg-white border border-sky-200 hover:bg-sky-100 flex items-center gap-1"
+                            title="Mark one as finished"
+                          >
+                            <CheckCircle2 className="w-3 h-3" /> Finish
+                          </button>
+                        </div>
+                      )}
+
                       {/* Stock bar */}
                       {item.minimumQuantity > 0 && (
                         <div className="h-1.5 rounded-full bg-surface-100 overflow-hidden">
@@ -752,8 +791,16 @@ function StockPageInner() {
                       )}
 
                       <div className="flex items-center gap-2 pt-1">
+                        <button
+                          onClick={() => handleOpenUnit(item)}
+                          disabled={(item.quantity || 0) <= 0}
+                          className="btn-secondary text-xs px-3 py-1.5 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="Open a unit (move from stock to in use)"
+                        >
+                          <PackageOpen className="w-3.5 h-3.5" /> Open
+                        </button>
                         <button onClick={() => openAdjust(item)} className="btn-secondary text-xs px-3 py-1.5 flex-1 flex items-center justify-center gap-1.5">
-                          <RefreshCw className="w-3.5 h-3.5" /> Update Stock
+                          <RefreshCw className="w-3.5 h-3.5" /> Update
                         </button>
                         {canManage && (
                           <>
