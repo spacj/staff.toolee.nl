@@ -341,14 +341,21 @@ export default function HomePage() {
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
+      </nav>
 
-        {/* Mobile Menu Overlay */}
-        {mobileMenuOpen && (
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <>
           <div
-            className="md:hidden fixed inset-0 top-16 bg-gradient-to-b from-white via-white to-brand-50/40 backdrop-blur-xl z-40 flex flex-col"
+            className="md:hidden fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm"
+            onClick={() => setMobileMenuOpen(false)}
             style={{ animation: 'fadeIn 0.2s ease-out' }}
+          />
+          <div
+            className="md:hidden fixed left-0 right-0 top-16 bottom-0 z-40 bg-gradient-to-b from-white via-white to-brand-50/40 flex flex-col overflow-hidden"
+            style={{ animation: 'slideInFromBottom 0.25s cubic-bezier(0.16, 1, 0.3, 1)' }}
           >
-            <div className="flex-1 overflow-y-auto px-5 py-6" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 24px)' }}>
+            <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-6" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 24px)' }}>
               <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold px-2 mb-2">Explore</p>
               <div className="space-y-1.5">
                 {[
@@ -403,8 +410,8 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-        )}
-      </nav>
+        </>
+      )}
 
 {/* Hero Section */}
       <section className="pt-28 sm:pt-32 pb-16 sm:pb-24 px-4 sm:px-6 relative overflow-hidden">
