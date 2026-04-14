@@ -134,6 +134,9 @@ function StockPageInner() {
 
   const [tab, setTab] = useState(() => searchParams?.get('tab') === 'requests' ? 'requests' : 'items');
   const [exportOpen, setExportOpen] = useState(false);
+  const [alertModalOpen, setAlertModalOpen] = useState(false);
+  const [alertRefillMap, setAlertRefillMap] = useState({});
+  const [alertRefilling, setAlertRefilling] = useState(false);
   const [items, setItems] = useState([]);
   const [requests, setRequests] = useState([]);
   const [workers, setWorkers] = useState([]);
@@ -171,6 +174,35 @@ function StockPageInner() {
   const [deleteConfirm, setDeleteConfirm] = useState(null); // item object
 
   const canManage = isAdmin || isManager;
+
+  const openAlertModal = () => {
+    const missing = items.filter(i => stockStatus(i) !== 'ok');
+    const map = {};
+    missing.forEach(i => { map[i.id] = Math.max((i.minimumQuantity || 1) * 2, (i.minimumQuantity || 0) + 1) - (i.quantity || 0); });
+    setAlertRefillMap(map);
+    setAlertModalOpen(true);
+  };
+
+  const handleAlertRefillAll = async () => {
+    setAlertRefilling(true);
+    try {
+      const updates = Object.entries(alertRefillMap)
+        .map(([id, add]) => ({ id, add: Number(add) || 0 }))
+        .filter(({ add }) => add > 0);
+      for (const { id, add } of updates) {
+        const item = items.find(x => x.id === id);
+        if (!item) continue;
+        await updateStockItem(id, { quantity: (item.quantity || 0) + add });
+      }
+      toast.success(`Refilled ${updates.length} item${updates.length !== 1 ? 's' : ''}`);
+      await load();
+      setAlertModalOpen(false);
+    } catch (e) {
+      toast.error('Failed to refill stock');
+    } finally {
+      setAlertRefilling(false);
+    }
+  };
 
   const load = async () => {
     if (!orgId) return;
@@ -537,7 +569,11 @@ function StockPageInner() {
 
         {/* Alert banner — low/out of stock items */}
         {alertItems.length > 0 && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3">
+          <button
+            type="button"
+            onClick={openAlertModal}
+            className="w-full text-left rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3 hover:bg-amber-100/70 transition-colors active:scale-[0.995]"
+          >
             <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-amber-800">
@@ -552,8 +588,75 @@ function StockPageInner() {
                 {alertItems.map(i => i.name).join(', ')}
               </p>
             </div>
-          </div>
+            <span className="text-xs font-semibold text-amber-800 bg-white border border-amber-200 px-2.5 py-1 rounded-lg flex-shrink-0">
+              {canManage ? 'Review & refill' : 'View'}
+            </span>
+          </button>
         )}
+
+        <Modal open={alertModalOpen} onClose={() => setAlertModalOpen(false)} title="Missing stock items" size="lg">
+          {alertItems.length === 0 ? (
+            <p className="text-sm text-surface-500">All items are well stocked.</p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-surface-500">
+                {canManage
+                  ? 'Suggested amounts bring each item to 2× its minimum. Adjust as needed, then refill all at once.'
+                  : 'Items below or at their minimum level. Ask a manager to restock or create a request.'}
+              </p>
+              <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+                {alertItems.map(item => {
+                  const s = stockStatus(item);
+                  const isOut = s === 'out';
+                  return (
+                    <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl border border-surface-200 bg-white">
+                      <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0', isOut ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600')}>
+                        <Package className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-surface-900 truncate">{item.name}</p>
+                        <p className="text-xs text-surface-500">
+                          {item.quantity} / min {item.minimumQuantity} {item.unit || ''}
+                          <span className={cn('ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold', isOut ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700')}>
+                            {isOut ? 'OUT' : 'LOW'}
+                          </span>
+                        </p>
+                      </div>
+                      {canManage ? (
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="text-xs text-surface-500">+</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={alertRefillMap[item.id] ?? ''}
+                            onChange={e => setAlertRefillMap(m => ({ ...m, [item.id]: e.target.value }))}
+                            className="w-16 px-2 py-1.5 text-sm border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
+                          />
+                          <span className="text-xs text-surface-500">{item.unit || ''}</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => { setAlertModalOpen(false); openRequest(item); }}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 border border-brand-200 hover:bg-brand-100 flex-shrink-0"
+                        >
+                          Request
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {canManage && (
+                <div className="flex gap-2 pt-2 border-t border-surface-100">
+                  <button onClick={() => setAlertModalOpen(false)} className="btn-secondary flex-1">Cancel</button>
+                  <button onClick={handleAlertRefillAll} disabled={alertRefilling} className="btn-primary flex-1 flex items-center justify-center gap-2">
+                    {alertRefilling ? 'Refilling…' : 'Refill all'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </Modal>
 
         {/* Tabs */}
         <div className="flex gap-1 border-b border-surface-200 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
