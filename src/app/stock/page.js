@@ -465,6 +465,7 @@ function StockPageInner() {
             <button onClick={load} className="btn-ghost p-2 rounded-lg" title="Refresh">
               <RefreshCw className="w-4 h-4" />
             </button>
+            {canManage && (
             <div className="relative">
               <button
                 onClick={() => setExportOpen(v => !v)}
@@ -495,6 +496,7 @@ function StockPageInner() {
                 </>
               )}
             </div>
+            )}
             {canManage && (
               <button onClick={openAddItem} className="btn-primary flex items-center gap-2">
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Item</span><span className="sm:hidden">Add</span>

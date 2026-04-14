@@ -3,7 +3,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
-import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog, getCorrectionRequests, getMessages, updatePermit, reviewCorrectionRequest, notifyWorker, getStockItems } from '@/lib/firestore';
+import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog, getCorrectionRequests, getMessages, updatePermit, reviewCorrectionRequest, notifyWorker, getStockItems, updateStockItem } from '@/lib/firestore';
+import Modal from '@/components/Modal';
 import { calculateCost, formatCurrency } from '@/lib/pricing';
 import { cn } from '@/utils/helpers';
 import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3, MessageCircle, AlertTriangle, XCircle, Package, TrendingDown } from 'lucide-react';
@@ -35,6 +36,9 @@ export default function DashboardPage() {
   const [messages, setMessages] = useState([]);
   const [stockItems, setStockItems] = useState([]);
   const [loadingAction, setLoadingAction] = useState(null);
+  const [stockModalOpen, setStockModalOpen] = useState(false);
+  const [refillMap, setRefillMap] = useState({});
+  const [refilling, setRefilling] = useState(false);
 
   // Quick approve/deny handlers
   const handlePermitAction = async (id, status) => {
@@ -90,6 +94,36 @@ export default function DashboardPage() {
     getActivityLog(8).then(setActivity);
     getStockItems({ orgId }).then(setStockItems).catch(() => setStockItems([]));
   }, [orgId]);
+
+  const openStockModal = () => {
+    const missing = [...stockItems].filter(i => i.minimumQuantity > 0 && i.quantity < i.minimumQuantity);
+    const map = {};
+    missing.forEach(i => { map[i.id] = Math.max(i.minimumQuantity * 2, i.minimumQuantity + 1) - i.quantity; });
+    setRefillMap(map);
+    setStockModalOpen(true);
+  };
+
+  const handleRefillAll = async () => {
+    setRefilling(true);
+    try {
+      const updates = Object.entries(refillMap)
+        .map(([id, add]) => ({ id, add: Number(add) || 0 }))
+        .filter(({ add }) => add > 0);
+      for (const { id, add } of updates) {
+        const item = stockItems.find(x => x.id === id);
+        if (!item) continue;
+        await updateStockItem(id, { quantity: (item.quantity || 0) + add });
+      }
+      toast.success(`Refilled ${updates.length} item${updates.length !== 1 ? 's' : ''}`);
+      const fresh = await getStockItems({ orgId });
+      setStockItems(fresh);
+      setStockModalOpen(false);
+    } catch (e) {
+      toast.error('Failed to refill stock');
+    } finally {
+      setRefilling(false);
+    }
+  };
 
   const lowStockItems = useMemo(
     () => stockItems.filter(i => i.minimumQuantity > 0 && i.quantity > 0 && i.quantity < i.minimumQuantity),
@@ -189,8 +223,11 @@ export default function DashboardPage() {
 
         {/* Urgent Stock Banner */}
         {(outOfStockItems.length > 0 || lowStockItems.length > 0) && (
-          <div className={cn(
-            'rounded-2xl p-4 sm:p-5 border-2 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4',
+          <button
+            type="button"
+            onClick={openStockModal}
+            className={cn(
+            'w-full text-left rounded-2xl p-4 sm:p-5 border-2 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:shadow-md transition-all active:scale-[0.995]',
             outOfStockItems.length > 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
           )}>
             <div className={cn(
@@ -211,20 +248,63 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="flex gap-2 flex-shrink-0">
-              <Link href="/stock" className="btn-secondary text-xs sm:text-sm px-3 py-2 flex items-center gap-1.5 whitespace-nowrap">
-                <Package className="w-4 h-4" /> View stock
-              </Link>
-              {outOfStockItems.length > 0 && (
-                <Link
-                  href="/stock?tab=requests&auto=1"
-                  className="text-xs sm:text-sm px-3 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 flex items-center gap-1.5 whitespace-nowrap"
-                >
-                  Create requests <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              )}
+              <span className={cn(
+                'text-xs sm:text-sm px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 whitespace-nowrap',
+                outOfStockItems.length > 0 ? 'bg-red-600 text-white' : 'bg-amber-600 text-white'
+              )}>
+                Review & refill <ArrowRight className="w-3.5 h-3.5" />
+              </span>
             </div>
-          </div>
+          </button>
         )}
+
+        <Modal open={stockModalOpen} onClose={() => setStockModalOpen(false)} title="Refill missing stock" size="lg">
+          {[...outOfStockItems, ...lowStockItems].length === 0 ? (
+            <p className="text-sm text-surface-500">No items need refilling.</p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-surface-500">Suggested amounts bring each item to 2× its minimum. Adjust as needed, then refill all at once.</p>
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                {[...outOfStockItems, ...lowStockItems].map(item => {
+                  const isOut = item.quantity === 0;
+                  return (
+                    <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl border border-surface-200 bg-white">
+                      <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0', isOut ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600')}>
+                        <Package className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-surface-900 truncate">{item.name}</p>
+                        <p className="text-xs text-surface-500">
+                          {item.quantity} / min {item.minimumQuantity} {item.unit || ''}
+                          <span className={cn('ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold', isOut ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700')}>
+                            {isOut ? 'OUT' : 'LOW'}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-xs text-surface-500">+</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={refillMap[item.id] ?? ''}
+                          onChange={e => setRefillMap(m => ({ ...m, [item.id]: e.target.value }))}
+                          className="w-16 px-2 py-1.5 text-sm border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                        <span className="text-xs text-surface-500">{item.unit || ''}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2 pt-2 border-t border-surface-100">
+                <button onClick={() => setStockModalOpen(false)} className="btn-secondary flex-1">Cancel</button>
+                <button onClick={handleRefillAll} disabled={refilling} className="btn-primary flex-1 flex items-center justify-center gap-2">
+                  {refilling ? 'Refilling…' : 'Refill all'}
+                </button>
+              </div>
+            </div>
+          )}
+        </Modal>
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-stagger">
