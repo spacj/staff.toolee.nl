@@ -128,10 +128,12 @@ export default function StockPage() {
 }
 
 function StockPageInner() {
-  const { orgId, user, userProfile, isManager, isAdmin } = useAuth();
+  const { orgId: authOrgId, user, userProfile, isManager, isAdmin, isInventory } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const autoHandledRef = useRef(false);
+  const orgIdOverride = searchParams?.get('orgId');
+  const orgId = isInventory && orgIdOverride ? orgIdOverride : authOrgId;
 
   const [tab, setTab] = useState(() => searchParams?.get('tab') === 'requests' ? 'requests' : 'items');
   const [exportOpen, setExportOpen] = useState(false);
@@ -174,7 +176,7 @@ function StockPageInner() {
   // Delete confirm
   const [deleteConfirm, setDeleteConfirm] = useState(null); // item object
 
-  const canManage = isAdmin || isManager;
+  const canManage = isAdmin || isManager || isInventory;
 
   const handleOpenUnit = async (item) => {
     try {

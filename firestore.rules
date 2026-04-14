@@ -6,6 +6,7 @@ service cloud.firestore {
     function isAdmin() { return isAuth() && userDoc().role == 'admin'; }
     function isManager() { return isAuth() && (userDoc().role == 'admin' || userDoc().role == 'manager'); }
     function isWebmaster() { return isAuth() && userDoc().role == 'webmaster'; }
+    function isInventory() { return isAuth() && userDoc().role == 'inventory'; }
 
     // Users: anyone can read, only self or admin can write
     match /users/{uid} {
@@ -198,19 +199,19 @@ service cloud.firestore {
       allow create: if isAuth();
     }
 
-    // Stock Items: all auth read (workers view stock), all auth create/update (workers add items/update stock), managers+ delete
+    // Stock Items: all auth read (workers view stock), all auth create/update (workers add items/update stock), managers+ or inventory delete
     match /stockItems/{id} {
       allow read: if isAuth();
       allow create: if isAuth();
       allow update: if isAuth();
-      allow delete: if isManager();
+      allow delete: if isManager() || isInventory();
     }
 
-    // Stock Requests: all auth read/create (workers submit requests), managers+ update (review)
+    // Stock Requests: all auth read/create (workers submit requests), managers+ or inventory update (review)
     match /stockRequests/{id} {
       allow read: if isAuth();
       allow create: if isAuth();
-      allow update: if isManager();
+      allow update: if isManager() || isInventory();
     }
 
     // Stock Logs: all auth read (managers view activity), all auth create (workers/managers log changes)

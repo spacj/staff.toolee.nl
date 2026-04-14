@@ -288,6 +288,7 @@ export function AuthProvider({ children }) {
     isManager: userProfile?.role === 'manager' || userProfile?.role === 'admin',
     isWorker: userProfile?.role === 'worker',
     isWebmaster: userProfile?.role === 'webmaster',
+    isInventory: userProfile?.role === 'inventory',
     role: userProfile?.role || 'worker',
     orgId: userProfile?.orgId || null,
     workerId: userProfile?.workerId || null,

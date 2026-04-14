@@ -7,12 +7,17 @@ import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, 
 
 export default function Sidebar({ mobile, onClose }) {
   const pathname = usePathname();
-  const { signOut, isAdmin, isManager, isWebmaster, organization, userProfile } = useAuth();
+  const { signOut, isAdmin, isManager, isWebmaster, isInventory, organization, userProfile } = useAuth();
 
   const webmasterLinks = [
     { href: '/webmaster', icon: Globe, label: 'Dashboard' },
     { href: '/webmaster/tickets', icon: Inbox, label: 'Support Tickets' },
     { href: '/webmaster/sales', icon: DollarSign, label: 'Sales Leads' },
+    { href: '/settings', icon: Settings, label: 'Settings' },
+  ];
+
+  const inventoryLinks = [
+    { href: '/inventory', icon: Building2, label: 'Organizations' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 
@@ -59,7 +64,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 
-  const links = isWebmaster ? webmasterLinks : isAdmin ? adminLinks : isManager ? managerLinks : workerLinks;
+  const links = isWebmaster ? webmasterLinks : isInventory ? inventoryLinks : isAdmin ? adminLinks : isManager ? managerLinks : workerLinks;
 
   return (
     <div className={cn(

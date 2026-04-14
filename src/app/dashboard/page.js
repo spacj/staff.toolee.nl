@@ -20,12 +20,13 @@ const STAT_STYLES = [
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { orgId, isManager, isWebmaster, userProfile, user, organization } = useAuth();
+  const { orgId, isManager, isWebmaster, isInventory, userProfile, user, organization } = useAuth();
 
-  // Redirect webmasters to their dedicated dashboard
+  // Redirect external roles to their dedicated dashboards
   useEffect(() => {
     if (isWebmaster) router.replace('/webmaster');
-  }, [isWebmaster, router]);
+    else if (isInventory) router.replace('/inventory');
+  }, [isWebmaster, isInventory, router]);
   const [workers, setWorkers] = useState([]);
   const [shops, setShops] = useState([]);
   const [shifts, setShifts] = useState([]);
