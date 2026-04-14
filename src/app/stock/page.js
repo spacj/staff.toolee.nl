@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
@@ -119,6 +119,14 @@ const emptyItemForm = { name: '', description: '', category: '', unit: 'pcs', qu
 const emptyRequestForm = { itemId: '', itemName: '', quantity: 1, reason: '', urgent: false };
 
 export default function StockPage() {
+  return (
+    <Suspense fallback={null}>
+      <StockPageInner />
+    </Suspense>
+  );
+}
+
+function StockPageInner() {
   const { orgId, user, userProfile, isManager, isAdmin } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
