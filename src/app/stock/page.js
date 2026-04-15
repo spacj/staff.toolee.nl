@@ -19,6 +19,20 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+function formatOpenedAt(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  const diffMs = now - d;
+  const diffDays = Math.floor(diffMs / 86400000);
+  const date = d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
+  if (diffDays <= 0) return `today (${date})`;
+  if (diffDays === 1) return `yesterday (${date})`;
+  if (diffDays < 7) return `${diffDays}d ago (${date})`;
+  return date;
+}
+
 // ─── Export Helpers ──────────────────────────────────
 function downloadCSV(items, filename = 'stock-items.csv') {
   const headers = ['Name', 'SKU', 'Category', 'Unit', 'Quantity', 'Min. Quantity', 'Status', 'Description'];
@@ -769,16 +783,32 @@ function StockPageInner() {
                       </div>
 
                       {(item.inUseQuantity || 0) > 0 && (
-                        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-700">
-                          <PackageOpen className="w-3.5 h-3.5 flex-shrink-0" />
-                          <span className="text-xs font-semibold">{item.inUseQuantity} in use</span>
-                          <button
-                            onClick={() => handleFinishUnit(item)}
-                            className="ml-auto text-[11px] font-semibold px-2 py-0.5 rounded bg-white border border-sky-200 hover:bg-sky-100 flex items-center gap-1"
-                            title="Mark one as finished"
-                          >
-                            <CheckCircle2 className="w-3 h-3" /> Finish
-                          </button>
+                        <div className="px-2.5 py-1.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <PackageOpen className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="text-xs font-semibold">{item.inUseQuantity} in use</span>
+                            <button
+                              onClick={() => handleFinishUnit(item)}
+                              className="ml-auto text-[11px] font-semibold px-2 py-0.5 rounded bg-white border border-sky-200 hover:bg-sky-100 flex items-center gap-1"
+                              title="Finish oldest opened unit"
+                            >
+                              <CheckCircle2 className="w-3 h-3" /> Finish
+                            </button>
+                          </div>
+                          {Array.isArray(item.inUseOpenedAt) && item.inUseOpenedAt.length > 0 && (
+                            <ul className="text-[10px] text-sky-600/90 space-y-0.5 pl-5">
+                              {item.inUseOpenedAt.slice(0, 3).map((entry, idx) => (
+                                <li key={idx} className="flex items-center gap-1">
+                                  <span className="w-1 h-1 rounded-full bg-sky-400" />
+                                  Opened {formatOpenedAt(entry.at)}
+                                  {entry.byName ? ` · ${entry.byName}` : ''}
+                                </li>
+                              ))}
+                              {item.inUseOpenedAt.length > 3 && (
+                                <li className="pl-2 italic">+{item.inUseOpenedAt.length - 3} more</li>
+                              )}
+                            </ul>
+                          )}
                         </div>
                       )}
 

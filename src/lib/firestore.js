@@ -1161,7 +1161,12 @@ export async function openStockUnit(itemId, userProfile = {}) {
   const previousQuantity = item.quantity;
   const newQuantity = previousQuantity - 1;
   const newInUse = (item.inUseQuantity || 0) + 1;
-  await upd(C.STOCK_ITEMS, itemId, { quantity: newQuantity, inUseQuantity: newInUse });
+  const openedAt = new Date().toISOString();
+  const inUseOpenedAt = [
+    ...(Array.isArray(item.inUseOpenedAt) ? item.inUseOpenedAt : []),
+    { at: openedAt, by: userProfile.uid || '', byName: userProfile.displayName || '' },
+  ];
+  await upd(C.STOCK_ITEMS, itemId, { quantity: newQuantity, inUseQuantity: newInUse, inUseOpenedAt });
   await createStockLog({
     orgId: item.orgId,
     itemId,
@@ -1188,7 +1193,9 @@ export async function finishStockUnit(itemId, userProfile = {}) {
   if (!item) return;
   if ((item.inUseQuantity || 0) <= 0) throw new Error('No units currently in use');
   const newInUse = item.inUseQuantity - 1;
-  await upd(C.STOCK_ITEMS, itemId, { inUseQuantity: newInUse });
+  const existing = Array.isArray(item.inUseOpenedAt) ? item.inUseOpenedAt : [];
+  const inUseOpenedAt = existing.slice(1); // drop oldest (FIFO)
+  await upd(C.STOCK_ITEMS, itemId, { inUseQuantity: newInUse, inUseOpenedAt });
   await createStockLog({
     orgId: item.orgId,
     itemId,
