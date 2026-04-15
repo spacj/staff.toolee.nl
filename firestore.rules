@@ -17,10 +17,11 @@ service cloud.firestore {
     }
 
     // Organizations: all authenticated can read, managers can update, owner can delete
+    // Inventory role can update too (needed to add stock categories stored on org doc)
     match /organizations/{orgId} {
       allow read: if isAuth();
       allow create: if isAuth();
-      allow update: if isManager();
+      allow update: if isManager() || isInventory();
       allow delete: if isAuth() && resource.data.ownerId == request.auth.uid;
     }
 
