@@ -57,7 +57,7 @@ export default function RecipesPage() {
 function RecipesPageInner() {
   const { orgId: authOrgId, user, userProfile, isManager, isAdmin, isInventory } = useAuth();
   const searchParams = useSearchParams();
-  const orgIdOverride = searchParams?.get('orgId');
+  const orgIdOverride = searchParams?.get('orgId') || '';
   const orgId = isInventory && orgIdOverride ? orgIdOverride : authOrgId;
   const canManage = isAdmin || isManager || isInventory;
 

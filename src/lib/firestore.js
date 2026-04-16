@@ -1347,7 +1347,45 @@ export async function executeRecipe(ingredients, userProfile = {}) {
       });
     }
 
-    // If still remaining, deduct from sealed stock quantity
+    if (remaining > 0 && item.bucketSize) {
+      const bucketSizeUnit = item.bucketSizeUnit || deductUnit;
+      const remainingInBucketUnit = convertUnit(remaining, deductUnit, bucketSizeUnit) ?? remaining;
+      
+      if (remainingInBucketUnit <= item.bucketSize && item.quantity > 0) {
+        const openInfo = {
+          capacity: item.bucketSize,
+          levelUnit: bucketSizeUnit,
+        };
+        await openStockUnit(ing.stockItemId, userProfile, openInfo);
+        
+        const takeFromNewBucket = Math.min(remainingInBucketUnit, item.bucketSize);
+        const updatedItem = await get1(C.STOCK_ITEMS, ing.stockItemId);
+        if (updatedItem && Array.isArray(updatedItem.inUseOpenedAt) && updatedItem.inUseOpenedAt.length > 0) {
+          const lastEntryIdx = updatedItem.inUseOpenedAt.length - 1;
+          const entry = updatedItem.inUseOpenedAt[lastEntryIdx];
+          const newLevel = Math.max(0, entry.currentLevel - takeFromNewBucket);
+          updatedItem.inUseOpenedAt[lastEntryIdx] = { ...entry, currentLevel: newLevel };
+          await upd(C.STOCK_ITEMS, ing.stockItemId, { inUseOpenedAt: updatedItem.inUseOpenedAt });
+          
+          const takenInOriginalUnit = convertUnit(takeFromNewBucket, bucketSizeUnit, deductUnit) ?? takeFromNewBucket;
+          remaining = Math.max(0, remaining - takenInOriginalUnit);
+          
+          await createStockLog({
+            orgId: item.orgId,
+            itemId: ing.stockItemId,
+            itemName: item.name,
+            previousQuantity: item.quantity + 1,
+            newQuantity: item.quantity,
+            change: 0,
+            type: 'recipe_used',
+            updatedBy: userProfile.uid || '',
+            updatedByName: userProfile.displayName || '',
+            details: `Auto-opened bucket and deducted ${takeFromNewBucket.toFixed(2)} ${bucketSizeUnit}`,
+          });
+        }
+      }
+    }
+
     if (remaining > 0) {
       const prev = item.quantity || 0;
       const newQty = Math.max(0, prev - remaining);

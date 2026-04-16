@@ -130,7 +130,7 @@ function StockBadge({ item }) {
   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />In stock</span>;
 }
 
-const emptyItemForm = { name: '', description: '', category: '', unit: 'pcs', quantity: 0, minimumQuantity: 0, sku: '' };
+const emptyItemForm = { name: '', description: '', category: '', unit: 'pcs', quantity: 0, minimumQuantity: 0, sku: '', bucketSize: '', bucketSizeUnit: 'kg' };
 const emptyRequestForm = { itemId: '', itemName: '', quantity: 1, reason: '', urgent: false };
 
 export default function StockPage() {
@@ -405,7 +405,7 @@ function StockPageInner() {
   };
 
   const openEditItem = (item) => {
-    setItemForm({ name: item.name, description: item.description || '', category: item.category || '', unit: item.unit || 'pcs', quantity: item.quantity, minimumQuantity: item.minimumQuantity || 0, sku: item.sku || '' });
+    setItemForm({ name: item.name, description: item.description || '', category: item.category || '', unit: item.unit || 'pcs', quantity: item.quantity, minimumQuantity: item.minimumQuantity || 0, sku: item.sku || '', bucketSize: item.bucketSize || '', bucketSizeUnit: item.bucketSizeUnit || 'kg' });
     setNewCategory('');
     setItemModal(item);
   };
@@ -423,6 +423,8 @@ function StockPageInner() {
         quantity: Number(itemForm.quantity) || 0,
         minimumQuantity: Number(itemForm.minimumQuantity) || 0,
         sku: itemForm.sku.trim(),
+        bucketSize: itemForm.bucketSize ? Number(itemForm.bucketSize) : null,
+        bucketSizeUnit: itemForm.bucketSizeUnit || 'kg',
         createdBy: user?.uid,
         createdByName: userProfile?.displayName || '',
       };
@@ -430,7 +432,7 @@ function StockPageInner() {
         await createStockItem(data, userProfile);
         toast.success('Item added');
       } else {
-        await updateStockItem(itemModal.id, { name: data.name, description: data.description, category: data.category, unit: data.unit, quantity: data.quantity, minimumQuantity: data.minimumQuantity, sku: data.sku }, userProfile);
+        await updateStockItem(itemModal.id, { name: data.name, description: data.description, category: data.category, unit: data.unit, quantity: data.quantity, minimumQuantity: data.minimumQuantity, sku: data.sku, bucketSize: data.bucketSize, bucketSizeUnit: data.bucketSizeUnit }, userProfile);
         toast.success('Item updated');
       }
       setItemModal(null);
@@ -1105,6 +1107,35 @@ function StockPageInner() {
                 </label>
                 <input type="number" min="0" className="input-field w-full" value={itemForm.minimumQuantity} onChange={e => setItemForm(f => ({ ...f, minimumQuantity: e.target.value }))} />
               </div>
+              {itemForm.unit === 'pcs' && (
+                <div className="col-span-2 p-3 bg-brand-50/50 rounded-lg border border-brand-200">
+                  <label className="block text-sm font-medium text-brand-700 mb-2">
+                    Bucket Size (optional)
+                    <span className="ml-1.5 text-xs text-surface-500 font-normal">(for auto-open in recipes)</span>
+                  </label>
+                  <div className="flex gap-3">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      className="input-field flex-1"
+                      placeholder="e.g. 5"
+                      value={itemForm.bucketSize}
+                      onChange={e => setItemForm(f => ({ ...f, bucketSize: e.target.value }))}
+                    />
+                    <select
+                      className="select-field w-24"
+                      value={itemForm.bucketSizeUnit}
+                      onChange={e => setItemForm(f => ({ ...f, bucketSizeUnit: e.target.value }))}
+                    >
+                      <option value="g">g</option>
+                      <option value="kg">kg</option>
+                      <option value="ml">ml</option>
+                      <option value="L">L</option>
+                    </select>
+                  </div>
+                </div>
+              )}
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-surface-700 mb-1">SKU / Code <span className="text-surface-400 font-normal">(optional)</span></label>
                 <input className="input-field w-full" placeholder="e.g. PPR-A4-80G" value={itemForm.sku} onChange={e => setItemForm(f => ({ ...f, sku: e.target.value }))} />
