@@ -13,6 +13,28 @@ import toast from 'react-hot-toast';
 
 const UNITS = ['g', 'kg', 'ml', 'L', 'pcs', 'tbsp', 'tsp', 'cups', 'oz', 'lb'];
 
+// Convert recipe quantity to stock unit for comparison/deduction
+function convertUnit(qty, fromUnit, toUnit) {
+  if (fromUnit === toUnit) return qty;
+  const key = `${fromUnit}->${toUnit}`;
+  const conversions = {
+    'g->kg': 0.001, 'kg->g': 1000,
+    'ml->L': 0.001, 'L->ml': 1000,
+    'oz->g': 28.3495, 'g->oz': 1 / 28.3495,
+    'oz->kg': 0.0283495, 'kg->oz': 35.274,
+    'lb->g': 453.592, 'g->lb': 1 / 453.592,
+    'lb->kg': 0.453592, 'kg->lb': 2.20462,
+    'oz->lb': 1 / 16, 'lb->oz': 16,
+    'ml->cups': 1 / 236.588, 'cups->ml': 236.588,
+    'L->cups': 1000 / 236.588, 'cups->L': 236.588 / 1000,
+    'tsp->ml': 4.929, 'ml->tsp': 1 / 4.929,
+    'tbsp->ml': 14.787, 'ml->tbsp': 1 / 14.787,
+    'tsp->tbsp': 1 / 3, 'tbsp->tsp': 3,
+  };
+  if (conversions[key]) return qty * conversions[key];
+  return null; // incompatible units
+}
+
 function smartRound(value, unit) {
   if (['pcs', 'cups'].includes(unit)) {
     if (value < 1 && value > 0) return Math.round(value * 4) / 4;
@@ -168,12 +190,17 @@ export default function RecipesPage() {
   const openExecModal = () => {
     const ings = scaledIngredients.map(ing => {
       const linked = ing.stockItemId ? stockItems.find(s => s.id === ing.stockItemId) : null;
+      const converted = linked ? convertUnit(ing.quantity, ing.unit, linked.unit) : null;
+      const deductInStockUnit = converted !== null ? smartRound(converted, linked.unit) : ing.quantity;
       return {
         ...ing,
-        deductQty: ing.quantity,
+        deductQty: deductInStockUnit,
+        deductUnit: linked?.unit || ing.unit,
         stockName: linked?.name || '',
         stockAvailable: linked?.quantity ?? null,
         stockUnit: linked?.unit || '',
+        recipeQty: ing.quantity,
+        recipeUnit: ing.unit,
       };
     });
     setExecIngredients(ings);
@@ -375,7 +402,8 @@ export default function RecipesPage() {
                 {scaledIngredients.map((ing, idx) => {
                   const isAnchor = idx === (calcRecipe.scaleIngredientIndex || 0);
                   const linked = ing.stockItemId ? stockItems.find(s => s.id === ing.stockItemId) : null;
-                  const insufficient = linked && linked.quantity < ing.quantity;
+                  const converted = linked ? convertUnit(ing.quantity, ing.unit, linked.unit) : null;
+                  const insufficient = linked && converted !== null && converted > linked.quantity;
                   return (
                     <div key={idx} className={cn(
                       'flex items-center gap-3 p-3 rounded-xl border',
@@ -388,8 +416,9 @@ export default function RecipesPage() {
                           {isAnchor && <Scale className="w-3 h-3 text-brand-500" />}
                         </p>
                         {linked && (
-                          <p className="text-[11px] text-surface-400 flex items-center gap-1">
+                          <p className="text-[11px] text-surface-400 flex items-center gap-1 flex-wrap">
                             <Package className="w-3 h-3" /> {linked.name}: {linked.quantity} {linked.unit} available
+                            {converted !== null && ing.unit !== linked.unit && <span className="text-brand-600">({smartRound(converted, linked.unit)} {linked.unit})</span>}
                             {insufficient && <span className="text-red-600 font-semibold ml-1">insufficient</span>}
                           </p>
                         )}
@@ -418,10 +447,11 @@ export default function RecipesPage() {
         {/* ─── Execution Confirmation Modal ─── */}
         <Modal open={execModal} onClose={() => setExecModal(false)} title="Confirm stock deduction" size="lg">
           <div className="space-y-4">
-            <p className="text-sm text-surface-500">Review and adjust the exact quantities to deduct from stock. Only linked items are shown.</p>
+            <p className="text-sm text-surface-500">Review and adjust the exact quantities to deduct from stock. Amounts are converted to stock units. Only linked items are shown.</p>
             <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
               {execIngredients.filter(i => i.stockItemId).map((ing, idx) => {
                 const insufficient = ing.stockAvailable !== null && ing.deductQty > ing.stockAvailable;
+                const unitsDiffer = ing.recipeUnit && ing.deductUnit && ing.recipeUnit !== ing.deductUnit;
                 return (
                   <div key={idx} className={cn(
                     'flex items-center gap-3 p-3 rounded-xl border',
@@ -432,6 +462,9 @@ export default function RecipesPage() {
                       <p className="text-[11px] text-surface-400">
                         Stock: <span className="font-medium text-surface-600">{ing.stockName}</span> — {ing.stockAvailable ?? '?'} {ing.stockUnit} available
                       </p>
+                      {unitsDiffer && (
+                        <p className="text-[11px] text-brand-600 mt-0.5">Recipe: {ing.recipeQty} {ing.recipeUnit} → {ing.deductQty} {ing.deductUnit}</p>
+                      )}
                       {insufficient && (
                         <p className="text-[11px] text-red-600 font-semibold flex items-center gap-1 mt-0.5">
                           <AlertTriangle className="w-3 h-3" /> Not enough in stock
@@ -449,7 +482,7 @@ export default function RecipesPage() {
                         }}
                         className="w-20 px-2 py-1.5 text-sm border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
                       />
-                      <span className="text-xs text-surface-500">{ing.unit}</span>
+                      <span className="text-xs text-surface-500">{ing.deductUnit}</span>
                     </div>
                   </div>
                 );
