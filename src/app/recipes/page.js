@@ -1,19 +1,19 @@
 'use client';
-import { useState, useEffect, useMemo, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getRecipes, createRecipe, updateRecipe, deleteRecipe, executeRecipe, getStockItems, getOrganization } from '@/lib/firestore';
+import { getRecipes, createRecipe, updateRecipe, deleteRecipe, executeRecipe, getStockItems } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
 import {
   CookingPot, Plus, Pencil, Trash2, Search, Calculator, ChevronDown,
-  Package, Check, X, AlertTriangle, Scale, Play,
+  Package, PackageOpen, Check, X, AlertTriangle, Scale, Play,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const UNITS = ['g', 'kg', 'ml', 'L', 'pcs', 'tbsp', 'tsp', 'cups', 'oz', 'lb'];
 
+// Convert recipe quantity to stock unit for comparison/deduction
 function convertUnit(qty, fromUnit, toUnit) {
   if (fromUnit === toUnit) return qty;
   const key = `${fromUnit}->${toUnit}`;
@@ -32,7 +32,7 @@ function convertUnit(qty, fromUnit, toUnit) {
     'tsp->tbsp': 1 / 3, 'tbsp->tsp': 3,
   };
   if (conversions[key]) return qty * conversions[key];
-  return null;
+  return null; // incompatible units
 }
 
 function smartRound(value, unit) {
@@ -47,25 +47,14 @@ function smartRound(value, unit) {
 }
 
 export default function RecipesPage() {
-  return (
-    <Suspense fallback={<Layout><div className="p-6">Loading...</div></Layout>}>
-      <RecipesPageInner />
-    </Suspense>
-  );
-}
-
-function RecipesPageInner() {
   const { orgId: authOrgId, user, userProfile, isManager, isAdmin, isInventory } = useAuth();
-  const searchParams = useSearchParams();
-  const orgIdOverride = searchParams?.get('orgId') || '';
-  const orgId = isInventory && orgIdOverride ? orgIdOverride : authOrgId;
+  const orgId = authOrgId;
   const canManage = isAdmin || isManager || isInventory;
 
   const [recipes, setRecipes] = useState([]);
   const [stockItems, setStockItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [orgName, setOrgName] = useState('');
 
   // Recipe editor
   const [editModal, setEditModal] = useState(null); // null | 'add' | recipe obj
@@ -95,12 +84,6 @@ function RecipesPageInner() {
       ]);
       setRecipes(r);
       setStockItems(s);
-      if (isInventory && orgIdOverride) {
-        const org = await getOrganization(orgIdOverride);
-        setOrgName(org?.name || 'Unknown Organization');
-      } else {
-        setOrgName('');
-      }
     } catch { toast.error('Failed to load recipes'); }
     finally { setLoading(false); }
   };
@@ -207,23 +190,48 @@ function RecipesPageInner() {
   const openExecModal = () => {
     const ings = scaledIngredients.map(ing => {
       const linked = ing.stockItemId ? stockItems.find(s => s.id === ing.stockItemId) : null;
-      const recipeQty = ing.quantity;
-      const recipeUnit = ing.unit;
-      const stockUnit = linked?.unit || recipeUnit;
-      const openUnits = Array.isArray(linked?.inUseOpenedAt) ? linked.inUseOpenedAt : [];
-      const openTotal = openUnits.reduce((sum, e) => sum + (e.currentLevel || 0), 0);
-      const openTotalInRecipeUnit = openUnits.length > 0 ? convertUnit(openTotal, openUnits[0].levelUnit || stockUnit, recipeUnit) : 0;
-      const sealedQtyInRecipeUnit = linked ? convertUnit(linked.quantity || 0, stockUnit, recipeUnit) ?? (linked.quantity || 0) : 0;
-      const totalAvailableInRecipeUnit = openTotalInRecipeUnit + sealedQtyInRecipeUnit;
-      const converted = linked ? convertUnit(ing.quantity, ing.unit, linked.unit) : null;
+      if (!linked) return { ...ing, deductQty: ing.quantity, deductUnit: ing.unit, stockName: '', stockAvailable: null, stockUnit: '', recipeQty: ing.quantity, recipeUnit: ing.unit, deductFromLevel: false, levelAvailable: null, levelUnit: '' };
+
+      // Check if this stock item has opened units with level tracking
+      const openedEntries = Array.isArray(linked.inUseOpenedAt) ? linked.inUseOpenedAt : [];
+      const levelEntries = openedEntries.filter(e => e.capacity > 0 && (e.currentLevel || 0) > 0);
+      const hasLevelTracking = levelEntries.length > 0;
+
+      if (hasLevelTracking) {
+        // Deduct from opened unit levels — use level unit, not stock unit
+        const firstEntry = levelEntries[0];
+        const levelUnit = firstEntry.levelUnit || 'g';
+        const totalLevelAvailable = levelEntries.reduce((sum, e) => sum + (e.currentLevel || 0), 0);
+        const convertedToLevel = convertUnit(ing.quantity, ing.unit, levelUnit);
+        const deductQty = convertedToLevel !== null ? smartRound(convertedToLevel, levelUnit) : ing.quantity;
+        return {
+          ...ing,
+          deductQty,
+          deductUnit: levelUnit,
+          deductFromLevel: true,
+          stockName: linked.name,
+          stockAvailable: linked.quantity,
+          stockUnit: linked.unit,
+          levelAvailable: totalLevelAvailable,
+          levelUnit,
+          recipeQty: ing.quantity,
+          recipeUnit: ing.unit,
+        };
+      }
+
+      // No level tracking — convert to stock unit as before
+      const converted = convertUnit(ing.quantity, ing.unit, linked.unit);
       const deductInStockUnit = converted !== null ? smartRound(converted, linked.unit) : ing.quantity;
       return {
         ...ing,
         deductQty: deductInStockUnit,
-        deductUnit: converted !== null ? linked?.unit : ing.unit,
-        stockName: linked?.name || '',
-        stockAvailable: totalAvailableInRecipeUnit,
-        stockUnit: recipeUnit,
+        deductUnit: linked.unit || ing.unit,
+        deductFromLevel: false,
+        stockName: linked.name,
+        stockAvailable: linked.quantity ?? null,
+        stockUnit: linked.unit,
+        levelAvailable: null,
+        levelUnit: '',
         recipeQty: ing.quantity,
         recipeUnit: ing.unit,
       };
@@ -253,7 +261,6 @@ function RecipesPageInner() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-display font-bold text-surface-900 flex items-center gap-2">
               <CookingPot className="w-7 h-7 text-brand-500" /> Recipes
-              {isInventory && orgName && <span className="text-lg font-normal text-surface-500">/ {orgName}</span>}
             </h1>
             <p className="text-sm text-surface-500 mt-0.5">Scale recipes, link ingredients to stock, and deduct on execution.</p>
           </div>
@@ -428,28 +435,19 @@ function RecipesPageInner() {
                 {scaledIngredients.map((ing, idx) => {
                   const isAnchor = idx === (calcRecipe.scaleIngredientIndex || 0);
                   const linked = ing.stockItemId ? stockItems.find(s => s.id === ing.stockItemId) : null;
-                  const recipeQty = ing.quantity;
-                  const recipeUnit = ing.unit;
-                  const stockUnit = linked?.unit || recipeUnit;
-                  const isPieces = stockUnit === 'pcs';
-                  const bucketSize = linked?.bucketSize || 1;
-                  const bucketSizeUnit = linked?.bucketSizeUnit || stockUnit;
-                  const openUnits = Array.isArray(linked?.inUseOpenedAt) ? linked.inUseOpenedAt : [];
-                  const openTotal = openUnits.reduce((sum, e) => sum + (e.currentLevel || 0), 0);
-                  const sealedPieces = linked?.quantity || 0;
-                  const openPiecesFromBuckets = openUnits.reduce((sum, e) => {
-                    const level = e.currentLevel || 0;
-                    const levelUnit = e.levelUnit || bucketSizeUnit;
-                    const levelInBucketUnit = convertUnit(level, levelUnit, bucketSizeUnit) ?? level;
-                    return sum + (levelInBucketUnit / bucketSize);
-                  }, 0);
-                  const totalPieces = isPieces ? sealedPieces + openPiecesFromBuckets : 0;
-                  const openTotalInRecipeUnit = openUnits.length > 0 ? convertUnit(openTotal, openUnits[0].levelUnit || stockUnit, recipeUnit) : 0;
-                  const sealedQtyInRecipeUnit = linked ? convertUnit(linked.quantity || 0, stockUnit, recipeUnit) ?? (linked.quantity || 0) : 0;
-                  const totalAvailableInRecipeUnit = openTotalInRecipeUnit + sealedQtyInRecipeUnit;
-                  const insufficient = linked && recipeQty > totalAvailableInRecipeUnit;
-                  const displayQty = isPieces ? totalPieces : totalAvailableInRecipeUnit;
-                  const displayUnit = isPieces ? 'pcs' : recipeUnit;
+                  const openedEntries = linked && Array.isArray(linked.inUseOpenedAt) ? linked.inUseOpenedAt.filter(e => e.capacity > 0 && (e.currentLevel || 0) > 0) : [];
+                  const hasLevel = openedEntries.length > 0;
+                  let insufficient = false;
+                  let converted = null;
+                  if (linked && hasLevel) {
+                    const levelUnit = openedEntries[0].levelUnit || 'g';
+                    const totalLevel = openedEntries.reduce((s, e) => s + (e.currentLevel || 0), 0);
+                    converted = convertUnit(ing.quantity, ing.unit, levelUnit);
+                    insufficient = converted !== null && converted > totalLevel;
+                  } else if (linked) {
+                    converted = convertUnit(ing.quantity, ing.unit, linked.unit);
+                    insufficient = converted !== null && converted > linked.quantity;
+                  }
                   return (
                     <div key={idx} className={cn(
                       'flex items-center gap-3 p-3 rounded-xl border',
@@ -461,11 +459,21 @@ function RecipesPageInner() {
                           {ing.name}
                           {isAnchor && <Scale className="w-3 h-3 text-brand-500" />}
                         </p>
-                        {linked && (
+                        {linked && hasLevel && (
+                          <div className="text-[11px] space-y-0.5">
+                            <p className="text-surface-400 flex items-center gap-1">
+                              <Package className="w-3 h-3" /> {linked.quantity} {linked.unit} sealed in stock
+                            </p>
+                            <p className="text-sky-600 flex items-center gap-1 flex-wrap">
+                              <PackageOpen className="w-3 h-3" /> {openedEntries.length} open · {openedEntries.reduce((s, e) => s + (e.currentLevel || 0), 0)} {openedEntries[0].levelUnit} remaining
+                              {insufficient && <span className="text-red-600 font-semibold ml-1">insufficient</span>}
+                            </p>
+                          </div>
+                        )}
+                        {linked && !hasLevel && (
                           <p className="text-[11px] text-surface-400 flex items-center gap-1 flex-wrap">
-                            <Package className="w-3 h-3" /> {linked.name}: {smartRound(displayQty, displayUnit)} {displayUnit} available
-                            {openUnits.length > 0 && <span className="text-brand-600">(+{openUnits.length} open)</span>}
-                            {isPieces && bucketSize > 0 && <span className="text-brand-600">(@{bucketSize}{bucketSizeUnit})</span>}
+                            <Package className="w-3 h-3" /> {linked.quantity} {linked.unit} in stock
+                            {converted !== null && ing.unit !== linked.unit && <span className="text-brand-600">({smartRound(converted, linked.unit)} {linked.unit})</span>}
                             {insufficient && <span className="text-red-600 font-semibold ml-1">insufficient</span>}
                           </p>
                         )}
@@ -494,10 +502,11 @@ function RecipesPageInner() {
         {/* ─── Execution Confirmation Modal ─── */}
         <Modal open={execModal} onClose={() => setExecModal(false)} title="Confirm stock deduction" size="lg">
           <div className="space-y-4">
-            <p className="text-sm text-surface-500">Review and adjust the exact quantities to deduct from stock. Amounts are converted to stock units. Only linked items are shown.</p>
+            <p className="text-sm text-surface-500">Review and adjust quantities. Items with open units deduct from their fill level first.</p>
             <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
               {execIngredients.filter(i => i.stockItemId).map((ing, idx) => {
-                const insufficient = ing.stockAvailable !== null && ing.deductQty > ing.stockAvailable;
+                const available = ing.deductFromLevel ? (ing.levelAvailable ?? 0) : (ing.stockAvailable ?? 0);
+                const insufficient = ing.deductQty > available;
                 const unitsDiffer = ing.recipeUnit && ing.deductUnit && ing.recipeUnit !== ing.deductUnit;
                 return (
                   <div key={idx} className={cn(
@@ -506,9 +515,20 @@ function RecipesPageInner() {
                   )}>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-surface-900 truncate">{ing.name}</p>
-                      <p className="text-[11px] text-surface-400">
-                        Stock: <span className="font-medium text-surface-600">{ing.stockName}</span> — {ing.stockAvailable ?? '?'} {ing.stockUnit} available
-                      </p>
+                      {ing.deductFromLevel ? (
+                        <div className="text-[11px] space-y-0.5">
+                          <p className="text-surface-400 flex items-center gap-1">
+                            <Package className="w-3 h-3" /> {ing.stockAvailable ?? '?'} {ing.stockUnit} sealed in stock
+                          </p>
+                          <p className="text-sky-600 flex items-center gap-1">
+                            <PackageOpen className="w-3 h-3" /> Deducting from open unit · {ing.levelAvailable} {ing.levelUnit} remaining
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-surface-400">
+                          <Package className="w-3 h-3 inline" /> {ing.stockName} — {ing.stockAvailable ?? '?'} {ing.stockUnit} in stock
+                        </p>
+                      )}
                       {unitsDiffer && (
                         <p className="text-[11px] text-brand-600 mt-0.5">Recipe: {ing.recipeQty} {ing.recipeUnit} → {ing.deductQty} {ing.deductUnit}</p>
                       )}

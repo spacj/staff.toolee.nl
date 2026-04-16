@@ -1286,52 +1286,26 @@ export async function deleteRecipe(id) {
   return del(C.RECIPES, id);
 }
 
-const unitConversions = {
-  'g->kg': 0.001, 'kg->g': 1000,
-  'ml->L': 0.001, 'L->ml': 1000,
-  'oz->g': 28.3495, 'g->oz': 1 / 28.3495,
-  'oz->kg': 0.0283495, 'kg->oz': 35.274,
-  'lb->g': 453.592, 'g->lb': 1 / 453.592,
-  'lb->kg': 0.453592, 'kg->lb': 2.20462,
-  'oz->lb': 1 / 16, 'lb->oz': 16,
-  'mg->g': 0.001, 'g->mg': 1000,
-};
-
-function convertUnit(qty, fromUnit, toUnit) {
-  if (fromUnit === toUnit) return qty;
-  const key = `${fromUnit}->${toUnit}`;
-  if (unitConversions[key]) return qty * unitConversions[key];
-  return null;
-}
-
 export async function executeRecipe(ingredients, userProfile = {}) {
   for (const ing of ingredients) {
     if (!ing.stockItemId || !ing.deductQty) continue;
     const item = await get1(C.STOCK_ITEMS, ing.stockItemId);
     if (!item) continue;
 
-    const deductUnit = ing.deductUnit || item.unit;
-    const entries = Array.isArray(item.inUseOpenedAt) ? [...item.inUseOpenedAt] : [];
-    let remaining = ing.deductQty;
-    let deductedFromLevel = false;
-    let deductedAmount = 0;
+    if (ing.deductFromLevel) {
+      // Deduct from opened unit levels (e.g. grams from an open bucket)
+      const entries = Array.isArray(item.inUseOpenedAt) ? [...item.inUseOpenedAt] : [];
+      let remaining = ing.deductQty;
 
-    for (let i = 0; i < entries.length && remaining > 0; i++) {
-      const e = entries[i];
-      if (e.capacity > 0 && (e.currentLevel || 0) > 0) {
-        const levelUnit = e.levelUnit || deductUnit;
-        const currentInLevelUnit = convertUnit(e.currentLevel, e.levelUnit || item.unit, levelUnit) ?? e.currentLevel;
-        const deductInLevelUnit = convertUnit(remaining, deductUnit, levelUnit) ?? remaining;
-        const take = Math.min(deductInLevelUnit, currentInLevelUnit);
-        const takenInOriginalUnit = convertUnit(take, levelUnit, deductUnit) ?? take;
-        entries[i] = { ...e, currentLevel: Math.max(0, e.currentLevel - (convertUnit(take, levelUnit, e.levelUnit || item.unit) ?? take)) };
-        remaining = Math.max(0, remaining - takenInOriginalUnit);
-        deductedAmount += takenInOriginalUnit;
-        deductedFromLevel = true;
+      for (let i = 0; i < entries.length && remaining > 0; i++) {
+        const e = entries[i];
+        if (e.capacity > 0 && (e.currentLevel || 0) > 0) {
+          const take = Math.min(remaining, e.currentLevel);
+          entries[i] = { ...e, currentLevel: Math.max(0, e.currentLevel - take) };
+          remaining -= take;
+        }
       }
-    }
 
-    if (deductedFromLevel) {
       await upd(C.STOCK_ITEMS, ing.stockItemId, { inUseOpenedAt: entries });
       await createStockLog({
         orgId: item.orgId,
@@ -1343,52 +1317,12 @@ export async function executeRecipe(ingredients, userProfile = {}) {
         type: 'recipe_used',
         updatedBy: userProfile.uid || '',
         updatedByName: userProfile.displayName || '',
-        details: `Deducted ${deductedAmount.toFixed(2)} ${deductUnit} from open units`,
+        details: `Deducted ${ing.deductQty} ${ing.deductUnit || ''} from open unit levels`,
       });
-    }
-
-    if (remaining > 0 && item.bucketSize) {
-      const bucketSizeUnit = item.bucketSizeUnit || deductUnit;
-      const remainingInBucketUnit = convertUnit(remaining, deductUnit, bucketSizeUnit) ?? remaining;
-      
-      if (remainingInBucketUnit <= item.bucketSize && item.quantity > 0) {
-        const openInfo = {
-          capacity: item.bucketSize,
-          levelUnit: bucketSizeUnit,
-        };
-        await openStockUnit(ing.stockItemId, userProfile, openInfo);
-        
-        const takeFromNewBucket = Math.min(remainingInBucketUnit, item.bucketSize);
-        const updatedItem = await get1(C.STOCK_ITEMS, ing.stockItemId);
-        if (updatedItem && Array.isArray(updatedItem.inUseOpenedAt) && updatedItem.inUseOpenedAt.length > 0) {
-          const lastEntryIdx = updatedItem.inUseOpenedAt.length - 1;
-          const entry = updatedItem.inUseOpenedAt[lastEntryIdx];
-          const newLevel = Math.max(0, entry.currentLevel - takeFromNewBucket);
-          updatedItem.inUseOpenedAt[lastEntryIdx] = { ...entry, currentLevel: newLevel };
-          await upd(C.STOCK_ITEMS, ing.stockItemId, { inUseOpenedAt: updatedItem.inUseOpenedAt });
-          
-          const takenInOriginalUnit = convertUnit(takeFromNewBucket, bucketSizeUnit, deductUnit) ?? takeFromNewBucket;
-          remaining = Math.max(0, remaining - takenInOriginalUnit);
-          
-          await createStockLog({
-            orgId: item.orgId,
-            itemId: ing.stockItemId,
-            itemName: item.name,
-            previousQuantity: item.quantity + 1,
-            newQuantity: item.quantity,
-            change: 0,
-            type: 'recipe_used',
-            updatedBy: userProfile.uid || '',
-            updatedByName: userProfile.displayName || '',
-            details: `Auto-opened bucket and deducted ${takeFromNewBucket.toFixed(2)} ${bucketSizeUnit}`,
-          });
-        }
-      }
-    }
-
-    if (remaining > 0) {
+    } else {
+      // Deduct from sealed stock quantity
       const prev = item.quantity || 0;
-      const newQty = Math.max(0, prev - remaining);
+      const newQty = Math.max(0, prev - ing.deductQty);
       await upd(C.STOCK_ITEMS, ing.stockItemId, { quantity: newQty });
       await createStockLog({
         orgId: item.orgId,
