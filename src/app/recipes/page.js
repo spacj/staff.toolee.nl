@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,7 +14,6 @@ import toast from 'react-hot-toast';
 
 const UNITS = ['g', 'kg', 'ml', 'L', 'pcs', 'tbsp', 'tsp', 'cups', 'oz', 'lb'];
 
-// Convert recipe quantity to stock unit for comparison/deduction
 function convertUnit(qty, fromUnit, toUnit) {
   if (fromUnit === toUnit) return qty;
   const key = `${fromUnit}->${toUnit}`;
@@ -32,7 +32,7 @@ function convertUnit(qty, fromUnit, toUnit) {
     'tsp->tbsp': 1 / 3, 'tbsp->tsp': 3,
   };
   if (conversions[key]) return qty * conversions[key];
-  return null; // incompatible units
+  return null;
 }
 
 function smartRound(value, unit) {
@@ -47,8 +47,18 @@ function smartRound(value, unit) {
 }
 
 export default function RecipesPage() {
+  return (
+    <Suspense fallback={<Layout><div className="p-6">Loading...</div></Layout>}>
+      <RecipesPageInner />
+    </Suspense>
+  );
+}
+
+function RecipesPageInner() {
   const { orgId: authOrgId, user, userProfile, isManager, isAdmin, isInventory } = useAuth();
-  const orgId = authOrgId;
+  const searchParams = useSearchParams();
+  const orgIdOverride = searchParams?.get('orgId');
+  const orgId = isInventory && orgIdOverride ? orgIdOverride : authOrgId;
   const canManage = isAdmin || isManager || isInventory;
 
   const [recipes, setRecipes] = useState([]);
