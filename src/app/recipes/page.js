@@ -431,12 +431,25 @@ function RecipesPageInner() {
                   const recipeQty = ing.quantity;
                   const recipeUnit = ing.unit;
                   const stockUnit = linked?.unit || recipeUnit;
+                  const isPieces = stockUnit === 'pcs';
+                  const bucketSize = linked?.bucketSize || 1;
+                  const bucketSizeUnit = linked?.bucketSizeUnit || stockUnit;
                   const openUnits = Array.isArray(linked?.inUseOpenedAt) ? linked.inUseOpenedAt : [];
                   const openTotal = openUnits.reduce((sum, e) => sum + (e.currentLevel || 0), 0);
+                  const sealedPieces = linked?.quantity || 0;
+                  const openPiecesFromBuckets = openUnits.reduce((sum, e) => {
+                    const level = e.currentLevel || 0;
+                    const levelUnit = e.levelUnit || bucketSizeUnit;
+                    const levelInBucketUnit = convertUnit(level, levelUnit, bucketSizeUnit) ?? level;
+                    return sum + (levelInBucketUnit / bucketSize);
+                  }, 0);
+                  const totalPieces = isPieces ? sealedPieces + openPiecesFromBuckets : 0;
                   const openTotalInRecipeUnit = openUnits.length > 0 ? convertUnit(openTotal, openUnits[0].levelUnit || stockUnit, recipeUnit) : 0;
                   const sealedQtyInRecipeUnit = linked ? convertUnit(linked.quantity || 0, stockUnit, recipeUnit) ?? (linked.quantity || 0) : 0;
                   const totalAvailableInRecipeUnit = openTotalInRecipeUnit + sealedQtyInRecipeUnit;
                   const insufficient = linked && recipeQty > totalAvailableInRecipeUnit;
+                  const displayQty = isPieces ? totalPieces : totalAvailableInRecipeUnit;
+                  const displayUnit = isPieces ? 'pcs' : recipeUnit;
                   return (
                     <div key={idx} className={cn(
                       'flex items-center gap-3 p-3 rounded-xl border',
@@ -450,9 +463,9 @@ function RecipesPageInner() {
                         </p>
                         {linked && (
                           <p className="text-[11px] text-surface-400 flex items-center gap-1 flex-wrap">
-                            <Package className="w-3 h-3" /> {linked.name}: {smartRound(totalAvailableInRecipeUnit, recipeUnit)} {recipeUnit} available
+                            <Package className="w-3 h-3" /> {linked.name}: {smartRound(displayQty, displayUnit)} {displayUnit} available
                             {openUnits.length > 0 && <span className="text-brand-600">(+{openUnits.length} open)</span>}
-                            {recipeUnit !== stockUnit && <span className="text-brand-600">(stock: {linked.quantity} {stockUnit})</span>}
+                            {isPieces && bucketSize > 0 && <span className="text-brand-600">(@{bucketSize}{bucketSizeUnit})</span>}
                             {insufficient && <span className="text-red-600 font-semibold ml-1">insufficient</span>}
                           </p>
                         )}
