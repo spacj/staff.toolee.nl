@@ -304,29 +304,35 @@ export default function RecipesPage() {
               <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
                 {form.ingredients.map((ing, idx) => (
                   <div key={idx} className={cn(
-                    'grid grid-cols-[1fr_80px_70px_1fr_auto_auto] gap-2 items-center p-2 rounded-lg border',
+                    'p-2.5 rounded-lg border space-y-2',
                     form.scaleIndex === idx ? 'border-brand-300 bg-brand-50/50' : 'border-surface-200'
                   )}>
-                    <input className="input-field text-sm" placeholder="Ingredient" value={ing.name} onChange={e => updateIngredient(idx, 'name', e.target.value)} />
-                    <input type="number" className="input-field text-sm" placeholder="Qty" value={ing.quantity} onChange={e => updateIngredient(idx, 'quantity', e.target.value)} />
-                    <select className="select-field text-sm !py-1.5" value={ing.unit} onChange={e => updateIngredient(idx, 'unit', e.target.value)}>
-                      {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                    </select>
-                    <select className="select-field text-sm !py-1.5" value={ing.stockItemId || ''} onChange={e => updateIngredient(idx, 'stockItemId', e.target.value)}>
-                      <option value="">No stock link</option>
-                      {stockItems.map(s => <option key={s.id} value={s.id}>{s.name} ({s.quantity} {s.unit})</option>)}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => setForm(f => ({ ...f, scaleIndex: idx }))}
-                      className={cn('w-7 h-7 rounded-lg flex items-center justify-center text-xs transition-colors', form.scaleIndex === idx ? 'bg-brand-500 text-white' : 'bg-surface-100 text-surface-400 hover:bg-brand-100 hover:text-brand-600')}
-                      title="Set as scale anchor"
-                    >
-                      <Scale className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" onClick={() => removeIngredient(idx)} className="w-7 h-7 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    {/* Row 1: Name + actions */}
+                    <div className="flex items-center gap-2">
+                      <input className="input-field text-sm flex-1 min-w-0" placeholder="Ingredient name" value={ing.name} onChange={e => updateIngredient(idx, 'name', e.target.value)} />
+                      <button
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, scaleIndex: idx }))}
+                        className={cn('w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs transition-colors', form.scaleIndex === idx ? 'bg-brand-500 text-white' : 'bg-surface-100 text-surface-400 hover:bg-brand-100 hover:text-brand-600')}
+                        title="Set as scale anchor"
+                      >
+                        <Scale className="w-3.5 h-3.5" />
+                      </button>
+                      <button type="button" onClick={() => removeIngredient(idx)} className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-red-400 hover:bg-red-50 hover:text-red-600">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    {/* Row 2: Qty + Unit + Stock link */}
+                    <div className="flex items-center gap-2">
+                      <input type="number" className="input-field text-sm w-20 flex-shrink-0" placeholder="Qty" value={ing.quantity} onChange={e => updateIngredient(idx, 'quantity', e.target.value)} />
+                      <select className="select-field text-sm !py-1.5 w-16 flex-shrink-0" value={ing.unit} onChange={e => updateIngredient(idx, 'unit', e.target.value)}>
+                        {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                      <select className="select-field text-sm !py-1.5 flex-1 min-w-0" value={ing.stockItemId || ''} onChange={e => updateIngredient(idx, 'stockItemId', e.target.value)}>
+                        <option value="">No stock link</option>
+                        {stockItems.map(s => <option key={s.id} value={s.id}>{s.name} ({s.quantity} {s.unit})</option>)}
+                      </select>
+                    </div>
                   </div>
                 ))}
               </div>
