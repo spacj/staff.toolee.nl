@@ -195,7 +195,7 @@ export default function RecipesPage() {
       return {
         ...ing,
         deductQty: deductInStockUnit,
-        deductUnit: linked?.unit || ing.unit,
+        deductUnit: converted !== null ? linked?.unit : ing.unit,
         stockName: linked?.name || '',
         stockAvailable: linked?.quantity ?? null,
         stockUnit: linked?.unit || '',
