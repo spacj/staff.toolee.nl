@@ -209,10 +209,12 @@ function RecipesPageInner() {
       const linked = ing.stockItemId ? stockItems.find(s => s.id === ing.stockItemId) : null;
       const converted = linked ? convertUnit(ing.quantity, ing.unit, linked.unit) : null;
       const deductInStockUnit = converted !== null ? smartRound(converted, linked.unit) : ing.quantity;
+      const recipeUnit = ing.unit;
       const openUnits = Array.isArray(linked?.inUseOpenedAt) ? linked.inUseOpenedAt : [];
       const openTotal = openUnits.reduce((sum, e) => sum + (e.currentLevel || 0), 0);
-      const openTotalConverted = linked && openUnits.length > 0 ? convertUnit(openTotal, openUnits[0].levelUnit || linked.unit, linked.unit) : 0;
-      const totalAvailable = (linked?.quantity || 0) + (openTotalConverted || 0);
+      const openTotalConverted = openUnits.length > 0 ? convertUnit(openTotal, openUnits[0].levelUnit || linked?.unit || recipeUnit, linked?.unit || recipeUnit) : null;
+      const sealedQty = linked?.quantity ?? 0;
+      const totalAvailable = converted !== null ? sealedQty + (openTotalConverted ?? 0) : (openTotal > 0 ? openTotal : sealedQty);
       return {
         ...ing,
         deductQty: deductInStockUnit,
@@ -425,11 +427,13 @@ function RecipesPageInner() {
                   const isAnchor = idx === (calcRecipe.scaleIngredientIndex || 0);
                   const linked = ing.stockItemId ? stockItems.find(s => s.id === ing.stockItemId) : null;
                   const converted = linked ? convertUnit(ing.quantity, ing.unit, linked.unit) : null;
+                  const recipeUnit = ing.unit;
                   const openUnits = Array.isArray(linked?.inUseOpenedAt) ? linked.inUseOpenedAt : [];
                   const openTotal = openUnits.reduce((sum, e) => sum + (e.currentLevel || 0), 0);
-                  const openTotalConverted = linked && openUnits.length > 0 ? convertUnit(openTotal, openUnits[0].levelUnit || linked.unit, linked.unit) : 0;
-                  const totalAvailable = (linked?.quantity || 0) + (openTotalConverted || 0);
-                  const insufficient = linked && converted !== null && converted > totalAvailable;
+                  const openTotalConverted = openUnits.length > 0 ? convertUnit(openTotal, openUnits[0].levelUnit || linked?.unit || recipeUnit, linked?.unit || recipeUnit) : null;
+                  const sealedQty = linked?.quantity ?? 0;
+                  const totalAvailable = converted !== null ? sealedQty + (openTotalConverted ?? 0) : (openTotal > 0 ? openTotal : sealedQty);
+                  const insufficient = converted !== null ? converted > totalAvailable : ing.quantity > totalAvailable;
                   return (
                     <div key={idx} className={cn(
                       'flex items-center gap-3 p-3 rounded-xl border',
