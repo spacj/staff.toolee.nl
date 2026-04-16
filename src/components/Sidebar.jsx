@@ -18,7 +18,6 @@ export default function Sidebar({ mobile, onClose }) {
 
   const inventoryLinks = [
     { href: '/inventory', icon: Building2, label: 'Organizations' },
-    { href: '/recipes', icon: CookingPot, label: 'Recipes' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 
