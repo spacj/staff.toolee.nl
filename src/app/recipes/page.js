@@ -192,12 +192,16 @@ export default function RecipesPage() {
       const linked = ing.stockItemId ? stockItems.find(s => s.id === ing.stockItemId) : null;
       const converted = linked ? convertUnit(ing.quantity, ing.unit, linked.unit) : null;
       const deductInStockUnit = converted !== null ? smartRound(converted, linked.unit) : ing.quantity;
+      const openUnits = Array.isArray(linked?.inUseOpenedAt) ? linked.inUseOpenedAt : [];
+      const openTotal = openUnits.reduce((sum, e) => sum + (e.currentLevel || 0), 0);
+      const openTotalConverted = linked && openUnits.length > 0 ? convertUnit(openTotal, openUnits[0].levelUnit || linked.unit, linked.unit) : 0;
+      const totalAvailable = (linked?.quantity || 0) + (openTotalConverted || 0);
       return {
         ...ing,
         deductQty: deductInStockUnit,
         deductUnit: converted !== null ? linked?.unit : ing.unit,
         stockName: linked?.name || '',
-        stockAvailable: linked?.quantity ?? null,
+        stockAvailable: totalAvailable,
         stockUnit: linked?.unit || '',
         recipeQty: ing.quantity,
         recipeUnit: ing.unit,
@@ -403,7 +407,11 @@ export default function RecipesPage() {
                   const isAnchor = idx === (calcRecipe.scaleIngredientIndex || 0);
                   const linked = ing.stockItemId ? stockItems.find(s => s.id === ing.stockItemId) : null;
                   const converted = linked ? convertUnit(ing.quantity, ing.unit, linked.unit) : null;
-                  const insufficient = linked && converted !== null && converted > linked.quantity;
+                  const openUnits = Array.isArray(linked?.inUseOpenedAt) ? linked.inUseOpenedAt : [];
+                  const openTotal = openUnits.reduce((sum, e) => sum + (e.currentLevel || 0), 0);
+                  const openTotalConverted = linked && openUnits.length > 0 ? convertUnit(openTotal, openUnits[0].levelUnit || linked.unit, linked.unit) : 0;
+                  const totalAvailable = (linked?.quantity || 0) + (openTotalConverted || 0);
+                  const insufficient = linked && converted !== null && converted > totalAvailable;
                   return (
                     <div key={idx} className={cn(
                       'flex items-center gap-3 p-3 rounded-xl border',
@@ -417,7 +425,8 @@ export default function RecipesPage() {
                         </p>
                         {linked && (
                           <p className="text-[11px] text-surface-400 flex items-center gap-1 flex-wrap">
-                            <Package className="w-3 h-3" /> {linked.name}: {linked.quantity} {linked.unit} available
+                            <Package className="w-3 h-3" /> {linked.name}: {smartRound(totalAvailable, linked.unit)} {linked.unit} available
+                            {openUnits.length > 0 && <span className="text-brand-600">(+{openUnits.length} open)</span>}
                             {converted !== null && ing.unit !== linked.unit && <span className="text-brand-600">({smartRound(converted, linked.unit)} {linked.unit})</span>}
                             {insufficient && <span className="text-red-600 font-semibold ml-1">insufficient</span>}
                           </p>
