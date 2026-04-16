@@ -6,7 +6,7 @@ import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getStockItems, createStockItem, updateStockItem, deleteStockItem, adjustStockQuantity,
-  openStockUnit, finishStockUnit,
+  openStockUnit, finishStockUnit, updateOpenedUnitLevel,
   getStockRequests, createStockRequest, reviewStockRequest,
   notifyManagers, notifyWorker, getWorkers, getStockLogsRealtime,
   getStockCategories, addStockCategory,
@@ -154,6 +154,15 @@ function StockPageInner() {
   const [alertModalOpen, setAlertModalOpen] = useState(false);
   const [alertRefillMap, setAlertRefillMap] = useState({});
   const [alertRefilling, setAlertRefilling] = useState(false);
+
+  // Open unit modal
+  const [openUnitModal, setOpenUnitModal] = useState(null); // null | item
+  const [openUnitForm, setOpenUnitForm] = useState({ capacity: '', levelUnit: 'g' });
+  const [openingUnit, setOpeningUnit] = useState(false);
+
+  // Level edit modal
+  const [levelEditModal, setLevelEditModal] = useState(null); // null | { item, entryIdx, entry }
+  const [levelEditValue, setLevelEditValue] = useState('');
   const [items, setItems] = useState([]);
   const [requests, setRequests] = useState([]);
   const [workers, setWorkers] = useState([]);
@@ -192,13 +201,44 @@ function StockPageInner() {
 
   const canManage = isAdmin || isManager || isInventory;
 
-  const handleOpenUnit = async (item) => {
+  const handleOpenUnit = (item) => {
+    setOpenUnitForm({ capacity: '', levelUnit: 'g' });
+    setOpenUnitModal(item);
+  };
+
+  const confirmOpenUnit = async () => {
+    if (!openUnitModal) return;
+    setOpeningUnit(true);
     try {
-      await openStockUnit(item.id, { uid: user?.uid, displayName: userProfile?.displayName || userProfile?.name || '' });
-      toast.success(`Opened 1 ${item.unit || 'unit'} of ${item.name}`);
+      await openStockUnit(
+        openUnitModal.id,
+        { uid: user?.uid, displayName: userProfile?.displayName || userProfile?.name || '' },
+        { capacity: Number(openUnitForm.capacity) || 0, levelUnit: openUnitForm.levelUnit }
+      );
+      toast.success(`Opened 1 ${openUnitModal.unit || 'unit'} of ${openUnitModal.name}`);
+      setOpenUnitModal(null);
       await load();
     } catch (e) {
       toast.error(e.message || 'Failed to open unit');
+    } finally {
+      setOpeningUnit(false);
+    }
+  };
+
+  const handleLevelEdit = (item, entryIdx, entry) => {
+    setLevelEditValue(String(entry.currentLevel ?? entry.capacity ?? ''));
+    setLevelEditModal({ item, entryIdx, entry });
+  };
+
+  const saveLevelEdit = async () => {
+    if (!levelEditModal) return;
+    try {
+      await updateOpenedUnitLevel(levelEditModal.item.id, levelEditModal.entryIdx, Number(levelEditValue) || 0);
+      toast.success('Level updated');
+      setLevelEditModal(null);
+      await load();
+    } catch {
+      toast.error('Failed to update level');
     }
   };
 
@@ -783,7 +823,7 @@ function StockPageInner() {
                       </div>
 
                       {(item.inUseQuantity || 0) > 0 && (
-                        <div className="px-2.5 py-1.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 space-y-1">
+                        <div className="px-2.5 py-2 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 space-y-2">
                           <div className="flex items-center gap-2">
                             <PackageOpen className="w-3.5 h-3.5 flex-shrink-0" />
                             <span className="text-xs font-semibold">{item.inUseQuantity} in use</span>
@@ -796,18 +836,38 @@ function StockPageInner() {
                             </button>
                           </div>
                           {Array.isArray(item.inUseOpenedAt) && item.inUseOpenedAt.length > 0 && (
-                            <ul className="text-[10px] text-sky-600/90 space-y-0.5 pl-5">
-                              {item.inUseOpenedAt.slice(0, 3).map((entry, idx) => (
-                                <li key={idx} className="flex items-center gap-1">
-                                  <span className="w-1 h-1 rounded-full bg-sky-400" />
-                                  Opened {formatOpenedAt(entry.at)}
-                                  {entry.byName ? ` · ${entry.byName}` : ''}
-                                </li>
-                              ))}
-                              {item.inUseOpenedAt.length > 3 && (
-                                <li className="pl-2 italic">+{item.inUseOpenedAt.length - 3} more</li>
-                              )}
-                            </ul>
+                            <div className="space-y-1.5">
+                              {item.inUseOpenedAt.map((entry, idx) => {
+                                const hasCap = entry.capacity > 0;
+                                const pct = hasCap ? Math.min(100, Math.max(0, ((entry.currentLevel || 0) / entry.capacity) * 100)) : null;
+                                const levelColor = pct !== null ? (pct < 15 ? 'bg-red-500' : pct < 40 ? 'bg-amber-500' : 'bg-sky-500') : '';
+                                return (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => handleLevelEdit(item, idx, entry)}
+                                    className="w-full text-left rounded-md bg-white/70 border border-sky-100 px-2 py-1.5 hover:bg-white transition-colors"
+                                  >
+                                    <div className="flex items-center justify-between text-[10px]">
+                                      <span className="text-sky-600">
+                                        #{idx + 1} · {formatOpenedAt(entry.at)}
+                                        {entry.byName ? ` · ${entry.byName}` : ''}
+                                      </span>
+                                      {hasCap && (
+                                        <span className="font-bold text-sky-800">
+                                          {entry.currentLevel ?? 0}/{entry.capacity} {entry.levelUnit || ''}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {hasCap && (
+                                      <div className="h-1.5 rounded-full bg-sky-100 overflow-hidden mt-1">
+                                        <div className={cn('h-full rounded-full transition-all', levelColor)} style={{ width: `${pct}%` }} />
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           )}
                         </div>
                       )}
@@ -1219,6 +1279,90 @@ function StockPageInner() {
           </div>
         </Modal>
       )}
+
+      {/* ── Open Unit Modal ── */}
+      <Modal open={!!openUnitModal} onClose={() => setOpenUnitModal(null)} title={openUnitModal ? `Open: ${openUnitModal.name}` : ''} size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-surface-500">Opening 1 {openUnitModal?.unit || 'unit'}. Optionally set the total capacity to track its fill level as you use it.</p>
+          <div>
+            <label className="label">Total capacity (when full)</label>
+            <div className="flex gap-2">
+              <input
+                type="number" min="0" step="any"
+                className="input-field flex-1"
+                placeholder="e.g. 5000"
+                value={openUnitForm.capacity}
+                onChange={e => setOpenUnitForm(f => ({ ...f, capacity: e.target.value }))}
+              />
+              <select
+                className="select-field w-20"
+                value={openUnitForm.levelUnit}
+                onChange={e => setOpenUnitForm(f => ({ ...f, levelUnit: e.target.value }))}
+              >
+                {['g', 'kg', 'ml', 'L', 'pcs', 'oz', 'lb'].map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <p className="text-[11px] text-surface-400 mt-1">Leave empty if you don't need level tracking for this item.</p>
+          </div>
+          <div className="flex gap-2 pt-2 border-t border-surface-100">
+            <button onClick={() => setOpenUnitModal(null)} className="btn-secondary flex-1">Cancel</button>
+            <button onClick={confirmOpenUnit} disabled={openingUnit} className="btn-primary flex-1">
+              {openingUnit ? 'Opening…' : 'Open unit'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Level Edit Modal ── */}
+      <Modal open={!!levelEditModal} onClose={() => setLevelEditModal(null)} title="Adjust fill level" size="sm">
+        {levelEditModal && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-sky-50 border border-sky-200">
+              <PackageOpen className="w-5 h-5 text-sky-600 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-surface-900">{levelEditModal.item.name} — Unit #{levelEditModal.entryIdx + 1}</p>
+                <p className="text-[11px] text-sky-600">
+                  Capacity: {levelEditModal.entry.capacity} {levelEditModal.entry.levelUnit || ''} · Opened {formatOpenedAt(levelEditModal.entry.at)}
+                </p>
+              </div>
+            </div>
+            <div>
+              <label className="label">Current level</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="range" min="0" max={levelEditModal.entry.capacity || 100} step="1"
+                  value={levelEditValue}
+                  onChange={e => setLevelEditValue(e.target.value)}
+                  className="flex-1 accent-sky-500"
+                />
+                <input
+                  type="number" min="0" max={levelEditModal.entry.capacity || 99999} step="any"
+                  value={levelEditValue}
+                  onChange={e => setLevelEditValue(e.target.value)}
+                  className="input-field w-20 text-sm"
+                />
+                <span className="text-xs text-surface-500">{levelEditModal.entry.levelUnit || ''}</span>
+              </div>
+              {levelEditModal.entry.capacity > 0 && (
+                <div className="h-2 rounded-full bg-surface-100 overflow-hidden mt-2">
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all',
+                      (Number(levelEditValue) / levelEditModal.entry.capacity) < 0.15 ? 'bg-red-500' :
+                      (Number(levelEditValue) / levelEditModal.entry.capacity) < 0.4 ? 'bg-amber-500' : 'bg-sky-500'
+                    )}
+                    style={{ width: `${Math.min(100, (Number(levelEditValue) / levelEditModal.entry.capacity) * 100)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 pt-2 border-t border-surface-100">
+              <button onClick={() => setLevelEditModal(null)} className="btn-secondary flex-1">Cancel</button>
+              <button onClick={saveLevelEdit} className="btn-primary flex-1">Save level</button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </Layout>
   );
 }

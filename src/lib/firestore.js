@@ -1155,7 +1155,7 @@ export async function adjustStockQuantity(itemId, newQuantity, userProfile = {})
   }
 }
 
-export async function openStockUnit(itemId, userProfile = {}) {
+export async function openStockUnit(itemId, userProfile = {}, openInfo = {}) {
   const item = await get1(C.STOCK_ITEMS, itemId);
   if (!item) return;
   if ((item.quantity || 0) <= 0) throw new Error('No sealed units available');
@@ -1163,9 +1163,11 @@ export async function openStockUnit(itemId, userProfile = {}) {
   const newQuantity = previousQuantity - 1;
   const newInUse = (item.inUseQuantity || 0) + 1;
   const openedAt = new Date().toISOString();
+  const capacity = Number(openInfo.capacity) || 0;
+  const levelUnit = openInfo.levelUnit || item.unit || '';
   const inUseOpenedAt = [
     ...(Array.isArray(item.inUseOpenedAt) ? item.inUseOpenedAt : []),
-    { at: openedAt, by: userProfile.uid || '', byName: userProfile.displayName || '' },
+    { at: openedAt, by: userProfile.uid || '', byName: userProfile.displayName || '', capacity, currentLevel: capacity, levelUnit },
   ];
   await upd(C.STOCK_ITEMS, itemId, { quantity: newQuantity, inUseQuantity: newInUse, inUseOpenedAt });
   await createStockLog({
@@ -1230,6 +1232,39 @@ export async function reviewStockRequest(id, status, reviewedBy, adminNotes = ''
   });
 }
 
+export async function updateOpenedUnitLevel(itemId, entryIdx, newLevel) {
+  const item = await get1(C.STOCK_ITEMS, itemId);
+  if (!item) return;
+  const entries = Array.isArray(item.inUseOpenedAt) ? [...item.inUseOpenedAt] : [];
+  if (entryIdx < 0 || entryIdx >= entries.length) return;
+  entries[entryIdx] = { ...entries[entryIdx], currentLevel: Math.max(0, Number(newLevel) || 0) };
+  await upd(C.STOCK_ITEMS, itemId, { inUseOpenedAt: entries });
+}
+
+export async function deductFromOpenedUnit(itemId, entryIdx, amount, userProfile = {}) {
+  const item = await get1(C.STOCK_ITEMS, itemId);
+  if (!item) return;
+  const entries = Array.isArray(item.inUseOpenedAt) ? [...item.inUseOpenedAt] : [];
+  if (entryIdx < 0 || entryIdx >= entries.length) return;
+  const entry = entries[entryIdx];
+  const prevLevel = entry.currentLevel || 0;
+  const newLevel = Math.max(0, prevLevel - amount);
+  entries[entryIdx] = { ...entry, currentLevel: newLevel };
+  await upd(C.STOCK_ITEMS, itemId, { inUseOpenedAt: entries });
+  await createStockLog({
+    orgId: item.orgId,
+    itemId,
+    itemName: item.name,
+    previousQuantity: item.quantity,
+    newQuantity: item.quantity,
+    change: 0,
+    type: 'level_deducted',
+    updatedBy: userProfile.uid || '',
+    updatedByName: userProfile.displayName || '',
+    details: `Unit #${entryIdx + 1}: ${prevLevel} → ${newLevel} ${entry.levelUnit || ''}`,
+  });
+}
+
 // ─── Recipes ─────────────────────────────────────────
 export async function getRecipes(filters = {}) {
   const c = [];
@@ -1256,27 +1291,62 @@ export async function executeRecipe(ingredients, userProfile = {}) {
     if (!ing.stockItemId || !ing.deductQty) continue;
     const item = await get1(C.STOCK_ITEMS, ing.stockItemId);
     if (!item) continue;
-    const prev = item.quantity || 0;
-    const newQty = Math.max(0, prev - ing.deductQty);
-    await upd(C.STOCK_ITEMS, ing.stockItemId, { quantity: newQty });
-    await createStockLog({
-      orgId: item.orgId,
-      itemId: ing.stockItemId,
-      itemName: item.name,
-      previousQuantity: prev,
-      newQuantity: newQty,
-      change: newQty - prev,
-      type: 'recipe_used',
-      updatedBy: userProfile.uid || '',
-      updatedByName: userProfile.displayName || '',
-    });
-    if (item.minimumQuantity > 0 && newQty < item.minimumQuantity) {
-      await notifyManagers(item.orgId, {
-        type: 'stock_low',
-        title: `Low Stock: ${item.name}`,
-        message: `${item.name} is below minimum (${newQty} ${item.unit} left, min: ${item.minimumQuantity}).`,
-        link: '/stock',
+
+    // Try to deduct from opened unit levels first
+    const entries = Array.isArray(item.inUseOpenedAt) ? [...item.inUseOpenedAt] : [];
+    let remaining = ing.deductQty;
+    let deductedFromLevel = false;
+
+    for (let i = 0; i < entries.length && remaining > 0; i++) {
+      const e = entries[i];
+      if (e.capacity > 0 && (e.currentLevel || 0) > 0) {
+        const take = Math.min(remaining, e.currentLevel);
+        entries[i] = { ...e, currentLevel: Math.max(0, e.currentLevel - take) };
+        remaining -= take;
+        deductedFromLevel = true;
+      }
+    }
+
+    if (deductedFromLevel) {
+      await upd(C.STOCK_ITEMS, ing.stockItemId, { inUseOpenedAt: entries });
+      await createStockLog({
+        orgId: item.orgId,
+        itemId: ing.stockItemId,
+        itemName: item.name,
+        previousQuantity: item.quantity,
+        newQuantity: item.quantity,
+        change: 0,
+        type: 'recipe_used',
+        updatedBy: userProfile.uid || '',
+        updatedByName: userProfile.displayName || '',
+        details: `Deducted ${ing.deductQty - remaining} from open units`,
       });
+    }
+
+    // If still remaining, deduct from sealed stock quantity
+    if (remaining > 0) {
+      const prev = item.quantity || 0;
+      const newQty = Math.max(0, prev - remaining);
+      await upd(C.STOCK_ITEMS, ing.stockItemId, { quantity: newQty });
+      await createStockLog({
+        orgId: item.orgId,
+        itemId: ing.stockItemId,
+        itemName: item.name,
+        previousQuantity: prev,
+        newQuantity: newQty,
+        change: newQty - prev,
+        type: 'recipe_used',
+        updatedBy: userProfile.uid || '',
+        updatedByName: userProfile.displayName || '',
+      });
+      if (item.minimumQuantity > 0 && newQty < item.minimumQuantity) {
+        await notifyManagers(item.orgId, {
+          type: 'stock_low',
+          title: `Low Stock: ${item.name}`,
+          message: `${item.name} is below minimum (${newQty} ${item.unit} left, min: ${item.minimumQuantity}).`,
+          link: '/stock',
+        });
+      }
     }
   }
 }
