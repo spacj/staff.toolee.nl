@@ -215,6 +215,14 @@ service cloud.firestore {
       allow update: if isManager() || isInventory();
     }
 
+    // Recipes: all auth read, managers/inventory create/update/delete
+    match /recipes/{id} {
+      allow read: if isAuth();
+      allow create: if isManager() || isInventory();
+      allow update: if isManager() || isInventory();
+      allow delete: if isManager() || isInventory();
+    }
+
     // Stock Logs: all auth read (managers view activity), all auth create (workers/managers log changes)
     match /stockLogs/{id} {
       allow read: if isAuth();

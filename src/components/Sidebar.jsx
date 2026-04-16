@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
-import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle, CalendarCheck, Globe, Building2, DollarSign, Tag, Inbox, BookOpen, ClipboardCheck, Package } from 'lucide-react';
+import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle, CalendarCheck, Globe, Building2, DollarSign, Tag, Inbox, BookOpen, ClipboardCheck, Package, CookingPot } from 'lucide-react';
 
 export default function Sidebar({ mobile, onClose }) {
   const pathname = usePathname();
@@ -18,6 +18,7 @@ export default function Sidebar({ mobile, onClose }) {
 
   const inventoryLinks = [
     { href: '/inventory', icon: Building2, label: 'Organizations' },
+    { href: '/recipes', icon: CookingPot, label: 'Recipes' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 
@@ -33,6 +34,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/checklists', icon: ClipboardCheck, label: 'Checklists' },
     { href: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
     { href: '/stock', icon: Package, label: 'Stock' },
+    { href: '/recipes', icon: CookingPot, label: 'Recipes' },
     { href: '/costs', icon: CreditCard, label: 'Costs & Billing' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
@@ -49,6 +51,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/checklists', icon: ClipboardCheck, label: 'Checklists' },
     { href: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
     { href: '/stock', icon: Package, label: 'Stock' },
+    { href: '/recipes', icon: CookingPot, label: 'Recipes' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 

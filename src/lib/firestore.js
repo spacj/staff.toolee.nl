@@ -18,6 +18,7 @@ const C = {
   CHECKLIST_TEMPLATES: 'checklistTemplates', CHECKLIST_ASSIGNMENTS: 'checklistAssignments',
   CHECKLIST_HISTORY: 'checklistHistory', PUBLIC_CHECKLIST_ASSIGNMENTS: 'publicChecklistAssignments',
   STOCK_ITEMS: 'stockItems', STOCK_REQUESTS: 'stockRequests', STOCK_LOGS: 'stockLogs',
+  RECIPES: 'recipes',
 };
 
 // ─── Helpers ──────────────────────────────────────────
@@ -1227,6 +1228,57 @@ export async function reviewStockRequest(id, status, reviewedBy, adminNotes = ''
     reviewedAt: new Date().toISOString(),
     adminNotes,
   });
+}
+
+// ─── Recipes ─────────────────────────────────────────
+export async function getRecipes(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  let results = await getAll(C.RECIPES, ...c);
+  results.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  return results;
+}
+
+export async function createRecipe(data) {
+  return add(C.RECIPES, data);
+}
+
+export async function updateRecipe(id, data) {
+  return upd(C.RECIPES, id, data);
+}
+
+export async function deleteRecipe(id) {
+  return del(C.RECIPES, id);
+}
+
+export async function executeRecipe(ingredients, userProfile = {}) {
+  for (const ing of ingredients) {
+    if (!ing.stockItemId || !ing.deductQty) continue;
+    const item = await get1(C.STOCK_ITEMS, ing.stockItemId);
+    if (!item) continue;
+    const prev = item.quantity || 0;
+    const newQty = Math.max(0, prev - ing.deductQty);
+    await upd(C.STOCK_ITEMS, ing.stockItemId, { quantity: newQty });
+    await createStockLog({
+      orgId: item.orgId,
+      itemId: ing.stockItemId,
+      itemName: item.name,
+      previousQuantity: prev,
+      newQuantity: newQty,
+      change: newQty - prev,
+      type: 'recipe_used',
+      updatedBy: userProfile.uid || '',
+      updatedByName: userProfile.displayName || '',
+    });
+    if (item.minimumQuantity > 0 && newQty < item.minimumQuantity) {
+      await notifyManagers(item.orgId, {
+        type: 'stock_low',
+        title: `Low Stock: ${item.name}`,
+        message: `${item.name} is below minimum (${newQty} ${item.unit} left, min: ${item.minimumQuantity}).`,
+        link: '/stock',
+      });
+    }
+  }
 }
 
 export { C as COLLECTIONS };
