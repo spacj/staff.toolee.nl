@@ -6,7 +6,7 @@ import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAllOrganizations, getStockItems } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
-import { Building2, Package, AlertTriangle, TrendingDown, PackageOpen, Search, ArrowRight } from 'lucide-react';
+import { Building2, Package, AlertTriangle, TrendingDown, PackageOpen, Search, ArrowRight, CookingPot } from 'lucide-react';
 
 export default function InventoryDashboard() {
   const { user, isInventory } = useAuth();
@@ -96,11 +96,10 @@ export default function InventoryDashboard() {
               const s = stats[o.id] || { items: 0, inUse: 0, low: 0, out: 0 };
               const hasAlerts = s.out > 0 || s.low > 0;
               return (
-                <Link
+                <div
                   key={o.id}
-                  href={`/stock?orgId=${encodeURIComponent(o.id)}`}
                   className={cn(
-                    'card p-4 flex flex-col gap-3 hover:shadow-md transition-all active:scale-[0.99]',
+                    'card p-4 flex flex-col gap-3',
                     s.out > 0 && 'border-red-200 bg-red-50/20',
                     s.out === 0 && s.low > 0 && 'border-amber-200 bg-amber-50/20'
                   )}
@@ -110,7 +109,6 @@ export default function InventoryDashboard() {
                       <p className="font-semibold text-surface-900 truncate">{o.name || 'Untitled org'}</p>
                       <p className="text-xs text-surface-400 mt-0.5">{s.items} item{s.items !== 1 ? 's' : ''} tracked</p>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-surface-400 flex-shrink-0 mt-1" />
                   </div>
 
                   <div className="grid grid-cols-4 gap-2 text-center">
@@ -118,6 +116,21 @@ export default function InventoryDashboard() {
                     <Mini label="In use" value={s.inUse} color="text-sky-600" />
                     <Mini label="Low" value={s.low} color="text-amber-600" />
                     <Mini label="Out" value={s.out} color="text-red-600" />
+                  </div>
+
+                  <div className="flex gap-2 mt-1">
+                    <Link
+                      href={`/stock?orgId=${encodeURIComponent(o.id)}`}
+                      className="btn-secondary flex-1 flex items-center justify-center gap-1.5 text-xs py-2"
+                    >
+                      <Package className="w-3.5 h-3.5" /> Stock
+                    </Link>
+                    <Link
+                      href={`/recipes?orgId=${encodeURIComponent(o.id)}`}
+                      className="btn-secondary flex-1 flex items-center justify-center gap-1.5 text-xs py-2"
+                    >
+                      <CookingPot className="w-3.5 h-3.5" /> Recipes
+                    </Link>
                   </div>
 
                   {hasAlerts && (
@@ -129,7 +142,7 @@ export default function InventoryDashboard() {
                       {s.out > 0 ? `${s.out} out of stock` : `${s.low} below minimum`}
                     </div>
                   )}
-                </Link>
+                </div>
               );
             })}
           </div>

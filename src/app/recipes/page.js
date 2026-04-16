@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getRecipes, createRecipe, updateRecipe, deleteRecipe, executeRecipe, getStockItems } from '@/lib/firestore';
+import { getRecipes, createRecipe, updateRecipe, deleteRecipe, executeRecipe, getStockItems, getOrganization } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
 import {
   CookingPot, Plus, Pencil, Trash2, Search, Calculator, ChevronDown,
@@ -65,6 +65,7 @@ function RecipesPageInner() {
   const [stockItems, setStockItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [orgName, setOrgName] = useState('');
 
   // Recipe editor
   const [editModal, setEditModal] = useState(null); // null | 'add' | recipe obj
@@ -94,6 +95,12 @@ function RecipesPageInner() {
       ]);
       setRecipes(r);
       setStockItems(s);
+      if (isInventory && orgIdOverride) {
+        const org = await getOrganization(orgIdOverride);
+        setOrgName(org?.name || 'Unknown Organization');
+      } else {
+        setOrgName('');
+      }
     } catch { toast.error('Failed to load recipes'); }
     finally { setLoading(false); }
   };
@@ -242,6 +249,7 @@ function RecipesPageInner() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-display font-bold text-surface-900 flex items-center gap-2">
               <CookingPot className="w-7 h-7 text-brand-500" /> Recipes
+              {isInventory && orgName && <span className="text-lg font-normal text-surface-500">/ {orgName}</span>}
             </h1>
             <p className="text-sm text-surface-500 mt-0.5">Scale recipes, link ingredients to stock, and deduct on execution.</p>
           </div>
