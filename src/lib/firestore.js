@@ -1070,6 +1070,34 @@ export async function getStockLogs(orgId, filters = {}) {
   return serAll(await getDocs(query(collection(db, C.STOCK_LOGS), ...c)));
 }
 
+export async function reverseStockLog(logId, userProfile = {}) {
+  const log = await get1(C.STOCK_LOGS, logId);
+  if (!log) throw new Error('Log not found');
+  if (log.reversed) throw new Error('Already reversed');
+  const item = await get1(C.STOCK_ITEMS, log.itemId);
+  if (!item) throw new Error('Stock item no longer exists');
+
+  const reverseChange = -(log.change || 0);
+  const newQty = (item.quantity || 0) + reverseChange;
+  if (newQty < 0) throw new Error('Reversal would result in negative stock');
+
+  await upd(C.STOCK_ITEMS, log.itemId, { quantity: newQty });
+  await upd(C.STOCK_LOGS, logId, { reversed: true, reversedAt: ts(), reversedBy: userProfile.uid || '', reversedByName: userProfile.displayName || '' });
+  await createStockLog({
+    orgId: log.orgId,
+    itemId: log.itemId,
+    itemName: log.itemName,
+    previousQuantity: item.quantity,
+    newQuantity: newQty,
+    change: reverseChange,
+    type: 'reversed',
+    updatedBy: userProfile.uid || '',
+    updatedByName: userProfile.displayName || '',
+    details: `Reversed: ${log.type} of ${Math.abs(log.change || 0)} by ${log.updatedByName || 'unknown'}`,
+    reversedLogId: logId,
+  });
+}
+
 export async function createStockItem(data, userProfile = {}) {
   const id = await add(C.STOCK_ITEMS, data);
   await createStockLog({

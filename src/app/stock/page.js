@@ -9,13 +9,13 @@ import {
   openStockUnit, finishStockUnit, updateOpenedUnitLevel,
   getStockRequests, createStockRequest, reviewStockRequest,
   notifyManagers, notifyWorker, getWorkers, getStockLogsRealtime,
-  getStockCategories, addStockCategory,
+  getStockCategories, addStockCategory, reverseStockLog,
 } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
 import {
   Package, Plus, Pencil, Trash2, AlertTriangle, CheckCircle, XCircle,
   ChevronDown, ChevronUp, Minus, ClipboardList, Bell, Search, Filter, RefreshCw,
-  Download, FileText, FileSpreadsheet, TrendingDown, Boxes, PackageOpen, CheckCircle2,
+  Download, FileText, FileSpreadsheet, TrendingDown, Boxes, PackageOpen, CheckCircle2, Undo2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -154,6 +154,7 @@ function StockPageInner() {
   const [alertModalOpen, setAlertModalOpen] = useState(false);
   const [alertRefillMap, setAlertRefillMap] = useState({});
   const [alertRefilling, setAlertRefilling] = useState(false);
+  const [reversingLogId, setReversingLogId] = useState(null);
 
   // Open unit modal
   const [openUnitModal, setOpenUnitModal] = useState(null); // null | item
@@ -255,7 +256,7 @@ function StockPageInner() {
   const openAlertModal = () => {
     const missing = items.filter(i => stockStatus(i) !== 'ok');
     const map = {};
-    missing.forEach(i => { map[i.id] = Math.max((i.minimumQuantity || 1) * 2, (i.minimumQuantity || 0) + 1) - (i.quantity || 0); });
+    missing.forEach(i => { map[i.id] = 0; });
     setAlertRefillMap(map);
     setAlertModalOpen(true);
   };
@@ -360,6 +361,20 @@ function StockPageInner() {
   }, [orgId, canManage]);
 
   // ─── Derived data ────────────────────────────────────
+  const handleReverseLog = async (log) => {
+    if (log.reversed || log.type === 'reversed' || log.type === 'created' || log.type === 'deleted') return;
+    setReversingLogId(log.id);
+    try {
+      await reverseStockLog(log.id, userProfile);
+      toast.success('Action reversed');
+      await load();
+    } catch (e) {
+      toast.error(e.message || 'Failed to reverse');
+    } finally {
+      setReversingLogId(null);
+    }
+  };
+
   const alertItems = items.filter(i => stockStatus(i) === 'low' || stockStatus(i) === 'out');
   const myRequests = requests.filter(r => r.requestedBy === user?.uid);
   const pendingRequests = requests.filter(r => r.status === 'pending');
@@ -1004,6 +1019,7 @@ function StockPageInner() {
                 <option value="edited">Edited</option>
                 <option value="created">Created</option>
                 <option value="deleted">Deleted</option>
+                <option value="reversed">Reversed</option>
               </select>
               <span className="text-xs text-surface-400">Updates in real-time</span>
             </div>
@@ -1016,8 +1032,10 @@ function StockPageInner() {
               </div>
             ) : (
               <div className="space-y-2">
-                {(logFilter === 'all' ? logs : logs.filter(l => l.type === logFilter)).map(log => (
-                  <div key={log.id} className="card p-4">
+                {(logFilter === 'all' ? logs : logs.filter(l => l.type === logFilter)).map(log => {
+                  const canReverse = !log.reversed && log.type !== 'reversed' && log.type !== 'created' && log.type !== 'deleted';
+                  return (
+                  <div key={log.id} className={cn('card p-4', log.reversed && 'opacity-50')}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 flex-1">
                         <div className={cn(
@@ -1026,9 +1044,10 @@ function StockPageInner() {
                           log.type === 'remove' ? 'bg-red-100 text-red-600' :
                           log.type === 'edited' ? 'bg-blue-100 text-blue-600' :
                           log.type === 'created' ? 'bg-purple-100 text-purple-600' :
+                          log.type === 'reversed' ? 'bg-orange-100 text-orange-600' :
                           'bg-gray-100 text-gray-600'
                         )}>
-                          {log.type === 'add' ? '+' : log.type === 'remove' ? '−' : log.type === 'edited' ? '✎' : log.type === 'created' ? '★' : '×'}
+                          {log.type === 'add' ? '+' : log.type === 'remove' ? '−' : log.type === 'edited' ? '✎' : log.type === 'created' ? '★' : log.type === 'reversed' ? '↩' : '×'}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-surface-900">
@@ -1039,9 +1058,10 @@ function StockPageInner() {
                             )}>
                               {log.change > 0 ? `+${log.change}` : log.change}
                             </span>
+                            {log.reversed && <span className="ml-2 text-[10px] font-semibold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">REVERSED</span>}
                           </p>
                           <p className="text-xs text-surface-500">
-                            {log.type === 'add' ? 'Added stock' : log.type === 'remove' ? 'Removed stock' : log.type === 'edited' ? 'Edited item' : log.type === 'created' ? 'Created item' : 'Deleted item'}
+                            {log.type === 'add' ? 'Added stock' : log.type === 'remove' ? 'Removed stock' : log.type === 'edited' ? 'Edited item' : log.type === 'created' ? 'Created item' : log.type === 'reversed' ? 'Reversed action' : 'Deleted item'}
                             {' · '}{log.updatedByName || 'Unknown'}
                             {' · '}{log.createdAt ? new Date(log.createdAt).toLocaleString() : 'Just now'}
                           </p>
@@ -1050,11 +1070,23 @@ function StockPageInner() {
                               {log.previousQuantity} → {log.newQuantity}
                             </p>
                           )}
+                          {log.details && <p className="text-xs text-surface-400 italic">{log.details}</p>}
                         </div>
                       </div>
+                      {canReverse && (
+                        <button
+                          onClick={() => handleReverseLog(log)}
+                          disabled={reversingLogId === log.id}
+                          title="Reverse this action"
+                          className="flex-shrink-0 p-2 rounded-lg text-surface-400 hover:text-orange-600 hover:bg-orange-50 transition-colors disabled:opacity-50"
+                        >
+                          <Undo2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

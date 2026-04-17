@@ -223,10 +223,11 @@ service cloud.firestore {
       allow delete: if isManager() || isInventory();
     }
 
-    // Stock Logs: all auth read (managers view activity), all auth create (workers/managers log changes)
+    // Stock Logs: all auth read, all auth create, managers/inventory can update (reverse actions)
     match /stockLogs/{id} {
       allow read: if isAuth();
       allow create: if isAuth();
+      allow update: if isManager() || isInventory();
     }
 
     // Availability Settings: stored in organizations doc, only admins can update
