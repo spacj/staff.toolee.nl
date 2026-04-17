@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
-import { LayoutDashboard, Users, Calendar, Clock, Settings, Store, ClipboardList, CreditCard, MessageCircle, CalendarCheck, Globe, Inbox, DollarSign, BookOpen, ClipboardCheck, Building2, Package, CookingPot } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Clock, Settings, Store, ClipboardList, CreditCard, MessageCircle, CalendarCheck, Globe, Inbox, DollarSign, BookOpen, ClipboardCheck, Building2, Package } from 'lucide-react';
 
 export default function MobileNav() {
   const pathname = usePathname();
@@ -18,7 +18,6 @@ export default function MobileNav() {
 
   const inventoryItems = [
     { href: '/inventory', icon: Building2, label: 'Orgs' },
-    { href: '/recipes', icon: CookingPot, label: 'Recipes' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 

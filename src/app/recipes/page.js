@@ -1,9 +1,10 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getRecipes, createRecipe, updateRecipe, deleteRecipe, executeRecipe, getStockItems } from '@/lib/firestore';
+import { getRecipes, createRecipe, updateRecipe, deleteRecipe, executeRecipe, getStockItems, getOrganization } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
 import {
   CookingPot, Plus, Pencil, Trash2, Search, Calculator, ChevronDown,
@@ -47,14 +48,25 @@ function smartRound(value, unit) {
 }
 
 export default function RecipesPage() {
+  return (
+    <Suspense fallback={<Layout><div className="p-6">Loading...</div></Layout>}>
+      <RecipesPageInner />
+    </Suspense>
+  );
+}
+
+function RecipesPageInner() {
   const { orgId: authOrgId, user, userProfile, isManager, isAdmin, isInventory } = useAuth();
-  const orgId = authOrgId;
+  const searchParams = useSearchParams();
+  const orgIdOverride = searchParams?.get('orgId') || '';
+  const orgId = isInventory && orgIdOverride ? orgIdOverride : authOrgId;
   const canManage = isAdmin || isManager || isInventory;
 
   const [recipes, setRecipes] = useState([]);
   const [stockItems, setStockItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [orgName, setOrgName] = useState('');
 
   // Recipe editor
   const [editModal, setEditModal] = useState(null); // null | 'add' | recipe obj
@@ -84,6 +96,12 @@ export default function RecipesPage() {
       ]);
       setRecipes(r);
       setStockItems(s);
+      if (isInventory && orgIdOverride) {
+        const org = await getOrganization(orgIdOverride);
+        setOrgName(org?.name || 'Unknown Organization');
+      } else {
+        setOrgName('');
+      }
     } catch { toast.error('Failed to load recipes'); }
     finally { setLoading(false); }
   };
@@ -261,6 +279,7 @@ export default function RecipesPage() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-display font-bold text-surface-900 flex items-center gap-2">
               <CookingPot className="w-7 h-7 text-brand-500" /> Recipes
+              {isInventory && orgName && <span className="text-lg font-normal text-surface-500">/ {orgName}</span>}
             </h1>
             <p className="text-sm text-surface-500 mt-0.5">Scale recipes, link ingredients to stock, and deduct on execution.</p>
           </div>
