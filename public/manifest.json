@@ -2,7 +2,7 @@
   "name": "StaffHub - Staff Management Platform",
   "short_name": "StaffHub",
   "description": "Manage your team, shifts, costs, checklists, and stock all in one place.",
-  "start_url": "/",
+  "start_url": "/login",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4c6ef5",
