@@ -296,14 +296,16 @@ export default function HomePage() {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    if (isPWA) {
       setIsInstalled(true);
+      if (!loading && !user) router.replace('/login');
     }
     const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
     window.addEventListener('appinstalled', () => setIsInstalled(true));
     return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
+  }, [loading, user, router]);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
