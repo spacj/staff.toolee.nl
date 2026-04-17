@@ -299,7 +299,11 @@ export default function HomePage() {
     const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
     if (isPWA) {
       setIsInstalled(true);
-      if (!loading && !user) router.replace('/login');
+      const hasNavigated = sessionStorage.getItem('pwa_navigated');
+      if (!hasNavigated && !loading && !user) {
+        sessionStorage.setItem('pwa_navigated', '1');
+        router.replace('/login');
+      }
     }
     const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
