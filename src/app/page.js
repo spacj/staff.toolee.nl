@@ -7,7 +7,7 @@ import { PRICE_PER_WORKER, PRICE_PER_SHOP, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_
 import { createSupportTicket } from '@/lib/firestore';
 import Modal from '@/components/Modal';
 import toast from 'react-hot-toast';
-import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ExternalLink, HelpCircle, Send, Loader2, Building2, Users as UsersIcon, Mail, Phone, Menu, X } from 'lucide-react';
+import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ExternalLink, HelpCircle, Send, Loader2, Building2, Users as UsersIcon, Mail, Phone, Menu, X, Download, Smartphone } from 'lucide-react';
 
 const features = [
   { icon: Store, title: 'Multi-Shop Management', desc: 'Manage multiple locations from one dashboard with separate schedules and staff.', color: 'from-brand-500 to-brand-600' },
@@ -292,6 +292,26 @@ export default function HomePage() {
   const router = useRouter();
   const [showSalesModal, setShowSalesModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+      setIsInstalled(true);
+    }
+    const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', () => setIsInstalled(true));
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') setIsInstalled(true);
+    setDeferredPrompt(null);
+  };
 
   useEffect(() => {
     if (!loading && user && userProfile) {
@@ -399,6 +419,15 @@ export default function HomePage() {
                 </Link>
               </div>
 
+              {deferredPrompt && !isInstalled && (
+                <button
+                  onClick={() => { handleInstall(); setMobileMenuOpen(false); }}
+                  className="mt-6 flex items-center justify-center gap-2 w-full py-3.5 px-4 rounded-2xl text-sm font-semibold bg-white border border-brand-200 text-brand-700 hover:bg-brand-50 active:scale-[0.98] transition-all"
+                >
+                  <Download className="w-4.5 h-4.5" /> Install App
+                </button>
+              )}
+
               <div className="mt-8 rounded-2xl bg-white border border-slate-200/70 p-4 flex items-start gap-3">
                 <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
                   <Check className="w-4.5 h-4.5" />
@@ -439,6 +468,16 @@ export default function HomePage() {
               View Pricing <ChevronRight className="w-4 h-4" />
             </a>
           </div>
+          {deferredPrompt && !isInstalled && (
+            <div className="flex justify-center mb-6 sm:mb-8">
+              <button
+                onClick={handleInstall}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow transition-all"
+              >
+                <Download className="w-4 h-4 text-brand-500" /> Install App
+              </button>
+            </div>
+          )}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-xs sm:text-sm text-slate-500 px-4">
             <span className="flex items-center gap-1.5 sm:gap-2"><Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" /> Free for up to {FREE_WORKER_LIMIT} workers</span>
             <span className="flex items-center gap-1.5 sm:gap-2"><Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" /> No credit card required</span>
