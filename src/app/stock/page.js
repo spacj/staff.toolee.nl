@@ -1019,6 +1019,7 @@ function StockPageInner() {
                 <option value="edited">Edited</option>
                 <option value="created">Created</option>
                 <option value="deleted">Deleted</option>
+                <option value="recipe_used">Recipe used</option>
                 <option value="reversed">Reversed</option>
               </select>
               <span className="text-xs text-surface-400">Updates in real-time</span>
@@ -1045,9 +1046,10 @@ function StockPageInner() {
                           log.type === 'edited' ? 'bg-blue-100 text-blue-600' :
                           log.type === 'created' ? 'bg-purple-100 text-purple-600' :
                           log.type === 'reversed' ? 'bg-orange-100 text-orange-600' :
+                          log.type === 'recipe_used' ? 'bg-pink-100 text-pink-600' :
                           'bg-gray-100 text-gray-600'
                         )}>
-                          {log.type === 'add' ? '+' : log.type === 'remove' ? '−' : log.type === 'edited' ? '✎' : log.type === 'created' ? '★' : log.type === 'reversed' ? '↩' : '×'}
+                          {log.type === 'add' ? '+' : log.type === 'remove' ? '−' : log.type === 'edited' ? '✎' : log.type === 'created' ? '★' : log.type === 'reversed' ? '↩' : log.type === 'recipe_used' ? '🍳' : '×'}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-surface-900">
@@ -1061,7 +1063,7 @@ function StockPageInner() {
                             {log.reversed && <span className="ml-2 text-[10px] font-semibold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">REVERSED</span>}
                           </p>
                           <p className="text-xs text-surface-500">
-                            {log.type === 'add' ? 'Added stock' : log.type === 'remove' ? 'Removed stock' : log.type === 'edited' ? 'Edited item' : log.type === 'created' ? 'Created item' : log.type === 'reversed' ? 'Reversed action' : 'Deleted item'}
+                            {log.type === 'add' ? 'Added stock' : log.type === 'remove' ? 'Removed stock' : log.type === 'edited' ? 'Edited item' : log.type === 'created' ? 'Created item' : log.type === 'reversed' ? 'Reversed action' : log.type === 'recipe_used' ? 'Recipe used' : 'Deleted item'}
                             {' · '}{log.updatedByName || 'Unknown'}
                             {' · '}{log.createdAt ? new Date(log.createdAt).toLocaleString() : 'Just now'}
                           </p>

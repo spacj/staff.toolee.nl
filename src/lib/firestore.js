@@ -1077,25 +1077,56 @@ export async function reverseStockLog(logId, userProfile = {}) {
   const item = await get1(C.STOCK_ITEMS, log.itemId);
   if (!item) throw new Error('Stock item no longer exists');
 
-  const reverseChange = -(log.change || 0);
-  const newQty = (item.quantity || 0) + reverseChange;
-  if (newQty < 0) throw new Error('Reversal would result in negative stock');
-
-  await upd(C.STOCK_ITEMS, log.itemId, { quantity: newQty });
-  await upd(C.STOCK_LOGS, logId, { reversed: true, reversedAt: ts(), reversedBy: userProfile.uid || '', reversedByName: userProfile.displayName || '' });
-  await createStockLog({
-    orgId: log.orgId,
-    itemId: log.itemId,
-    itemName: log.itemName,
-    previousQuantity: item.quantity,
-    newQuantity: newQty,
-    change: reverseChange,
-    type: 'reversed',
-    updatedBy: userProfile.uid || '',
-    updatedByName: userProfile.displayName || '',
-    details: `Reversed: ${log.type} of ${Math.abs(log.change || 0)} by ${log.updatedByName || 'unknown'}`,
-    reversedLogId: logId,
-  });
+  if (log.deductFromLevel && log.levelDeducted > 0) {
+    const entries = Array.isArray(item.inUseOpenedAt) ? [...item.inUseOpenedAt] : [];
+    let remaining = log.levelDeducted;
+    for (let i = 0; i < entries.length && remaining > 0; i++) {
+      const e = entries[i];
+      if (e.capacity > 0) {
+        const space = e.capacity - (e.currentLevel || 0);
+        const refill = Math.min(remaining, space);
+        entries[i] = { ...e, currentLevel: (e.currentLevel || 0) + refill };
+        remaining -= refill;
+      }
+    }
+    await upd(C.STOCK_ITEMS, log.itemId, { inUseOpenedAt: entries });
+    await upd(C.STOCK_LOGS, logId, { reversed: true, reversedAt: ts(), reversedBy: userProfile.uid || '', reversedByName: userProfile.displayName || '' });
+    await createStockLog({
+      orgId: log.orgId,
+      itemId: log.itemId,
+      itemName: log.itemName,
+      previousQuantity: item.quantity,
+      newQuantity: item.quantity,
+      change: 0,
+      type: 'reversed',
+      deductFromLevel: true,
+      levelDeducted: -(log.levelDeducted),
+      levelUnit: log.levelUnit || '',
+      updatedBy: userProfile.uid || '',
+      updatedByName: userProfile.displayName || '',
+      details: `Reversed: refilled ${log.levelDeducted} ${log.levelUnit || ''} to open units`,
+      reversedLogId: logId,
+    });
+  } else {
+    const reverseChange = -(log.change || 0);
+    const newQty = (item.quantity || 0) + reverseChange;
+    if (newQty < 0) throw new Error('Reversal would result in negative stock');
+    await upd(C.STOCK_ITEMS, log.itemId, { quantity: newQty });
+    await upd(C.STOCK_LOGS, logId, { reversed: true, reversedAt: ts(), reversedBy: userProfile.uid || '', reversedByName: userProfile.displayName || '' });
+    await createStockLog({
+      orgId: log.orgId,
+      itemId: log.itemId,
+      itemName: log.itemName,
+      previousQuantity: item.quantity,
+      newQuantity: newQty,
+      change: reverseChange,
+      type: 'reversed',
+      updatedBy: userProfile.uid || '',
+      updatedByName: userProfile.displayName || '',
+      details: `Reversed: ${log.type} of ${Math.abs(log.change || 0)} by ${log.updatedByName || 'unknown'}`,
+      reversedLogId: logId,
+    });
+  }
 }
 
 export async function createStockItem(data, userProfile = {}) {
@@ -1343,9 +1374,12 @@ export async function executeRecipe(ingredients, userProfile = {}) {
         newQuantity: item.quantity,
         change: 0,
         type: 'recipe_used',
+        deductFromLevel: true,
+        levelDeducted: ing.deductQty - remaining,
+        levelUnit: ing.deductUnit || '',
         updatedBy: userProfile.uid || '',
         updatedByName: userProfile.displayName || '',
-        details: `Deducted ${ing.deductQty} ${ing.deductUnit || ''} from open unit levels`,
+        details: `Deducted ${ing.deductQty - remaining} ${ing.deductUnit || ''} from open unit levels`,
       });
     } else {
       // Deduct from sealed stock quantity
