@@ -777,6 +777,47 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Leave Balance Settings */}
+              <div className="card">
+                <div className="px-6 py-5 border-b border-surface-100">
+                  <h2 className="text-lg font-display font-semibold text-surface-900">Leave Balance</h2>
+                  <p className="text-sm text-surface-500 mt-0.5">Set the annual leave allowance for your team.</p>
+                </div>
+                <div className="px-6 py-5 space-y-4">
+                  <div>
+                    <label className="label">Annual Holiday Allowance (days per worker)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="365"
+                      value={orgData?.leaveAllowance ?? 25}
+                      onChange={e => setOrgData(d => ({ ...d, leaveAllowance: Number(e.target.value) }))}
+                      className="input-field max-w-[120px]"
+                    />
+                    <span className="text-xs text-surface-400 ml-2">days per year</span>
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={async () => {
+                        setLoading(true);
+                        try {
+                          const { updateOrganization } = await import('@/lib/firestore');
+                          await updateOrganization(orgId, { leaveAllowance: orgData?.leaveAllowance ?? 25 });
+                          toast.success('Leave allowance updated');
+                        } catch (err) {
+                          toast.error('Failed to save');
+                        }
+                        setLoading(false);
+                      }}
+                      disabled={loading}
+                      className="btn-primary flex items-center gap-2"
+                    >
+                      <Save className="w-4 h-4" /> {loading ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

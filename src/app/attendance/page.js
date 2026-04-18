@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getAttendance, getPermits, updatePermit, getWorkers, getShops, approveAttendance, notifyWorker, getCorrectionRequests, reviewCorrectionRequest, getMessages, createMessage, markMessageRead, updateAttendance, createAttendance, deleteAttendance } from '@/lib/firestore';
+import { getAttendance, getPermits, updatePermit, getWorkers, getShops, approveAttendance, notifyWorker, getCorrectionRequests, reviewCorrectionRequest, getMessages, createMessage, markMessageRead, updateAttendance, createAttendance, deleteAttendance, getOrganization } from '@/lib/firestore';
 import { formatCurrency } from '@/lib/pricing';
 import { cn } from '@/utils/helpers';
 import { Clock, CheckCircle, XCircle, Calendar, Users, FileCheck, MessageSquare, AlertTriangle, Send, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Grid3X3, Download, FileText, FileSpreadsheet } from 'lucide-react';
@@ -43,6 +43,7 @@ export default function AttendancePage() {
   const [expandedMsg, setExpandedMsg] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [leaveAllowance, setLeaveAllowance] = useState(25);
 
   const calYear = calDate.getFullYear();
   const calMonth = calDate.getMonth();
@@ -60,6 +61,7 @@ export default function AttendancePage() {
     getShops(orgId).then(setShops);
     getCorrectionRequests({ orgId, limit: 50 }).then(setCorrections).catch(() => setCorrections([]));
     getMessages({ orgId, limit: 100 }).then(setMessages).catch(() => setMessages([]));
+    getOrganization(orgId).then(org => { if (org?.leaveAllowance !== undefined) setLeaveAllowance(org.leaveAllowance); }).catch(() => {});
   };
 
   // Load calendar month data
@@ -597,6 +599,46 @@ export default function AttendancePage() {
         {/* ═══ PERMITS TAB ═══ */}
         {tab === 'permits' && (
           <div className="space-y-4">
+            {/* Leave Balance Summary */}
+            {isManager && (() => {
+              const year = new Date().getFullYear();
+              const approved = permits.filter(p => p.status === 'approved' && p.type === 'holiday');
+              const byWorker = {};
+              approved.forEach(p => {
+                const start = new Date(p.startDate);
+                const end = p.endDate ? new Date(p.endDate) : start;
+                if (start.getFullYear() !== year && end.getFullYear() !== year) return;
+                const days = Math.max(1, Math.round((end - start) / 86400000) + 1);
+                const name = p.workerName || workerName(p.workerId);
+                byWorker[name] = (byWorker[name] || 0) + days;
+              });
+              const entries = Object.entries(byWorker).sort((a, b) => b[1] - a[1]);
+              if (entries.length === 0 && permits.length === 0) return null;
+              return (
+                <div className="card p-4">
+                  <p className="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-3">Leave Balance {year} — {leaveAllowance} days allowance</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {entries.map(([name, used]) => {
+                      const remaining = leaveAllowance - used;
+                      const pct = Math.min(100, (used / leaveAllowance) * 100);
+                      return (
+                        <div key={name} className="p-3 rounded-xl bg-surface-50 border border-surface-100">
+                          <p className="text-sm font-medium text-surface-800 truncate">{name}</p>
+                          <div className="flex items-baseline gap-1 mt-1">
+                            <span className={cn('text-lg font-bold', remaining <= 0 ? 'text-red-600' : remaining <= 5 ? 'text-amber-600' : 'text-emerald-600')}>{remaining}</span>
+                            <span className="text-xs text-surface-400">days left</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-surface-200 rounded-full mt-2">
+                            <div className={cn('h-full rounded-full transition-all', pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500')} style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className="text-[10px] text-surface-400 mt-1">{used} of {leaveAllowance} used</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
             {permits.length === 0 && <div className="card p-8 text-center"><FileCheck className="w-8 h-8 text-surface-300 mx-auto mb-2" /><p className="text-surface-400 text-sm">No leave requests.</p></div>}
             {permits.map(p => (
               <div key={p.id} className={cn('card p-5', p.status === 'pending' ? 'border-amber-200' : '')}>
