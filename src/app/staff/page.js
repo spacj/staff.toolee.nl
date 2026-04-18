@@ -1,7 +1,8 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
+import Pagination from '@/components/Pagination';
 import WorkerForm from '@/components/WorkerForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { getWorkers, deleteWorker, syncOrgPlan } from '@/lib/firestore';
@@ -11,6 +12,8 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import useStore from '@/lib/store';
 
+const PAGE_SIZE = 12;
+
 export default function StaffPage() {
   const { orgId, isAdmin, isManager } = useAuth();
   const [workers, setWorkers] = useState([]);
@@ -19,6 +22,7 @@ export default function StaffPage() {
   const [showForm, setShowForm] = useState(false);
   const [editWorker, setEditWorker] = useState(null);
   const [menuId, setMenuId] = useState(null);
+  const [page, setPage] = useState(1);
 
   const load = () => orgId && getWorkers({ orgId }).then(setWorkers);
   useEffect(() => { load(); }, [orgId]);
@@ -30,6 +34,11 @@ export default function StaffPage() {
 
   const active = filtered.filter(w => w.status === 'active');
   const inactive = filtered.filter(w => w.status !== 'active');
+
+  const totalPages = Math.ceil(active.length / PAGE_SIZE);
+  const pagedActive = useMemo(() => active.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [active, page]);
+
+  useEffect(() => { setPage(1); }, [search, searchQuery]);
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this worker?')) return;
@@ -101,9 +110,12 @@ export default function StaffPage() {
         </div>
 
         {active.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-stagger">
-            {active.map(w => <WorkerCard key={w.id} w={w} />)}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-stagger">
+              {pagedActive.map(w => <WorkerCard key={w.id} w={w} />)}
+            </div>
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={active.length} pageSize={PAGE_SIZE} />
+          </>
         )}
 
         {inactive.length > 0 && (

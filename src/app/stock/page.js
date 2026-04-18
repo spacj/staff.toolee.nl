@@ -1,8 +1,9 @@
 'use client';
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
+import Pagination from '@/components/Pagination';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getStockItems, createStockItem, updateStockItem, deleteStockItem, adjustStockQuantity,
@@ -384,6 +385,19 @@ function StockPageInner() {
     const matchCat = categoryFilter === 'all' || i.category === categoryFilter;
     return matchSearch && matchCat;
   });
+
+  const ITEMS_PER_PAGE = 12;
+  const [itemPage, setItemPage] = useState(1);
+  const itemTotalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
+  const pagedItems = useMemo(() => filteredItems.slice((itemPage - 1) * ITEMS_PER_PAGE, itemPage * ITEMS_PER_PAGE), [filteredItems, itemPage]);
+  useEffect(() => { setItemPage(1); }, [search, categoryFilter]);
+
+  const LOGS_PER_PAGE = 20;
+  const [logPage, setLogPage] = useState(1);
+  const filteredLogs = logFilter === 'all' ? logs : logs.filter(l => l.type === logFilter);
+  const logTotalPages = Math.ceil(filteredLogs.length / LOGS_PER_PAGE);
+  const pagedLogs = useMemo(() => filteredLogs.slice((logPage - 1) * LOGS_PER_PAGE, logPage * LOGS_PER_PAGE), [filteredLogs, logPage]);
+  useEffect(() => { setLogPage(1); }, [logFilter]);
 
   const filteredRequests = (canManage ? requests : myRequests).filter(r =>
     requestStatusFilter === 'all' || r.status === requestStatusFilter
@@ -814,8 +828,9 @@ function StockPageInner() {
                 )}
               </div>
             ) : (
+              <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredItems.map(item => {
+                {pagedItems.map(item => {
                   const s = stockStatus(item);
                   return (
                     <div key={item.id} className={cn('card p-4 flex flex-col gap-3', s === 'out' && 'border-red-200 bg-red-50/30', s === 'low' && 'border-amber-200 bg-amber-50/20')}>
@@ -931,6 +946,8 @@ function StockPageInner() {
                   );
                 })}
               </div>
+              <Pagination page={itemPage} totalPages={itemTotalPages} onPageChange={setItemPage} totalItems={filteredItems.length} pageSize={ITEMS_PER_PAGE} />
+              </>
             )}
           </div>
         )}
@@ -1032,8 +1049,9 @@ function StockPageInner() {
                 <p className="text-sm text-surface-400 mt-1">Stock changes will appear here</p>
               </div>
             ) : (
+              <>
               <div className="space-y-2">
-                {(logFilter === 'all' ? logs : logs.filter(l => l.type === logFilter)).map(log => {
+                {pagedLogs.map(log => {
                   const canReverse = !log.reversed && log.type !== 'reversed' && log.type !== 'created' && log.type !== 'deleted';
                   return (
                   <div key={log.id} className={cn('card p-4', log.reversed && 'opacity-50')}>
@@ -1090,6 +1108,8 @@ function StockPageInner() {
                   );
                 })}
               </div>
+              <Pagination page={logPage} totalPages={logTotalPages} onPageChange={setLogPage} totalItems={filteredLogs.length} pageSize={LOGS_PER_PAGE} />
+              </>
             )}
           </div>
         )}
