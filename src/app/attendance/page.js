@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getAttendance, getPermits, updatePermit, getWorkers, getShops, approveAttendance, notifyWorker, getCorrectionRequests, reviewCorrectionRequest, getMessages, createMessage, markMessageRead, updateAttendance, createAttendance, deleteAttendance } from '@/lib/firestore';
 import { formatCurrency } from '@/lib/pricing';
 import { cn } from '@/utils/helpers';
-import { Clock, CheckCircle, XCircle, Calendar, Users, FileCheck, MessageSquare, AlertTriangle, Send, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Grid3X3 } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Calendar, Users, FileCheck, MessageSquare, AlertTriangle, Send, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Grid3X3, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function AttendancePage() {
@@ -314,6 +314,60 @@ export default function AttendancePage() {
   const monthTotalHours = allAttendance.reduce((s, a) => s + (a.totalHours || 0), 0);
   const monthPending = allAttendance.filter(a => a.approvalStatus === 'pending').length;
 
+  const [exportOpen, setExportOpen] = useState(false);
+
+  const exportAttendanceCSV = () => {
+    const data = allAttendance.length > 0 ? allAttendance : attendance;
+    if (data.length === 0) return toast.error('No records to export');
+    const rows = [['Date', 'Worker', 'Shop', 'Clock In', 'Clock Out', 'Hours', 'Status']];
+    data.forEach(a => {
+      const entries = Array.isArray(a.entries) ? a.entries : [];
+      if (entries.length === 0) {
+        rows.push([a.date, workerName(a.workerId), shopName(a.shopId), '', '', (a.totalHours || 0).toFixed(2), a.approvalStatus || '']);
+      } else {
+        entries.forEach(e => {
+          rows.push([a.date, workerName(a.workerId), shopName(a.shopId), e.clockIn?.slice(11, 16) || '', e.clockOut?.slice(11, 16) || 'active', (a.totalHours || 0).toFixed(2), a.approvalStatus || '']);
+        });
+      }
+    });
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `attendance-${monthStr || dateFilter}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setExportOpen(false);
+    toast.success('CSV exported');
+  };
+
+  const exportAttendancePDF = () => {
+    const data = allAttendance.length > 0 ? allAttendance : attendance;
+    if (data.length === 0) return toast.error('No records to export');
+    const byWorker = {};
+    data.forEach(a => {
+      const name = workerName(a.workerId);
+      if (!byWorker[name]) byWorker[name] = { hours: 0, records: 0, pending: 0 };
+      byWorker[name].hours += a.totalHours || 0;
+      byWorker[name].records++;
+      if (a.approvalStatus === 'pending') byWorker[name].pending++;
+    });
+    const totalH = data.reduce((s, a) => s + (a.totalHours || 0), 0);
+    let html = `<html><head><style>body{font-family:system-ui;padding:40px;color:#1a1a2e}h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;color:#666;margin-bottom:20px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:13px}th{background:#f5f5f5;font-weight:600}.total{font-weight:700;background:#f0f4ff}</style></head><body>`;
+    html += `<h1>Attendance Report</h1><h2>${navTitle} — ${data.length} records · ${totalH.toFixed(1)} total hours</h2>`;
+    html += `<table><tr><th>Worker</th><th>Records</th><th>Hours</th><th>Pending</th></tr>`;
+    Object.entries(byWorker).sort((a, b) => b[1].hours - a[1].hours).forEach(([name, s]) => {
+      html += `<tr><td>${name}</td><td>${s.records}</td><td>${s.hours.toFixed(1)}</td><td>${s.pending || '—'}</td></tr>`;
+    });
+    html += `<tr class="total"><td>Total</td><td>${data.length}</td><td>${totalH.toFixed(1)}</td><td>${data.filter(a => a.approvalStatus === 'pending').length || '—'}</td></tr>`;
+    html += `</table></body></html>`;
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+    w.print();
+    setExportOpen(false);
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -322,11 +376,29 @@ export default function AttendancePage() {
             <h1 className="page-title">Attendance & Leave</h1>
             <p className="text-surface-500 mt-1">Review hours, approve time, manage leave requests.</p>
           </div>
-          {isManager && tab === 'calendar' && (
-            <button onClick={() => openAddEntry(selectedCalDate)} className="btn-primary !px-3 sm:!px-5">
-              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Record</span><span className="sm:hidden">Add</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {isManager && (tab === 'calendar' || tab === 'hours') && (
+              <div className="relative">
+                <button onClick={() => setExportOpen(!exportOpen)} className="btn-secondary !py-2 !px-3">
+                  <Download className="w-4 h-4" /> <span className="hidden sm:inline">Export</span>
+                </button>
+                {exportOpen && (
+                  <>
+                    <div className="dropdown-backdrop" onClick={() => setExportOpen(false)} />
+                    <div className="dropdown-menu !right-0 !left-auto">
+                      <button onClick={exportAttendanceCSV} className="dropdown-item"><FileSpreadsheet className="w-3.5 h-3.5" /> Export CSV</button>
+                      <button onClick={exportAttendancePDF} className="dropdown-item"><FileText className="w-3.5 h-3.5" /> Print / PDF</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            {isManager && tab === 'calendar' && (
+              <button onClick={() => openAddEntry(selectedCalDate)} className="btn-primary !px-3 sm:!px-5">
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Record</span><span className="sm:hidden">Add</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Stats */}

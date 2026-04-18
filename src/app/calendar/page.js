@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getShifts, getWorkers, getShops, getShiftTemplates, getPermits, bulkCreateShifts, deleteShift, createShift, getPublicHolidays, savePublicHolidays } from '@/lib/firestore';
 import { generateWeeklySchedule, DAY_LABELS } from '@/lib/scheduling';
 import { cn } from '@/utils/helpers';
-import { ChevronLeft, ChevronRight, Plus, Wand2, Trash2, Calendar as CalIcon, Users, Clock, Grid3X3, List, LayoutGrid, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Wand2, Trash2, Calendar as CalIcon, Users, Clock, Grid3X3, List, LayoutGrid, AlertTriangle, CheckCircle, X, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const VIEWS = { MONTH: 'month', WEEK: 'week', LIST: 'list' };
@@ -308,6 +308,50 @@ export default function CalendarPage() {
     );
   };
 
+  const [scheduleExportOpen, setScheduleExportOpen] = useState(false);
+
+  const exportScheduleCSV = () => {
+    if (shifts.length === 0) return toast.error('No shifts to export');
+    const rows = [['Date', 'Worker', 'Shop', 'Start', 'End', 'Hours', 'Template']];
+    [...shifts].sort((a, b) => a.date.localeCompare(b.date)).forEach(s => {
+      const hours = s.startTime && s.endTime ? ((new Date(`2000-01-01T${s.endTime}`) - new Date(`2000-01-01T${s.startTime}`)) / 3600000).toFixed(1) : '';
+      rows.push([s.date, workerName(s.workerId), shopName(s.shopId), s.startTime || '', s.endTime || '', hours, s.templateName || '']);
+    });
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `schedule-${loadRange.start}-to-${loadRange.end}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setScheduleExportOpen(false);
+    toast.success('CSV exported');
+  };
+
+  const exportSchedulePDF = () => {
+    if (shifts.length === 0) return toast.error('No shifts to export');
+    const byDate = {};
+    shifts.forEach(s => { if (!byDate[s.date]) byDate[s.date] = []; byDate[s.date].push(s); });
+    const dates = Object.keys(byDate).sort();
+    let html = `<html><head><style>body{font-family:system-ui;padding:40px;color:#1a1a2e}h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;color:#666;margin-bottom:20px}h3{font-size:14px;margin:16px 0 8px;color:#333}table{width:100%;border-collapse:collapse;margin-bottom:16px}th,td{border:1px solid #ddd;padding:6px 10px;text-align:left;font-size:12px}th{background:#f5f5f5;font-weight:600}</style></head><body>`;
+    html += `<h1>Schedule</h1><h2>${loadRange.start} to ${loadRange.end} — ${shifts.length} shifts</h2>`;
+    dates.forEach(d => {
+      const dayShifts = byDate[d];
+      const dayName = new Date(d + 'T00:00').toLocaleDateString('en', { weekday: 'long', month: 'short', day: 'numeric' });
+      html += `<h3>${dayName}</h3><table><tr><th>Worker</th><th>Shop</th><th>Time</th><th>Template</th></tr>`;
+      dayShifts.forEach(s => {
+        html += `<tr><td>${workerName(s.workerId)}</td><td>${shopName(s.shopId)}</td><td>${s.startTime || '?'}–${s.endTime || '?'}</td><td>${s.templateName || ''}</td></tr>`;
+      });
+      html += `</table>`;
+    });
+    html += `</body></html>`;
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+    w.print();
+    setScheduleExportOpen(false);
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -318,6 +362,20 @@ export default function CalendarPage() {
           </div>
           {isManager && (
             <div className="flex gap-2">
+              <div className="relative">
+                <button onClick={() => setScheduleExportOpen(!scheduleExportOpen)} className="btn-secondary !py-2 !px-3">
+                  <Download className="w-4 h-4" /> <span className="hidden sm:inline">Export</span>
+                </button>
+                {scheduleExportOpen && (
+                  <>
+                    <div className="dropdown-backdrop" onClick={() => setScheduleExportOpen(false)} />
+                    <div className="dropdown-menu !right-0 !left-auto">
+                      <button onClick={exportScheduleCSV} className="dropdown-item"><FileSpreadsheet className="w-3.5 h-3.5" /> Export CSV</button>
+                      <button onClick={exportSchedulePDF} className="dropdown-item"><FileText className="w-3.5 h-3.5" /> Print / PDF</button>
+                    </div>
+                  </>
+                )}
+              </div>
               {(!selectedDate || activeWorkers.length > shiftsForDate(selectedDate).length) && (
                 <button onClick={() => openAddShift(selectedDate)} className="btn-secondary !px-3 sm:!px-5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Shift</span><span className="sm:hidden">Add</span></button>
               )}
