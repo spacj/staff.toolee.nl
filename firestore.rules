@@ -230,6 +230,21 @@ service cloud.firestore {
       allow update: if isManager() || isInventory();
     }
 
+    // Shift Swaps: all auth read/create, managers review (update)
+    match /shiftSwaps/{id} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isManager();
+    }
+
+    // Open Shifts: all auth read/claim (update), managers create/delete
+    match /openShifts/{id} {
+      allow read: if isAuth();
+      allow create: if isManager();
+      allow update: if isAuth();
+      allow delete: if isManager();
+    }
+
     // Availability Settings: stored in organizations doc, only admins can update
     // This is part of the organizations collection, so we use the rule above
     // Rule: allow update on availabilitySettings field if isAdmin()

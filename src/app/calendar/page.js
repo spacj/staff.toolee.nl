@@ -3,10 +3,10 @@ import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getShifts, getWorkers, getShops, getShiftTemplates, getPermits, bulkCreateShifts, deleteShift, createShift, getPublicHolidays, savePublicHolidays } from '@/lib/firestore';
+import { getShifts, getWorkers, getShops, getShiftTemplates, getPermits, bulkCreateShifts, deleteShift, createShift, getPublicHolidays, savePublicHolidays, getOpenShifts, createOpenShift, claimOpenShift, deleteOpenShift, getShiftSwaps, createShiftSwap, reviewShiftSwap, notifyManagers, notifyWorker } from '@/lib/firestore';
 import { generateWeeklySchedule, DAY_LABELS } from '@/lib/scheduling';
 import { cn } from '@/utils/helpers';
-import { ChevronLeft, ChevronRight, Plus, Wand2, Trash2, Calendar as CalIcon, Users, Clock, Grid3X3, List, LayoutGrid, AlertTriangle, CheckCircle, X, Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Wand2, Trash2, Calendar as CalIcon, Users, Clock, Grid3X3, List, LayoutGrid, AlertTriangle, CheckCircle, X, Download, FileText, FileSpreadsheet, ArrowLeftRight, Hand, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const VIEWS = { MONTH: 'month', WEEK: 'week', LIST: 'list' };
@@ -29,6 +29,12 @@ export default function CalendarPage() {
   const [selectedTemplates, setSelectedTemplates] = useState([]);
   const [shiftForm, setShiftForm] = useState({ workerId: '', shopId: '', date: '', startTime: '09:00', endTime: '17:00', templateName: '', notes: '' });
   const [publicHolidays, setPublicHolidays] = useState([]);
+  const [openShifts, setOpenShifts] = useState([]);
+  const [swapRequests, setSwapRequests] = useState([]);
+  const [showOpenShiftModal, setShowOpenShiftModal] = useState(false);
+  const [openShiftForm, setOpenShiftForm] = useState({ shopId: '', date: '', startTime: '09:00', endTime: '17:00', templateName: '', notes: '' });
+  const [showSwapModal, setShowSwapModal] = useState(null); // shift to swap
+  const [swapTargetWorker, setSwapTargetWorker] = useState('');
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -53,11 +59,69 @@ export default function CalendarPage() {
     getShiftTemplates(orgId).then(setTemplates);
     getPermits({ orgId, status: 'approved' }).then(setPermits);
     getPublicHolidays(orgId).then(setPublicHolidays);
+    getOpenShifts({ orgId, status: 'open' }).then(setOpenShifts);
+    getShiftSwaps({ orgId }).then(setSwapRequests);
   }, [orgId, loadRange.start, loadRange.end]);
 
   const reload = async () => {
     const s = await getShifts({ orgId, startDate: loadRange.start, endDate: loadRange.end });
     setShifts(s);
+    getOpenShifts({ orgId, status: 'open' }).then(setOpenShifts);
+    getShiftSwaps({ orgId }).then(setSwapRequests);
+  };
+
+  const handlePostOpenShift = async (e) => {
+    e.preventDefault();
+    if (!openShiftForm.date || !openShiftForm.shopId) return toast.error('Date and shop required');
+    setSaving(true);
+    try {
+      await createOpenShift({ orgId, ...openShiftForm });
+      toast.success('Open shift posted');
+      setShowOpenShiftModal(false);
+      await reload();
+    } catch { toast.error('Failed to post'); }
+    setSaving(false);
+  };
+
+  const handleClaimShift = async (os) => {
+    try {
+      await claimOpenShift(os.id, userProfile?.workerId || userProfile?.uid, userProfile?.displayName || 'Worker');
+      toast.success('Shift claimed!');
+      await reload();
+    } catch (e) { toast.error(e.message || 'Failed to claim'); }
+  };
+
+  const handleSwapRequest = async () => {
+    if (!showSwapModal || !swapTargetWorker) return;
+    try {
+      await createShiftSwap({
+        orgId,
+        shiftId: showSwapModal.id,
+        date: showSwapModal.date,
+        fromWorkerId: showSwapModal.workerId,
+        fromWorkerName: workerName(showSwapModal.workerId),
+        toWorkerId: swapTargetWorker,
+        toWorkerName: workerName(swapTargetWorker),
+      });
+      await notifyManagers(orgId, {
+        type: 'shift_swap',
+        title: 'Shift Swap Request',
+        message: `${workerName(showSwapModal.workerId)} wants to swap their ${showSwapModal.date} shift with ${workerName(swapTargetWorker)}.`,
+        link: '/calendar',
+      });
+      toast.success('Swap request sent');
+      setShowSwapModal(null);
+      setSwapTargetWorker('');
+      await reload();
+    } catch { toast.error('Failed to send swap request'); }
+  };
+
+  const handleSwapReview = async (swap, approved) => {
+    try {
+      await reviewShiftSwap(swap.id, approved, userProfile?.uid, userProfile?.displayName);
+      toast.success(approved ? 'Swap approved' : 'Swap denied');
+      await reload();
+    } catch { toast.error('Failed to review'); }
   };
 
   const activeWorkers = workers.filter(w => w.status === 'active');
@@ -261,8 +325,15 @@ export default function CalendarPage() {
           {!compact && shopName(s.shopId) && ` · ${shopName(s.shopId)}`}
         </p>
       </div>
-      {isManager && !compact && (
-        <button onClick={() => handleDeleteShift(s.id)} className="btn-icon !w-7 !h-7 hover:!text-red-600 flex-shrink-0"><Trash2 className="w-3.5 h-3.5" /></button>
+      {!compact && (
+        <div className="flex gap-1 flex-shrink-0">
+          {!isManager && s.workerId === (userProfile?.workerId || userProfile?.uid) && (
+            <button onClick={() => setShowSwapModal(s)} className="btn-icon !w-7 !h-7 hover:!text-brand-600" title="Request swap"><ArrowLeftRight className="w-3.5 h-3.5" /></button>
+          )}
+          {isManager && (
+            <button onClick={() => handleDeleteShift(s.id)} className="btn-icon !w-7 !h-7 hover:!text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -376,6 +447,7 @@ export default function CalendarPage() {
                   </>
                 )}
               </div>
+              <button onClick={() => { setOpenShiftForm({ shopId: '', date: selectedDate || '', startTime: '09:00', endTime: '17:00', templateName: '', notes: '' }); setShowOpenShiftModal(true); }} className="btn-secondary !px-3 sm:!px-5"><Hand className="w-4 h-4" /> <span className="hidden sm:inline">Open Shift</span><span className="sm:hidden">Open</span></button>
               {(!selectedDate || activeWorkers.length > shiftsForDate(selectedDate).length) && (
                 <button onClick={() => openAddShift(selectedDate)} className="btn-secondary !px-3 sm:!px-5"><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Shift</span><span className="sm:hidden">Add</span></button>
               )}
@@ -677,6 +749,106 @@ export default function CalendarPage() {
               <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Adding...' : 'Add Shift'}</button>
             </div>
           </form>
+        </Modal>
+
+        {/* ─── Open Shifts & Swap Requests Board ─── */}
+        {(openShifts.length > 0 || swapRequests.filter(s => s.status === 'pending').length > 0) && (
+          <div className="space-y-4 mt-6">
+            {openShifts.length > 0 && (
+              <div className="card">
+                <div className="px-5 py-3 border-b border-surface-100 flex items-center justify-between">
+                  <h3 className="section-title text-sm flex items-center gap-2"><Hand className="w-4 h-4 text-brand-500" /> Open Shifts ({openShifts.length})</h3>
+                </div>
+                <div className="divide-y divide-surface-100">
+                  {openShifts.map(os => (
+                    <div key={os.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-surface-800">{os.date} · {os.startTime}–{os.endTime}</p>
+                        <p className="text-xs text-surface-500">{shopName(os.shopId) || 'Any shop'} {os.templateName && `· ${os.templateName}`}</p>
+                        {os.notes && <p className="text-xs text-surface-400 italic mt-0.5">{os.notes}</p>}
+                      </div>
+                      <div className="flex gap-2">
+                        {!isManager && (
+                          <button onClick={() => handleClaimShift(os)} className="btn-primary !py-1.5 !px-3 !text-xs"><Hand className="w-3.5 h-3.5" /> Claim</button>
+                        )}
+                        {isManager && (
+                          <button onClick={async () => { await deleteOpenShift(os.id); toast.success('Removed'); reload(); }} className="btn-secondary !py-1.5 !px-3 !text-xs hover:!text-red-600"><Trash2 className="w-3.5 h-3.5" /> Remove</button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {isManager && swapRequests.filter(s => s.status === 'pending').length > 0 && (
+              <div className="card">
+                <div className="px-5 py-3 border-b border-surface-100">
+                  <h3 className="section-title text-sm flex items-center gap-2"><ArrowLeftRight className="w-4 h-4 text-amber-500" /> Swap Requests ({swapRequests.filter(s => s.status === 'pending').length})</h3>
+                </div>
+                <div className="divide-y divide-surface-100">
+                  {swapRequests.filter(s => s.status === 'pending').map(swap => (
+                    <div key={swap.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-surface-800">{swap.fromWorkerName} → {swap.toWorkerName}</p>
+                        <p className="text-xs text-surface-500">{swap.date}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => handleSwapReview(swap, true)} className="btn-primary !py-1.5 !px-3 !text-xs"><CheckCircle className="w-3.5 h-3.5" /> Approve</button>
+                        <button onClick={() => handleSwapReview(swap, false)} className="btn-secondary !py-1.5 !px-3 !text-xs hover:!text-red-600"><XCircle className="w-3.5 h-3.5" /> Deny</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── Post Open Shift Modal ─── */}
+        <Modal open={showOpenShiftModal} onClose={() => setShowOpenShiftModal(false)} title="Post Open Shift">
+          <form onSubmit={handlePostOpenShift} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="label">Date *</label><input type="date" value={openShiftForm.date} onChange={e => setOpenShiftForm(f => ({ ...f, date: e.target.value }))} className="input-field" required /></div>
+              <div><label className="label">Shop *</label>
+                <select value={openShiftForm.shopId} onChange={e => setOpenShiftForm(f => ({ ...f, shopId: e.target.value }))} className="select-field" required>
+                  <option value="">Select shop</option>
+                  {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="label">Start</label><input type="time" value={openShiftForm.startTime} onChange={e => setOpenShiftForm(f => ({ ...f, startTime: e.target.value }))} className="input-field" /></div>
+              <div><label className="label">End</label><input type="time" value={openShiftForm.endTime} onChange={e => setOpenShiftForm(f => ({ ...f, endTime: e.target.value }))} className="input-field" /></div>
+            </div>
+            <div><label className="label">Name / Notes</label><input value={openShiftForm.notes} onChange={e => setOpenShiftForm(f => ({ ...f, notes: e.target.value }))} className="input-field" placeholder="e.g. Need cover for morning" /></div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setShowOpenShiftModal(false)} className="btn-secondary">Cancel</button>
+              <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Posting...' : 'Post Open Shift'}</button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* ─── Swap Request Modal ─── */}
+        <Modal open={!!showSwapModal} onClose={() => { setShowSwapModal(null); setSwapTargetWorker(''); }} title="Request Shift Swap">
+          {showSwapModal && (
+            <div className="space-y-4">
+              <p className="text-sm text-surface-500">Swap your shift on <strong>{showSwapModal.date}</strong> ({showSwapModal.startTime}–{showSwapModal.endTime}) with another worker.</p>
+              <div>
+                <label className="label">Swap with *</label>
+                <select value={swapTargetWorker} onChange={e => setSwapTargetWorker(e.target.value)} className="select-field">
+                  <option value="">Select worker</option>
+                  {activeWorkers.filter(w => w.id !== showSwapModal.workerId).map(w => (
+                    <option key={w.id} value={w.id}>{w.firstName} {w.lastName}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => { setShowSwapModal(null); setSwapTargetWorker(''); }} className="btn-secondary">Cancel</button>
+                <button onClick={handleSwapRequest} disabled={!swapTargetWorker} className="btn-primary">Send Request</button>
+              </div>
+            </div>
+          )}
         </Modal>
       </div>
     </Layout>

@@ -19,6 +19,7 @@ const C = {
   CHECKLIST_HISTORY: 'checklistHistory', PUBLIC_CHECKLIST_ASSIGNMENTS: 'publicChecklistAssignments',
   STOCK_ITEMS: 'stockItems', STOCK_REQUESTS: 'stockRequests', STOCK_LOGS: 'stockLogs',
   RECIPES: 'recipes',
+  SHIFT_SWAPS: 'shiftSwaps', OPEN_SHIFTS: 'openShifts',
 };
 
 // ─── Helpers ──────────────────────────────────────────
@@ -1407,6 +1408,56 @@ export async function executeRecipe(ingredients, userProfile = {}) {
       }
     }
   }
+}
+
+// ─── Shift Swaps ─────────────────────────────────────
+export async function getShiftSwaps(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  if (filters.status) c.push(where('status', '==', filters.status));
+  c.push(orderBy('createdAt', 'desc'));
+  return getAll(C.SHIFT_SWAPS, ...c);
+}
+
+export async function createShiftSwap(data) {
+  return add(C.SHIFT_SWAPS, { ...data, status: 'pending' });
+}
+
+export async function reviewShiftSwap(id, approved, reviewerId, reviewerName) {
+  const swap = await get1(C.SHIFT_SWAPS, id);
+  if (!swap) return;
+  await upd(C.SHIFT_SWAPS, id, { status: approved ? 'approved' : 'denied', reviewedBy: reviewerId, reviewedByName: reviewerName, reviewedAt: ts() });
+  if (approved && swap.shiftId && swap.toWorkerId) {
+    await upd(C.SHIFTS, swap.shiftId, { workerId: swap.toWorkerId });
+  }
+}
+
+// ─── Open Shifts ──────────────────────────────────────
+export async function getOpenShifts(filters = {}) {
+  const c = [];
+  if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
+  if (filters.status) c.push(where('status', '==', filters.status));
+  c.push(orderBy('date', 'asc'));
+  return getAll(C.OPEN_SHIFTS, ...c);
+}
+
+export async function createOpenShift(data) {
+  return add(C.OPEN_SHIFTS, { ...data, status: 'open', claimedBy: null });
+}
+
+export async function claimOpenShift(id, workerId, workerName) {
+  const shift = await get1(C.OPEN_SHIFTS, id);
+  if (!shift || shift.status !== 'open') throw new Error('Shift no longer available');
+  await upd(C.OPEN_SHIFTS, id, { status: 'claimed', claimedBy: workerId, claimedByName: workerName, claimedAt: ts() });
+  await add(C.SHIFTS, {
+    orgId: shift.orgId, workerId, shopId: shift.shopId, date: shift.date,
+    startTime: shift.startTime, endTime: shift.endTime, templateName: shift.templateName || 'Open Shift',
+    notes: shift.notes || '',
+  });
+}
+
+export async function deleteOpenShift(id) {
+  return del(C.OPEN_SHIFTS, id);
 }
 
 export { C as COLLECTIONS };
