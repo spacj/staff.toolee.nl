@@ -32,8 +32,6 @@ const OWNER_NAV = [
   { id: 'attendance', label: 'Attendance', short: 'Hours', icon: Clock },
   { id: 'checklists', label: 'Checklists', short: 'Lists', icon: ClipboardCheck },
   { id: 'knowledge', label: 'Knowledge Base', short: 'Guides', icon: BookOpen },
-  { id: 'stock', label: 'Stock', short: 'Stock', icon: Package },
-  { id: 'recipes', label: 'Recipes', short: 'Recipes', icon: CookingPot },
   { id: 'costs', label: 'Costs & Billing', short: 'Costs', icon: CreditCard },
   { id: 'settings', label: 'Settings', short: 'Settings', icon: Settings },
 ];
@@ -46,9 +44,21 @@ const WORKER_NAV = [
   { id: 'my-checklists', label: 'My Checklists', short: 'Tasks', icon: ClipboardCheck },
   { id: 'chat', label: 'Chat', short: 'Chat', icon: MessageCircle },
   { id: 'knowledge', label: 'Knowledge Base', short: 'Guides', icon: BookOpen },
-  { id: 'stock', label: 'Stock', short: 'Stock', icon: Package },
   { id: 'settings', label: 'Settings', short: 'Settings', icon: Settings },
 ];
+
+const INVENTORY_NAV = [
+  { id: 'stock', label: 'Stock', short: 'Stock', icon: Package },
+  { id: 'recipes', label: 'Recipes', short: 'Recipes', icon: CookingPot },
+];
+
+const NAVS = { owner: OWNER_NAV, worker: WORKER_NAV, inventory: INVENTORY_NAV };
+const DEFAULT_SECTION = { owner: 'dashboard', worker: 'time', inventory: 'stock' };
+const ROLE_META = {
+  owner: { icon: LayoutDashboard, pill: 'bg-brand-600 text-white' },
+  worker: { icon: Smartphone, pill: 'bg-slate-900 text-white' },
+  inventory: { icon: Package, pill: 'bg-emerald-600 text-white' },
+};
 
 const INITIAL_STOCK = [
   { id: 'beans', name: 'Arabica Coffee Beans', unit: 'kg', qty: 4.2, min: 6, step: 0.5 },
@@ -61,6 +71,7 @@ const INITIAL_STOCK = [
 const TIPS = {
   common: {
     stock: 'Adjust levels with − / +, or Refill low items — the bar and status update live.',
+    recipes: 'Expand a recipe and tap Make one — its ingredients are deducted from Stock automatically.',
     chat: 'Message your whole team. Try typing and hitting send.',
     knowledge: 'Guides and SOPs your team can open anytime.',
     settings: 'Manage your account and preferences here.',
@@ -73,7 +84,6 @@ const TIPS = {
     'staff-availability': 'See who can work at a glance before you schedule.',
     attendance: 'Review and approve clocked hours in one tap.',
     checklists: 'Track opening, closing and compliance tasks per shop.',
-    recipes: 'Make a recipe — its ingredients are deducted from Stock automatically.',
     costs: 'See labor cost per shop and exactly what your plan costs.',
     staff: 'Add people and set how each is paid.',
   },
@@ -84,8 +94,12 @@ const TIPS = {
     availability: 'Tap a day to tell managers when you can work.',
     'my-checklists': 'Tick off your opening tasks — progress saves as you go.',
   },
+  inventory: {
+    stock: 'Live inventory. Adjust with − / +, or Refill low items — then check Recipes.',
+    recipes: 'Make a drink and watch its ingredients come off your Stock in real time.',
+  },
 };
-const getTip = (role, id) => (role === 'owner' ? TIPS.owner : TIPS.worker)[id] || TIPS.common[id] || null;
+const getTip = (role, id) => TIPS[role]?.[id] || TIPS.common[id] || null;
 
 const RECIPES = [
   { id: 'latte', name: 'Signature Latte', cat: 'Drinks', cost: '€0.82', tint: 'bg-amber-100 text-amber-700', ingredients: [{ id: 'beans', amount: 0.02 }, { id: 'oat', amount: 0.25 }, { id: 'cups', amount: 1 }] },
@@ -113,13 +127,14 @@ export default function LandingDemo() {
             </span>
             Interactive demo — try it
           </div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-display font-bold text-slate-900 mb-3 sm:mb-4">Two apps, one platform</h2>
-          <p className="text-sm sm:text-lg text-slate-600 max-w-2xl mx-auto">Owners run the whole business; your team gets a focused app for their shifts — both on their phone. Tap the bottom bar to browse sections, and actually try it: auto-schedule a week, approve leave, refill stock, make a recipe. Each phone is fully independent.</p>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-display font-bold text-slate-900 mb-3 sm:mb-4">One platform, an app for every role</h2>
+          <p className="text-sm sm:text-lg text-slate-600 max-w-2xl mx-auto">Owners run the whole business, your team gets a focused app for their shifts, and inventory lives in its own Stock &amp; Recipes app. Tap the bottom bar to browse sections and actually try it — auto-schedule a week, approve leave, make a recipe and watch stock update. Each phone is fully independent.</p>
         </div>
 
-        <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-10 lg:gap-16">
+        <div className="flex flex-wrap items-start justify-center gap-8 lg:gap-10">
           <PhoneApp role="owner" roleLabel="Owner / Manager" />
           <PhoneApp role="worker" roleLabel="Worker" />
+          <PhoneApp role="inventory" roleLabel="Stock & Recipes" />
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-8">A real, interactive preview — nothing is saved. This is exactly what managers and staff see on their phones. <a href="/register" className="text-brand-600 font-medium hover:underline">Create your free account →</a></p>
@@ -131,8 +146,9 @@ export default function LandingDemo() {
 /* ─── Phone app (per role) ──────────────────────────────────── */
 
 function PhoneApp({ role, roleLabel }) {
-  const nav = role === 'owner' ? OWNER_NAV : WORKER_NAV;
-  const [active, setActive] = useState(role === 'owner' ? 'dashboard' : 'time');
+  const nav = NAVS[role];
+  const meta = ROLE_META[role];
+  const [active, setActive] = useState(DEFAULT_SECTION[role]);
   // Each phone owns a cloned copy of the stock so the two demos never share state.
   const [stock, setStock] = useState(() => INITIAL_STOCK.map((s) => ({ ...s })));
   const [dismissedTips, setDismissedTips] = useState(() => new Set());
@@ -146,9 +162,8 @@ function PhoneApp({ role, roleLabel }) {
 
   return (
     <div className="flex flex-col items-center">
-      <div className={cn('inline-flex items-center gap-2 mb-4 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold shadow-sm',
-        role === 'owner' ? 'bg-brand-600 text-white' : 'bg-slate-900 text-white')}>
-        {role === 'owner' ? <LayoutDashboard className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
+      <div className={cn('inline-flex items-center gap-2 mb-4 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold shadow-sm', meta.pill)}>
+        <meta.icon className="w-4 h-4" />
         {roleLabel}
       </div>
       <PhoneFrame>
