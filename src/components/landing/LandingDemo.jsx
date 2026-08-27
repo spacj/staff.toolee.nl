@@ -6,7 +6,7 @@ import {
   CalendarCheck, ClipboardCheck, BookOpen, Package, CookingPot, CreditCard, Settings,
   Shield, Bell, Play, Square, Check, X, CheckCircle, AlertTriangle, BarChart3,
   DollarSign, TrendingUp, ChevronDown, RotateCw, Send, Wand2, Coffee, Plus, Smartphone,
-  Loader2, MapPin,
+  Loader2, MapPin, Minus, Sparkles,
 } from 'lucide-react';
 
 /**
@@ -51,11 +51,41 @@ const WORKER_NAV = [
 ];
 
 const INITIAL_STOCK = [
-  { id: 'beans', name: 'Arabica Coffee Beans', unit: 'kg', qty: 4.2, min: 6 },
-  { id: 'oat', name: 'Oat Milk', unit: 'L', qty: 0, min: 8 },
-  { id: 'sugar', name: 'Cane Sugar', unit: 'kg', qty: 12, min: 4 },
-  { id: 'cups', name: 'Paper Cups (12oz)', unit: 'pcs', qty: 320, min: 200 },
+  { id: 'beans', name: 'Arabica Coffee Beans', unit: 'kg', qty: 4.2, min: 6, step: 0.5 },
+  { id: 'oat', name: 'Oat Milk', unit: 'L', qty: 0, min: 8, step: 1 },
+  { id: 'sugar', name: 'Cane Sugar', unit: 'kg', qty: 12, min: 4, step: 1 },
+  { id: 'cups', name: 'Paper Cups (12oz)', unit: 'pcs', qty: 320, min: 200, step: 20 },
 ];
+
+// Per-section coach-marks shown as the visitor navigates the demo.
+const TIPS = {
+  common: {
+    stock: 'Adjust levels with − / +, or Refill low items — the bar and status update live.',
+    chat: 'Message your whole team. Try typing and hitting send.',
+    knowledge: 'Guides and SOPs your team can open anytime.',
+    settings: 'Manage your account and preferences here.',
+  },
+  owner: {
+    dashboard: 'Your daily overview. Approve pending leave right here — tap the green ✓.',
+    shops: 'You run multiple locations. Tap a shop to see its team, hours and coverage gaps.',
+    shifts: 'Reusable shift templates power the auto-scheduler.',
+    calendar: 'Tap Auto-Schedule and watch AI build a balanced week from staff availability.',
+    'staff-availability': 'See who can work at a glance before you schedule.',
+    attendance: 'Review and approve clocked hours in one tap.',
+    checklists: 'Track opening, closing and compliance tasks per shop.',
+    recipes: 'Make a recipe — its ingredients are deducted from Stock automatically.',
+    costs: 'See labor cost per shop and exactly what your plan costs.',
+    staff: 'Add people and set how each is paid.',
+  },
+  worker: {
+    dashboard: 'Quick actions for your shift — jump straight to what you need.',
+    time: 'You’re clocked in and the timer is live. Tap Clock Out to end your shift.',
+    calendar: 'Your upcoming shifts, at a glance.',
+    availability: 'Tap a day to tell managers when you can work.',
+    'my-checklists': 'Tick off your opening tasks — progress saves as you go.',
+  },
+};
+const getTip = (role, id) => (role === 'owner' ? TIPS.owner : TIPS.worker)[id] || TIPS.common[id] || null;
 
 const RECIPES = [
   { id: 'latte', name: 'Signature Latte', cat: 'Drinks', cost: '€0.82', tint: 'bg-amber-100 text-amber-700', ingredients: [{ id: 'beans', amount: 0.02 }, { id: 'oat', amount: 0.25 }, { id: 'cups', amount: 1 }] },
@@ -105,9 +135,14 @@ function PhoneApp({ role, roleLabel }) {
   const [active, setActive] = useState(role === 'owner' ? 'dashboard' : 'time');
   // Each phone owns a cloned copy of the stock so the two demos never share state.
   const [stock, setStock] = useState(() => INITIAL_STOCK.map((s) => ({ ...s })));
+  const [dismissedTips, setDismissedTips] = useState(() => new Set());
   const onInteract = () => {}; // retained for screen signatures; no cross-phone effects
   const go = (id) => setActive(id);
   const current = nav.find((n) => n.id === active) || nav[0];
+
+  const tip = getTip(role, active);
+  const showTip = tip && !dismissedTips.has(active);
+  const dismissTip = () => setDismissedTips((prev) => new Set(prev).add(active));
 
   return (
     <div className="flex flex-col items-center">
@@ -150,6 +185,8 @@ function PhoneApp({ role, roleLabel }) {
             })}
           </div>
         </div>
+        {/* Contextual pop-up tutorial for the current section */}
+        {showTip && <Coachmark tip={tip} onDismiss={dismissTip} />}
       </PhoneFrame>
     </div>
   );
@@ -159,9 +196,22 @@ function PhoneFrame({ children }) {
   return (
     <div className="relative w-[288px] sm:w-[330px] rounded-[2.75rem] bg-slate-900 p-2.5 shadow-2xl shadow-slate-900/30 border border-slate-800 animate-in">
       <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-28 h-5 bg-slate-900 rounded-b-2xl z-20" />
-      <div className="rounded-[2.25rem] overflow-hidden bg-surface-50 h-[580px] flex flex-col">
+      <div className="relative rounded-[2.25rem] overflow-hidden bg-surface-50 h-[580px] flex flex-col">
         {children}
       </div>
+    </div>
+  );
+}
+
+function Coachmark({ tip, onDismiss }) {
+  return (
+    <div className="absolute left-3 right-3 bottom-16 z-30 animate-in">
+      <div className="rounded-xl bg-surface-900 text-white shadow-xl shadow-slate-900/40 p-3 flex items-start gap-2.5">
+        <div className="w-6 h-6 rounded-lg bg-brand-500/25 flex items-center justify-center flex-shrink-0"><Sparkles className="w-3.5 h-3.5 text-brand-300" /></div>
+        <p className="text-[11px] leading-relaxed text-white/90 flex-1">{tip}</p>
+        <button onClick={onDismiss} aria-label="Dismiss tip" className="text-white/50 hover:text-white transition-colors flex-shrink-0 -mt-0.5"><X className="w-4 h-4" /></button>
+      </div>
+      <div className="w-3 h-3 bg-surface-900 rotate-45 mx-auto -mt-1.5" />
     </div>
   );
 }
@@ -951,34 +1001,45 @@ function StockScreen({ stock, setStock, onInteract }) {
     low: { badge: 'bg-amber-100 text-amber-700', bar: 'bg-amber-500', label: 'Low' },
     out: { badge: 'bg-red-100 text-red-700', bar: 'bg-red-500', label: 'Out' },
   };
+  const adjust = (id, delta) => { onInteract(); setStock((prev) => prev.map((s) => (s.id === id ? { ...s, qty: Math.max(0, Math.round((s.qty + delta) * 100) / 100) } : s))); };
   const refill = (id) => { onInteract(); setStock((prev) => prev.map((s) => (s.id === id ? { ...s, qty: s.min * 2 } : s))); };
-  const attention = stock.filter((s) => stockStatus(s) !== 'ok').length;
+  const low = stock.filter((s) => stockStatus(s) === 'low').length;
+  const out = stock.filter((s) => stockStatus(s) === 'out').length;
+  const attention = low + out;
   return (
     <Pad>
-      <Head title="Stock" sub="Live levels with low-stock alerts and one-tap refills."
-        right={<span className={cn('inline-flex items-center gap-1 badge !text-[10px]', attention > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')}>{attention > 0 ? <><AlertTriangle className="w-3 h-3" /> {attention} need attention</> : <><CheckCircle className="w-3 h-3" /> All stocked</>}</span>} />
-      <div className="rounded-xl border border-surface-200/70 bg-white divide-y divide-surface-100 overflow-hidden">
+      <Head title="Stock" sub={`${stock.length} items · ${low} low · ${out} out`}
+        right={<span className={cn('inline-flex items-center gap-1 badge !text-[10px]', attention > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')}>{attention > 0 ? <><AlertTriangle className="w-3 h-3" /> {attention} to fix</> : <><CheckCircle className="w-3 h-3" /> All good</>}</span>} />
+      <div className="space-y-2.5">
         {stock.map((it) => {
           const st = stockStatus(it); const m = meta[st];
           return (
-            <div key={it.id} className="p-3.5 flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+            <div key={it.id} className="rounded-xl border border-surface-200/70 bg-white p-3">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <p className="text-sm font-medium text-surface-800 truncate">{it.name}</p>
-                  <span className={cn('badge !text-[9px] !px-1.5 !py-0', m.badge)}>{m.label}</span>
+                  <span className={cn('badge !text-[9px] !px-1.5 !py-0 flex-shrink-0', m.badge)}>{m.label}</span>
                 </div>
-                <div className="mt-1.5 h-1.5 rounded-full bg-surface-100 overflow-hidden max-w-[220px]"><div className={cn('h-full rounded-full transition-all duration-500', m.bar)} style={{ width: `${stockPct(it)}%` }} /></div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button onClick={() => adjust(it.id, -it.step)} className="w-6 h-6 rounded-lg bg-surface-100 hover:bg-surface-200 text-surface-600 flex items-center justify-center active:scale-90 transition-all"><Minus className="w-3.5 h-3.5" /></button>
+                  <span className="text-sm font-display font-bold text-surface-900 tabular-nums w-14 text-center">{it.qty}<span className="text-[9px] text-surface-400 font-normal ml-0.5">{it.unit}</span></span>
+                  <button onClick={() => adjust(it.id, it.step)} className="w-6 h-6 rounded-lg bg-surface-100 hover:bg-surface-200 text-surface-600 flex items-center justify-center active:scale-90 transition-all"><Plus className="w-3.5 h-3.5" /></button>
+                </div>
               </div>
-              <div className="text-right flex-shrink-0 w-14"><p className="text-sm font-display font-bold text-surface-900 tabular-nums">{it.qty}<span className="text-[10px] text-surface-400 font-normal ml-0.5">{it.unit}</span></p><p className="text-[9px] text-surface-400">min {it.min}{it.unit}</p></div>
-              {st !== 'ok' ? (
-                <button onClick={() => refill(it.id)} className="inline-flex items-center gap-1 bg-surface-900 hover:bg-brand-600 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg active:scale-95 transition-all flex-shrink-0"><RotateCw className="w-3 h-3" /> Refill</button>
-              ) : (
-                <span className="w-[62px] flex justify-center flex-shrink-0"><CheckCircle className="w-4 h-4 text-emerald-400" /></span>
-              )}
+              <div className="h-1.5 rounded-full bg-surface-100 overflow-hidden"><div className={cn('h-full rounded-full transition-all duration-500', m.bar)} style={{ width: `${stockPct(it)}%` }} /></div>
+              <div className="flex items-center justify-between mt-1.5">
+                <span className="text-[10px] text-surface-400">Par level {it.min}{it.unit}</span>
+                {st !== 'ok' ? (
+                  <button onClick={() => refill(it.id)} className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-600 hover:text-brand-700 active:scale-95 transition-all"><RotateCw className="w-3 h-3" /> Refill to par</button>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-500"><CheckCircle className="w-3 h-3" /> Stocked</span>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
+      <p className="text-[11px] text-surface-400 mt-3 flex items-center gap-1.5"><Package className="w-3.5 h-3.5" /> Levels sync with Recipes — making a drink deducts stock automatically.</p>
     </Pad>
   );
 }
