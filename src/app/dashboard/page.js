@@ -5,6 +5,8 @@ import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { getWorkers, getShops, getShifts, getAttendance, getPermits, getActivityLog, getCorrectionRequests, getMessages, updatePermit, reviewCorrectionRequest, notifyWorker, getStockItems, updateStockItem } from '@/lib/firestore';
 import Modal from '@/components/Modal';
+import PageIntro from '@/components/help/PageIntro';
+import OnboardingChecklist from '@/components/OnboardingChecklist';
 import { calculateCost, formatCurrency } from '@/lib/pricing';
 import { cn } from '@/utils/helpers';
 import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3, MessageCircle, AlertTriangle, XCircle, Package, TrendingDown } from 'lucide-react';
@@ -165,6 +167,7 @@ export default function DashboardPage() {
             <h1 className="text-2xl sm:text-3xl font-display font-bold mt-1">{firstName}</h1>
             <p className="text-brand-200 mt-2">Ready for your shift?</p>
           </div>
+          <PageIntro page="dashboard" />
           <div className="grid grid-cols-2 gap-4">
             <Link href="/time" className="card-hover p-5 flex flex-col items-center text-center gap-2 relative">
               <div className="w-12 h-12 rounded-2xl bg-brand-100 flex items-center justify-center"><Clock className="w-6 h-6 text-brand-600" /></div>
@@ -221,6 +224,21 @@ export default function DashboardPage() {
             <p className="text-white/60 mt-1">Here's what's happening today</p>
           </div>
         </div>
+
+        {/* Getting started — first-run guidance, auto-hides when complete */}
+        <OnboardingChecklist
+          variant="manager"
+          data={{
+            shops: shops.length,
+            workers: activeWorkers.length,
+            shifts: todayShifts,
+            attendance: attendance.length,
+            isPaidTier: cost.tier !== 'free',
+            hasBilling: !!(organization?.paidThrough || organization?.subscriptionId || organization?.subscription),
+          }}
+        />
+
+        <PageIntro page="dashboard" />
 
         {/* Urgent Stock Banner */}
         {(outOfStockItems.length > 0 || lowStockItems.length > 0) && (

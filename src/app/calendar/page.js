@@ -2,6 +2,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
+import PageIntro from '@/components/help/PageIntro';
+import HelpTip from '@/components/help/HelpTip';
 import { useAuth } from '@/contexts/AuthContext';
 import { getShifts, getWorkers, getShops, getShiftTemplates, getPermits, bulkCreateShifts, deleteShift, createShift, getPublicHolidays, savePublicHolidays, getOpenShifts, createOpenShift, claimOpenShift, deleteOpenShift, getShiftSwaps, createShiftSwap, reviewShiftSwap, notifyManagers, notifyWorker } from '@/lib/firestore';
 import { generateWeeklySchedule, DAY_LABELS } from '@/lib/scheduling';
@@ -456,6 +458,8 @@ export default function CalendarPage() {
           )}
         </div>
 
+        <PageIntro page="calendar" />
+
         {/* View toggle + nav */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex gap-1 bg-surface-100 rounded-xl p-1">
@@ -464,6 +468,7 @@ export default function CalendarPage() {
                 <v.icon className="w-3.5 h-3.5" /> {v.label}
               </button>
             ))}
+            <span className="hidden sm:inline-flex items-center pl-1"><HelpTip tip="shift-types" /></span>
           </div>
           <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
             <button onClick={() => { setSelectedDate(getWeekMonday(new Date().toISOString().split('T')[0])); openAutoSchedule(); }} className="btn-secondary !py-1.5 !text-xs hidden sm:inline-flex"><Wand2 className="w-3.5 h-3.5" /> Auto Schedule</button>
@@ -552,7 +557,13 @@ export default function CalendarPage() {
         {/* LIST VIEW */}
         {view === VIEWS.LIST && (
           <div className="space-y-4">
-            {listDates.length === 0 && <div className="card p-8 text-center"><CalIcon className="w-8 h-8 text-surface-300 mx-auto mb-2" /><p className="text-surface-400 text-sm">No shifts in this period.</p></div>}
+            {listDates.length === 0 && (
+              <div className="card p-10 text-center">
+                <CalIcon className="w-8 h-8 text-surface-300 mx-auto mb-2" />
+                <p className="text-surface-600 text-sm font-medium">No shifts in this period</p>
+                <p className="text-surface-400 text-xs mt-1">{isManager ? 'Add a shift or use Auto-Schedule to fill the week.' : 'Nothing scheduled here yet — check back soon.'}</p>
+              </div>
+            )}
             {listDates.map(ds => {
               const dayShifts = shiftsForDate(ds);
               const isToday = ds === todayStr;

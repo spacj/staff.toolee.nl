@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PRICE_PER_WORKER, PRICE_PER_SHOP, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE, ENTERPRISE_THRESHOLD, FREE_WORKER_LIMIT } from '@/lib/pricing';
 import { createSupportTicket } from '@/lib/firestore';
 import Modal from '@/components/Modal';
+import LandingDemo from '@/components/landing/LandingDemo';
 import toast from 'react-hot-toast';
 import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ExternalLink, HelpCircle, Send, Loader2, Building2, Users as UsersIcon, Mail, Phone, Menu, X, Download, Smartphone } from 'lucide-react';
 
@@ -353,6 +354,7 @@ export default function HomePage() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-1">
+            <a href="#demo" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2 rounded-lg hover:bg-slate-100">Live Demo</a>
             <a href="#contact" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2 rounded-lg hover:bg-slate-100">Contact</a>
             <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2 rounded-lg hover:bg-slate-100">Sign In</Link>
             <Link href="/register" className="btn-primary !py-2 !px-5 !text-sm !shadow-lg !shadow-brand-500/30 ml-2">Get Started</Link>
@@ -385,6 +387,7 @@ export default function HomePage() {
               <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold px-2 mb-2">Explore</p>
               <div className="space-y-1.5">
                 {[
+                  { href: '#demo', icon: Smartphone, label: 'Live Demo', desc: 'Try the app on every screen' },
                   { href: '#features', icon: Sparkles, label: 'Features', desc: 'What StaffHub can do' },
                   { href: '#pricing', icon: BarChart3, label: 'Pricing', desc: 'Simple per-worker plans' },
                   { href: '#contact', icon: Mail, label: 'Contact', desc: 'Get in touch with our team' },
@@ -504,6 +507,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Live Product Demo */}
+      <LandingDemo />
 
 {/* Features Grid */}
       <section id="features" className="py-16 sm:py-24 px-4 sm:px-6">

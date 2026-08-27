@@ -5,6 +5,8 @@ import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import MonthCarousel from '@/components/MonthCarousel';
 import PayPalCheckout from '@/components/PayPalCheckout';
+import PageIntro from '@/components/help/PageIntro';
+import HelpTip from '@/components/help/HelpTip';
 import { useAuth } from '@/contexts/AuthContext';
 import { getWorkers, getShops, getShifts, getPayments, getOrganization, getPublicHolidays, getOvertimeRules } from '@/lib/firestore';
 import { calculateCost, formatCurrency, getTierInfo, FREE_WORKER_LIMIT } from '@/lib/pricing';
@@ -210,6 +212,30 @@ function CostsContent() {
           <p className="text-sm text-surface-500 hidden sm:block">
             Navigate months to view reports or future previsions
           </p>
+        </div>
+
+        <PageIntro page="costs" />
+
+        {/* ── Your plan explainer ── */}
+        <div className="card p-4 sm:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className={cn('badge !text-xs !px-3 !py-1', getTierInfo(cost.tier).badge)}>{getTierInfo(cost.tier).name} plan</span>
+              <div className="text-sm text-surface-600 flex items-center gap-1.5">
+                <span className="font-semibold text-surface-900">{cost.total === 0 ? 'Free' : `${formatCurrency(cost.total)}/mo`}</span>
+                <HelpTip tip="plan-tiers" />
+              </div>
+            </div>
+            <p className="text-xs text-surface-500 flex items-center gap-1.5">
+              {activeWorkers.length} active worker{activeWorkers.length !== 1 ? 's' : ''} · {shops.length} shop{shops.length !== 1 ? 's' : ''}
+              <HelpTip tip="price-drivers" align="right" />
+            </p>
+          </div>
+          <div className="mt-3 pt-3 border-t border-surface-100 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-surface-500">
+            <p className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" /> First {freeLimit || FREE_WORKER_LIMIT} workers &amp; 1 shop free</p>
+            <p className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-brand-500 flex-shrink-0" /> Extra workers &amp; shops billed monthly</p>
+            <p className="flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" /> Save with yearly billing <HelpTip tip="yearly-billing" align="right" /></p>
+          </div>
         </div>
 
         {/* ── Month Carousel ── */}

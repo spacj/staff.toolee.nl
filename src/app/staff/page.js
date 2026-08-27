@@ -4,6 +4,9 @@ import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import Pagination from '@/components/Pagination';
 import WorkerForm from '@/components/WorkerForm';
+import PageIntro from '@/components/help/PageIntro';
+import HelpTip from '@/components/help/HelpTip';
+import EmptyState from '@/components/help/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { getWorkers, deleteWorker, syncOrgPlan } from '@/lib/firestore';
 import { cn, getInitials, generateAvatarColor } from '@/utils/helpers';
@@ -95,7 +98,7 @@ export default function StaffPage() {
         <div className="page-header">
           <div>
             <h1 className="page-title">Staff</h1>
-            <p className="text-surface-500 mt-1">{active.length} active · {inactive.length} inactive</p>
+            <p className="text-surface-500 mt-1 flex items-center gap-1.5">{active.length} active · {inactive.length} inactive <HelpTip tip="worker-status" /></p>
           </div>
           {isManager && (
             <button onClick={() => { setEditWorker(null); setShowForm(true); }} className="btn-primary">
@@ -103,6 +106,8 @@ export default function StaffPage() {
             </button>
           )}
         </div>
+
+        {isManager && <PageIntro page="staff" />}
 
         <div className="relative max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
@@ -128,11 +133,21 @@ export default function StaffPage() {
         )}
 
         {filtered.length === 0 && (
-          <div className="card p-12 text-center">
-            <Users className="w-10 h-10 text-surface-300 mx-auto mb-3" />
-            <p className="text-surface-500 font-medium">No staff found</p>
-            <p className="text-sm text-surface-400 mt-1">Add your first team member to get started.</p>
-          </div>
+          workers.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="No team members yet"
+              description="Add your first worker to start scheduling shifts and tracking hours. You can invite them to the app with a code afterwards."
+              actionLabel={isManager ? 'Add your first worker' : undefined}
+              onAction={isManager ? () => { setEditWorker(null); setShowForm(true); } : undefined}
+            />
+          ) : (
+            <div className="card p-12 text-center">
+              <Search className="w-9 h-9 text-surface-300 mx-auto mb-3" />
+              <p className="text-surface-600 font-medium">No matches for “{effectiveSearch}”</p>
+              <p className="text-sm text-surface-400 mt-1">Try a different name, role or position.</p>
+            </div>
+          )
         )}
 
         <Modal open={showForm} onClose={() => setShowForm(false)} title={editWorker ? 'Edit Worker' : 'Add Worker'} size="lg">

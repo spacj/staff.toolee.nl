@@ -2,6 +2,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
+import PageIntro from '@/components/help/PageIntro';
+import HelpTip from '@/components/help/HelpTip';
+import EmptyState from '@/components/help/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAttendance, getActiveClockIn, clockIn, clockOut, getPermits, createPermit, getShops, getWorkers, getWorker, notifyManagers, getCorrectionRequests, createCorrectionRequest, getMessages, createMessage, markMessageRead } from '@/lib/firestore';
 import { formatCurrency } from '@/lib/pricing';
@@ -215,11 +218,14 @@ export default function TimePage() {
   if (!resolvedWorkerId) {
     return (
       <Layout>
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <AlertCircle className="w-10 h-10 text-amber-400 mb-3" />
-          <h2 className="text-lg font-display font-semibold text-surface-800">No worker profile linked</h2>
-          <p className="text-sm text-surface-500 mt-1 max-w-sm">Ask your admin to create a worker record for you or register with an invite code at <strong>/join</strong>.</p>
-        </div>
+        <EmptyState
+          icon={AlertCircle}
+          title="No worker profile linked yet"
+          description="Clocking in needs a worker record. Ask your manager to add you, or join with an invite code they share."
+          href="/join"
+          actionLabel="Enter an invite code"
+          className="mt-6"
+        />
       </Layout>
     );
   }
@@ -233,6 +239,8 @@ export default function TimePage() {
             <p className="text-surface-500 mt-1">Clock in/out, track your hours, and manage leave.</p>
           </div>
         </div>
+
+        <PageIntro page="time" />
 
         {/* Clock In/Out */}
         <div className={cn('card overflow-hidden', isCurrentlyIn ? 'border-emerald-200' : '')}>
@@ -250,7 +258,7 @@ export default function TimePage() {
               {active.entries?.filter(e => e.clockOut).length > 0 && (
                 <p className="text-xs text-emerald-500 mt-1">{active.entries.filter(e => e.clockOut).length} previous segment(s) today</p>
               )}
-              <button onClick={handleClockOut} className="btn-danger mt-6 !py-3.5 !px-10 !text-base"><Square className="w-5 h-5" /> Clock Out</button>
+              <button onClick={handleClockOut} className="btn-danger mt-6 w-full sm:w-auto !py-4 sm:!py-3.5 !px-10 !text-base"><Square className="w-5 h-5" /> Clock Out</button>
             </>
           ) : (
             <>
@@ -261,7 +269,7 @@ export default function TimePage() {
               {active?.entries?.length > 0 && (
                 <p className="text-xs text-surface-400 mt-1">{active.entries.length} segment(s) logged today · {(active.totalHours || 0).toFixed(1)}h so far</p>
               )}
-              <button onClick={handleClockIn} className="btn-primary mt-6 !py-3.5 !px-10 !text-base !shadow-lg !shadow-brand-500/20"><Play className="w-5 h-5" /> Clock In</button>
+              <button onClick={handleClockIn} className="btn-primary mt-6 w-full sm:w-auto !py-4 sm:!py-3.5 !px-10 !text-base !shadow-lg !shadow-brand-500/20"><Play className="w-5 h-5" /> Clock In</button>
             </>
           )}
           </div>
@@ -287,7 +295,7 @@ export default function TimePage() {
             <div className="flex items-center gap-3">
               <DollarSign className="w-5 h-5 text-amber-500" />
               <div>
-                <p className="text-sm font-medium text-surface-800">Expected: {formatCurrency(expectedEarnings.earned)} · Approved: {formatCurrency(expectedEarnings.approved)}</p>
+                <p className="text-sm font-medium text-surface-800 flex items-center gap-1.5">Expected: {formatCurrency(expectedEarnings.earned)} · Approved: {formatCurrency(expectedEarnings.approved)} <HelpTip tip="expected-earnings" /></p>
                 <p className="text-xs text-surface-400">{expectedEarnings.label} · Pending hours may change after manager approval</p>
               </div>
             </div>
@@ -297,7 +305,7 @@ export default function TimePage() {
         {/* Leave Requests */}
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="section-title">Leave Requests</h3>
+            <h3 className="section-title flex items-center gap-1.5">Leave Requests <HelpTip tip="leave-requests" /></h3>
             <button onClick={() => setShowPermitForm(true)} className="btn-secondary !py-2 !text-sm"><Plus className="w-4 h-4" /> Request Leave</button>
           </div>
           <div className="divide-y divide-surface-100">
@@ -320,7 +328,7 @@ export default function TimePage() {
         {/* Correction Requests */}
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="section-title">Time Corrections</h3>
+            <h3 className="section-title flex items-center gap-1.5">Time Corrections <HelpTip tip="time-corrections" /></h3>
             <button onClick={() => { setCorrectionForm({ type: 'missed_clockin', date: '', requestedClockIn: '', requestedClockOut: '', message: '', attendanceId: '' }); setShowCorrectionForm(true); }} className="btn-secondary !py-2 !text-sm"><AlertTriangle className="w-4 h-4" /> Report Issue</button>
           </div>
           <p className="text-xs text-surface-400 mb-3">Forgot to clock in/out or hours are wrong? Submit a correction request for management to review.</p>
@@ -346,7 +354,7 @@ export default function TimePage() {
         {/* Messages to Management */}
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="section-title">Messages</h3>
+            <h3 className="section-title flex items-center gap-1.5">Messages <HelpTip tip="worker-messages" /></h3>
             <button onClick={() => setShowMessageForm(true)} className="btn-secondary !py-2 !text-sm"><MessageCircle className="w-4 h-4" /> New Message</button>
           </div>
           <p className="text-xs text-surface-400 mb-3">Send a message to management about schedule changes, shift swaps, or any work-related questions.</p>
@@ -393,7 +401,13 @@ export default function TimePage() {
         <div className="card">
           <div className="px-5 py-4 border-b border-surface-100"><h3 className="section-title">Clock Records This Month</h3></div>
           <div className="divide-y divide-surface-100">
-            {records.length === 0 && <p className="p-5 text-sm text-surface-400 text-center">No records this month.</p>}
+            {records.length === 0 && (
+              <div className="p-8 text-center">
+                <Clock className="w-8 h-8 text-surface-300 mx-auto mb-2" />
+                <p className="text-sm text-surface-500 font-medium">No hours logged yet this month</p>
+                <p className="text-xs text-surface-400 mt-1">Tap Clock In above when you start your shift and it’ll show up here.</p>
+              </div>
+            )}
             {records.slice(0, 20).map(r => {
               const entries = r.entries || [];
               return (
