@@ -13,10 +13,14 @@ import {
   getStockCategories, addStockCategory, reverseStockLog,
 } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
+import BarcodeScanner from '@/components/BarcodeScanner';
+import BarcodeAddFlow from '@/components/BarcodeAddFlow';
+import { findByBarcode, boxUnits } from '@/lib/stock-barcode';
 import {
   Package, Plus, Pencil, Trash2, AlertTriangle, CheckCircle, XCircle,
   ChevronDown, ChevronUp, Minus, ClipboardList, Bell, Search, Filter, RefreshCw,
   Download, FileText, FileSpreadsheet, TrendingDown, Boxes, PackageOpen, CheckCircle2, Undo2,
+  ScanLine, Barcode,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -131,7 +135,7 @@ function StockBadge({ item }) {
   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />In stock</span>;
 }
 
-const emptyItemForm = { name: '', description: '', category: '', unit: 'pcs', quantity: 0, minimumQuantity: 0, sku: '', bucketSize: '', bucketSizeUnit: 'kg' };
+const emptyItemForm = { name: '', description: '', category: '', unit: 'pcs', quantity: 0, minimumQuantity: 0, sku: '', bucketSize: '', bucketSizeUnit: 'kg', barcode: '', boxBarcode: '', unitsPerBox: '' };
 const emptyRequestForm = { itemId: '', itemName: '', quantity: 1, reason: '', urgent: false };
 
 export default function StockPage() {
@@ -200,6 +204,10 @@ function StockPageInner() {
 
   // Delete confirm
   const [deleteConfirm, setDeleteConfirm] = useState(null); // item object
+
+  // Barcode scanning
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [barcodeFlow, setBarcodeFlow] = useState(null); // null | { code }  (not-recognised flow)
 
   const canManage = isAdmin || isManager || isInventory;
 
@@ -434,7 +442,7 @@ function StockPageInner() {
   };
 
   const openEditItem = (item) => {
-    setItemForm({ name: item.name, description: item.description || '', category: item.category || '', unit: item.unit || 'pcs', quantity: item.quantity, minimumQuantity: item.minimumQuantity || 0, sku: item.sku || '', bucketSize: item.bucketSize || '', bucketSizeUnit: item.bucketSizeUnit || 'kg' });
+    setItemForm({ name: item.name, description: item.description || '', category: item.category || '', unit: item.unit || 'pcs', quantity: item.quantity, minimumQuantity: item.minimumQuantity || 0, sku: item.sku || '', bucketSize: item.bucketSize || '', bucketSizeUnit: item.bucketSizeUnit || 'kg', barcode: item.barcode || '', boxBarcode: item.boxBarcode || '', unitsPerBox: item.unitsPerBox || '' });
     setNewCategory('');
     setItemModal(item);
   };
@@ -454,6 +462,9 @@ function StockPageInner() {
         sku: itemForm.sku.trim(),
         bucketSize: itemForm.bucketSize ? Number(itemForm.bucketSize) : null,
         bucketSizeUnit: itemForm.bucketSizeUnit || 'kg',
+        barcode: (itemForm.barcode || '').trim(),
+        boxBarcode: (itemForm.boxBarcode || '').trim() || null,
+        unitsPerBox: itemForm.unitsPerBox ? Number(itemForm.unitsPerBox) : null,
         createdBy: user?.uid,
         createdByName: userProfile?.displayName || '',
       };
@@ -461,7 +472,7 @@ function StockPageInner() {
         await createStockItem(data, userProfile);
         toast.success('Item added');
       } else {
-        await updateStockItem(itemModal.id, { name: data.name, description: data.description, category: data.category, unit: data.unit, quantity: data.quantity, minimumQuantity: data.minimumQuantity, sku: data.sku, bucketSize: data.bucketSize, bucketSizeUnit: data.bucketSizeUnit }, userProfile);
+        await updateStockItem(itemModal.id, { name: data.name, description: data.description, category: data.category, unit: data.unit, quantity: data.quantity, minimumQuantity: data.minimumQuantity, sku: data.sku, bucketSize: data.bucketSize, bucketSizeUnit: data.bucketSizeUnit, barcode: data.barcode, boxBarcode: data.boxBarcode, unitsPerBox: data.unitsPerBox }, userProfile);
         toast.success('Item updated');
       }
       setItemModal(null);
@@ -510,6 +521,55 @@ function StockPageInner() {
     } finally {
       setSavingAdjust(false);
     }
+  };
+
+  // ─── Barcode scanning ────────────────────────────────
+  const handleScanDetected = async (code) => {
+    setScannerOpen(false);
+    const match = findByBarcode(items, code);
+    if (match) {
+      if (match.kind === 'box') {
+        const add = boxUnits(match.item);
+        try {
+          await adjustStockQuantity(match.item.id, (match.item.quantity || 0) + add, userProfile);
+          toast.success(`+${add} ${match.item.unit || ''} · ${match.item.name} (box)`);
+          load();
+        } catch { toast.error('Failed to update stock'); }
+      } else {
+        // Recognised unit → open the adjust modal pre-set to add +1
+        setAdjustModal(match.item);
+        setAdjustMode('add');
+        setAdjustQty(1);
+        toast.success(`Recognised: ${match.item.name}`);
+      }
+      return;
+    }
+    // Not recognised → offer to add it
+    setBarcodeFlow({ code });
+  };
+
+  const startSingleFromBarcode = (code) => {
+    setBarcodeFlow(null);
+    setItemForm({ ...emptyItemForm, barcode: code });
+    setNewCategory('');
+    setItemModal('add');
+  };
+
+  const startBoxNewFromBarcode = (code, units) => {
+    setBarcodeFlow(null);
+    setItemForm({ ...emptyItemForm, boxBarcode: code, unitsPerBox: units, quantity: units });
+    setNewCategory('');
+    setItemModal('add');
+  };
+
+  const applyBoxToExisting = async (item, code, units) => {
+    setBarcodeFlow(null);
+    try {
+      await updateStockItem(item.id, { boxBarcode: code, unitsPerBox: Number(units) }, userProfile);
+      await adjustStockQuantity(item.id, (item.quantity || 0) + Number(units), userProfile);
+      toast.success(`+${units} ${item.unit || ''} · ${item.name}`);
+      load();
+    } catch { toast.error('Failed to update item'); }
   };
 
   // ─── Stock Requests ──────────────────────────────────
@@ -637,6 +697,9 @@ function StockPageInner() {
               )}
             </div>
             )}
+            <button onClick={() => setScannerOpen(true)} className="btn-secondary flex items-center gap-2" title="Scan a barcode">
+              <ScanLine className="w-4 h-4" /> <span className="hidden sm:inline">Scan</span>
+            </button>
             {canManage && (
               <button onClick={openAddItem} className="btn-primary flex items-center gap-2">
                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Item</span><span className="sm:hidden">Add</span>
@@ -1195,6 +1258,26 @@ function StockPageInner() {
                 <input className="input-field w-full" placeholder="e.g. PPR-A4-80G" value={itemForm.sku} onChange={e => setItemForm(f => ({ ...f, sku: e.target.value }))} />
               </div>
               <div className="col-span-2">
+                <label className="text-sm font-medium text-surface-700 mb-1 flex items-center gap-1.5"><Barcode className="w-3.5 h-3.5" /> Barcode <span className="text-surface-400 font-normal">(optional)</span></label>
+                <div className="flex gap-2">
+                  <input className="input-field flex-1" placeholder="Scan or type the item barcode" value={itemForm.barcode} onChange={e => setItemForm(f => ({ ...f, barcode: e.target.value }))} />
+                  <button type="button" onClick={() => setScannerOpen(true)} className="btn-secondary px-3 flex-shrink-0" title="Scan barcode"><ScanLine className="w-4 h-4" /></button>
+                </div>
+                <p className="text-[11px] text-surface-400 mt-1">Scanning this code later will find and update this item.</p>
+              </div>
+              {(itemForm.boxBarcode || itemForm.unitsPerBox) && (
+                <div className="col-span-2 grid grid-cols-2 gap-4 p-3 bg-surface-50 rounded-lg border border-surface-200">
+                  <div>
+                    <label className="block text-xs font-medium text-surface-600 mb-1">Box barcode</label>
+                    <input className="input-field w-full text-sm" placeholder="Case barcode" value={itemForm.boxBarcode} onChange={e => setItemForm(f => ({ ...f, boxBarcode: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-surface-600 mb-1">Units per box</label>
+                    <input type="number" min="1" className="input-field w-full text-sm" placeholder="e.g. 24" value={itemForm.unitsPerBox} onChange={e => setItemForm(f => ({ ...f, unitsPerBox: e.target.value }))} />
+                  </div>
+                </div>
+              )}
+              <div className="col-span-2">
                 <label className="block text-sm font-medium text-surface-700 mb-1">Description <span className="text-surface-400 font-normal">(optional)</span></label>
                 <textarea className="textarea-field w-full" rows={2} placeholder="Brief description..." value={itemForm.description} onChange={e => setItemForm(f => ({ ...f, description: e.target.value }))} />
               </div>
@@ -1448,6 +1531,21 @@ function StockPageInner() {
           </div>
         )}
       </Modal>
+
+      {/* ── Barcode Scanner ── */}
+      <BarcodeScanner open={scannerOpen} onClose={() => setScannerOpen(false)} onDetected={handleScanDetected} />
+
+      {/* ── Barcode not recognised flow ── */}
+      {barcodeFlow && (
+        <BarcodeAddFlow
+          code={barcodeFlow.code}
+          items={items}
+          onClose={() => setBarcodeFlow(null)}
+          onSingle={startSingleFromBarcode}
+          onBoxNew={startBoxNewFromBarcode}
+          onBoxExisting={applyBoxToExisting}
+        />
+      )}
     </Layout>
   );
 }

@@ -1,12 +1,15 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { cn } from '@/utils/helpers';
+import BarcodeScanner from '@/components/BarcodeScanner';
+import BarcodeAddFlow from '@/components/BarcodeAddFlow';
+import { findByBarcode, boxUnits } from '@/lib/stock-barcode';
 import {
   LayoutDashboard, MessageCircle, Users, Store, ClipboardList, Calendar, Clock,
   CalendarCheck, ClipboardCheck, BookOpen, Package, CookingPot, CreditCard, Settings,
   Shield, Bell, Play, Square, Check, X, CheckCircle, AlertTriangle, BarChart3,
   DollarSign, TrendingUp, ChevronDown, RotateCw, Send, Wand2, Coffee, Plus, Smartphone,
-  Loader2, MapPin, Minus, Sparkles,
+  Loader2, MapPin, Minus, Sparkles, ScanLine,
 } from 'lucide-react';
 
 /**
@@ -61,16 +64,19 @@ const ROLE_META = {
 };
 
 const INITIAL_STOCK = [
-  { id: 'beans', name: 'Arabica Coffee Beans', unit: 'kg', qty: 4.2, min: 6, step: 0.5 },
-  { id: 'oat', name: 'Oat Milk', unit: 'L', qty: 0, min: 8, step: 1 },
-  { id: 'sugar', name: 'Cane Sugar', unit: 'kg', qty: 12, min: 4, step: 1 },
-  { id: 'cups', name: 'Paper Cups (12oz)', unit: 'pcs', qty: 320, min: 200, step: 20 },
+  { id: 'beans', name: 'Arabica Coffee Beans', unit: 'kg', qty: 4.2, min: 6, step: 0.5, barcode: '5011121555842' },
+  { id: 'oat', name: 'Oat Milk', unit: 'L', qty: 0, min: 8, step: 1, barcode: '8410031000345' },
+  { id: 'sugar', name: 'Cane Sugar', unit: 'kg', qty: 12, min: 4, step: 1, barcode: '4008400202631' },
+  { id: 'cups', name: 'Paper Cups (12oz)', unit: 'pcs', qty: 320, min: 200, step: 20, barcode: '5000159407236' },
 ];
+
+// Simulate order in the demo scanner: a recognised code, then an unknown one.
+const DEMO_BARCODES = ['5011121555842', '9990001112223'];
 
 // Per-section coach-marks shown as the visitor navigates the demo.
 const TIPS = {
   common: {
-    stock: 'Adjust levels with − / +, or Refill low items — the bar and status update live.',
+    stock: 'Tap Scan to add stock by barcode, adjust with − / +, or Refill low items — all live.',
     recipes: 'Expand a recipe and tap Make one — its ingredients are deducted from Stock automatically.',
     chat: 'Message your whole team. Try typing and hitting send.',
     knowledge: 'Guides and SOPs your team can open anytime.',
@@ -95,7 +101,7 @@ const TIPS = {
     'my-checklists': 'Tick off your opening tasks — progress saves as you go.',
   },
   inventory: {
-    stock: 'Live inventory. Adjust with − / +, or Refill low items — then check Recipes.',
+    stock: 'Tap Scan to add stock by barcode (try Simulate scan twice), adjust with − / +, or Refill.',
     recipes: 'Make a drink and watch its ingredients come off your Stock in real time.',
   },
 };
@@ -1016,15 +1022,47 @@ function StockScreen({ stock, setStock, onInteract }) {
     low: { badge: 'bg-amber-100 text-amber-700', bar: 'bg-amber-500', label: 'Low' },
     out: { badge: 'bg-red-100 text-red-700', bar: 'bg-red-500', label: 'Out' },
   };
+  const [scanOpen, setScanOpen] = useState(false);
+  const [flowCode, setFlowCode] = useState(null);
   const adjust = (id, delta) => { onInteract(); setStock((prev) => prev.map((s) => (s.id === id ? { ...s, qty: Math.max(0, Math.round((s.qty + delta) * 100) / 100) } : s))); };
   const refill = (id) => { onInteract(); setStock((prev) => prev.map((s) => (s.id === id ? { ...s, qty: s.min * 2 } : s))); };
+
+  const onScan = (code) => {
+    onInteract();
+    setScanOpen(false);
+    const match = findByBarcode(stock, code);
+    if (match) {
+      const add = match.kind === 'box' ? boxUnits(match.item) : 1;
+      setStock((prev) => prev.map((s) => (s.id === match.item.id ? { ...s, qty: Math.round((s.qty + add) * 100) / 100 } : s)));
+    } else {
+      setFlowCode(code);
+    }
+  };
+  const addSingle = (code, name) => {
+    setFlowCode(null);
+    setStock((prev) => [...prev, { id: 'b' + Date.now(), name: name || 'New item', unit: 'pcs', qty: 1, min: 4, step: 1, barcode: code }]);
+  };
+  const addBoxNew = (code, units, name) => {
+    setFlowCode(null);
+    setStock((prev) => [...prev, { id: 'b' + Date.now(), name: name || 'New item', unit: 'pcs', qty: units, min: Math.max(1, Math.round(units / 2)), step: units, boxBarcode: code, unitsPerBox: units }]);
+  };
+  const addBoxExisting = (item, code, units) => {
+    setFlowCode(null);
+    setStock((prev) => prev.map((s) => (s.id === item.id ? { ...s, qty: s.qty + Number(units), boxBarcode: code, unitsPerBox: Number(units) } : s)));
+  };
+
   const low = stock.filter((s) => stockStatus(s) === 'low').length;
   const out = stock.filter((s) => stockStatus(s) === 'out').length;
   const attention = low + out;
   return (
     <Pad>
       <Head title="Stock" sub={`${stock.length} items · ${low} low · ${out} out`}
-        right={<span className={cn('inline-flex items-center gap-1 badge !text-[10px]', attention > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')}>{attention > 0 ? <><AlertTriangle className="w-3 h-3" /> {attention} to fix</> : <><CheckCircle className="w-3 h-3" /> All good</>}</span>} />
+        right={<div className="flex items-center gap-1.5">
+          <button onClick={() => { onInteract(); setScanOpen(true); }} className="inline-flex items-center gap-1 bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg active:scale-95 transition-all"><ScanLine className="w-3.5 h-3.5" /> Scan</button>
+          <span className={cn('inline-flex items-center gap-1 badge !text-[10px]', attention > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')}>{attention > 0 ? <><AlertTriangle className="w-3 h-3" /> {attention}</> : <CheckCircle className="w-3 h-3" />}</span>
+        </div>} />
+      <BarcodeScanner open={scanOpen} onClose={() => setScanOpen(false)} onDetected={onScan} allowSimulate simulateCodes={DEMO_BARCODES} />
+      {flowCode && <BarcodeAddFlow code={flowCode} items={stock} collectName onClose={() => setFlowCode(null)} onSingle={addSingle} onBoxNew={addBoxNew} onBoxExisting={addBoxExisting} />}
       <div className="space-y-2.5">
         {stock.map((it) => {
           const st = stockStatus(it); const m = meta[st];
