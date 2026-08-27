@@ -1,22 +1,24 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/utils/helpers';
 import {
   LayoutDashboard, MessageCircle, Users, Store, ClipboardList, Calendar, Clock,
   CalendarCheck, ClipboardCheck, BookOpen, Package, CookingPot, CreditCard, Settings,
-  Shield, Search, Bell, Play, Square, Check, X, CheckCircle, AlertTriangle, BarChart3,
+  Shield, Bell, Play, Square, Check, X, CheckCircle, AlertTriangle, BarChart3,
   DollarSign, TrendingUp, ChevronDown, RotateCw, Send, Wand2, Coffee, Plus, Smartphone,
+  Loader2, MapPin,
 } from 'lucide-react';
 
 /**
  * Interactive product demo for the marketing homepage.
  *
- * A self-contained replica of the real app shell (dark sidebar + topbar +
- * content) running inside a browser frame — no auth, no data. Visitors navigate
- * the actual sections via the sidebar and switch between the Owner and Worker
- * roles (role-based access is a real feature). Many screens are genuinely
- * interactive: a ticking clock-in timer, working leave approvals, refillable
- * stock, a Recipes→Stock loop, togglable availability and checklists.
+ * Two independent phone apps shown side by side — one for the owner/manager and
+ * one for the worker. Each is a self-contained mobile replica of the real app
+ * (status bar, top bar, bottom nav) with its OWN state, so interacting with one
+ * never affects the other. All content renders at mobile size regardless of the
+ * viewer's screen. Genuinely interactive: an AI auto-scheduler, a ticking
+ * clock-in timer, leave/attendance approvals, refillable stock, a Recipes→Stock
+ * loop, multi-shop coverage, togglable availability and checklists.
  */
 
 const OWNER_NAV = [
@@ -47,9 +49,6 @@ const WORKER_NAV = [
   { id: 'stock', label: 'Stock', short: 'Stock', icon: Package },
   { id: 'settings', label: 'Settings', short: 'Settings', icon: Settings },
 ];
-
-const OWNER_TOUR = ['dashboard', 'calendar', 'staff', 'stock', 'recipes', 'costs'];
-const WORKER_TOUR = ['time', 'calendar', 'availability', 'my-checklists'];
 
 const INITIAL_STOCK = [
   { id: 'beans', name: 'Arabica Coffee Beans', unit: 'kg', qty: 4.2, min: 6 },
@@ -82,15 +81,15 @@ export default function LandingDemo() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            Live, interactive demo
+            Interactive demo — try it
           </div>
           <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-display font-bold text-slate-900 mb-3 sm:mb-4">Two apps, one platform</h2>
-          <p className="text-sm sm:text-lg text-slate-600 max-w-2xl mx-auto">Owners run the whole business; your team gets a focused app for their shifts — both on their phone. Tap the bottom bar to browse sections, and actually try it: clock in, approve leave, refill stock, make a recipe.</p>
+          <p className="text-sm sm:text-lg text-slate-600 max-w-2xl mx-auto">Owners run the whole business; your team gets a focused app for their shifts — both on their phone. Tap the bottom bar to browse sections, and actually try it: auto-schedule a week, approve leave, refill stock, make a recipe. Each phone is fully independent.</p>
         </div>
 
         <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-10 lg:gap-16">
-          <PhoneApp role="owner" name="Sofia Marin" roleLabel="Owner / Manager" tour={OWNER_TOUR} />
-          <PhoneApp role="worker" name="Alex Novak" roleLabel="Worker" tour={WORKER_TOUR} />
+          <PhoneApp role="owner" roleLabel="Owner / Manager" />
+          <PhoneApp role="worker" roleLabel="Worker" />
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-8">A real, interactive preview — nothing is saved. This is exactly what managers and staff see on their phones. <a href="/register" className="text-brand-600 font-medium hover:underline">Create your free account →</a></p>
@@ -101,23 +100,13 @@ export default function LandingDemo() {
 
 /* ─── Phone app (per role) ──────────────────────────────────── */
 
-function PhoneApp({ role, name, roleLabel, tour }) {
+function PhoneApp({ role, roleLabel }) {
   const nav = role === 'owner' ? OWNER_NAV : WORKER_NAV;
   const [active, setActive] = useState(role === 'owner' ? 'dashboard' : 'time');
-  const [interacted, setInteracted] = useState(false);
-  const [stock, setStock] = useState(INITIAL_STOCK);
-  const timer = useRef(null);
-
-  const onInteract = () => setInteracted(true);
-  useEffect(() => {
-    if (interacted || !tour) return;
-    timer.current = setInterval(() => {
-      setActive((cur) => { const i = tour.indexOf(cur); return tour[(i + 1) % tour.length]; });
-    }, 4200);
-    return () => clearInterval(timer.current);
-  }, [interacted, tour]);
-
-  const go = (id) => { onInteract(); setActive(id); };
+  // Each phone owns a cloned copy of the stock so the two demos never share state.
+  const [stock, setStock] = useState(() => INITIAL_STOCK.map((s) => ({ ...s })));
+  const onInteract = () => {}; // retained for screen signatures; no cross-phone effects
+  const go = (id) => setActive(id);
   const current = nav.find((n) => n.id === active) || nav[0];
 
   return (
@@ -168,7 +157,7 @@ function PhoneApp({ role, name, roleLabel, tour }) {
 
 function PhoneFrame({ children }) {
   return (
-    <div className="relative w-[300px] sm:w-[330px] rounded-[2.75rem] bg-slate-900 p-2.5 shadow-2xl shadow-slate-900/30 border border-slate-800 animate-in">
+    <div className="relative w-[288px] sm:w-[330px] rounded-[2.75rem] bg-slate-900 p-2.5 shadow-2xl shadow-slate-900/30 border border-slate-800 animate-in">
       <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-28 h-5 bg-slate-900 rounded-b-2xl z-20" />
       <div className="rounded-[2.25rem] overflow-hidden bg-surface-50 h-[580px] flex flex-col">
         {children}
@@ -185,9 +174,9 @@ function Section({ role, active, stock, setStock, onInteract, go }) {
     case 'dashboard': return worker ? <WorkerDashboard go={go} /> : <OwnerDashboard onInteract={onInteract} go={go} />;
     case 'chat': return <ChatScreen role={role} onInteract={onInteract} />;
     case 'staff': return <StaffScreen />;
-    case 'shops': return <ShopsScreen />;
+    case 'shops': return <ShopsScreen onInteract={onInteract} />;
     case 'shifts': return <TemplatesScreen />;
-    case 'calendar': return worker ? <MyScheduleScreen /> : <CalendarScreen />;
+    case 'calendar': return worker ? <MyScheduleScreen /> : <CalendarScreen onInteract={onInteract} />;
     case 'staff-availability': return <StaffAvailabilityScreen />;
     case 'availability': return <AvailabilityScreen onInteract={onInteract} />;
     case 'attendance': return <AttendanceScreen onInteract={onInteract} />;
@@ -203,7 +192,7 @@ function Section({ role, active, stock, setStock, onInteract, go }) {
   }
 }
 
-const Pad = ({ children }) => <div className="p-4 sm:p-5 text-left">{children}</div>;
+const Pad = ({ children }) => <div className="p-4 text-left">{children}</div>;
 const Head = ({ title, sub, right }) => (
   <div className="flex items-center justify-between gap-2 mb-4">
     <div><p className="text-base font-display font-bold text-surface-900">{title}</p>{sub && <p className="text-xs text-surface-500">{sub}</p>}</div>
@@ -236,7 +225,7 @@ function OwnerDashboard({ onInteract, go }) {
         <p className="text-white/50 text-xs font-medium">Good morning</p>
         <p className="text-lg font-display font-bold leading-tight">Sofia — here's what's happening today</p>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+      <div className="grid grid-cols-2 gap-2.5 mb-4">
         {stats.map((s) => (
           <div key={s.label} className={cn('rounded-xl p-3 text-white bg-gradient-to-br', s.tint)}>
             <s.icon className="w-4 h-4 text-white/80 mb-2" />
@@ -350,7 +339,7 @@ function WorkerTimeScreen({ onInteract }) {
           )}
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-w-md">
+      <div className="grid grid-cols-2 gap-2.5">
         <Stat icon={BarChart3} tint="text-brand-400" value={`${monthH.toFixed(1)}h`} label="This month" />
         <Stat icon={DollarSign} tint="text-amber-400" value={`€${Math.round(monthH * 15)}`} label="Expected pay" />
       </div>
@@ -413,8 +402,8 @@ const STAFF = [
 function StaffScreen() {
   return (
     <Pad>
-      <Head title="Staff" sub="6 active · 1 inactive" right={<span className="btn-primary !py-1.5 !px-3 !text-xs pointer-events-none"><Plus className="w-3.5 h-3.5" /> Add Worker</span>} />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <Head title="Staff" sub="6 active · 1 inactive" right={<span className="btn-primary !py-1.5 !px-3 !text-xs pointer-events-none"><Plus className="w-3.5 h-3.5" /> Add</span>} />
+      <div className="grid grid-cols-1 gap-2.5">
         {STAFF.map((w) => (
           <div key={w.name} className="rounded-xl border border-surface-200/70 bg-white p-3.5 flex items-center gap-3">
             <div className="relative">
@@ -436,26 +425,65 @@ function StaffScreen() {
   );
 }
 
-/* ─── Shops ─────────────────────────────────────────────────── */
+/* ─── Shops (multi-location org, interactive) ───────────────── */
 
-function ShopsScreen() {
-  const shops = [
-    { name: 'Downtown', addr: '12 Market St', staff: 11, color: '#4c6ef5' },
-    { name: 'Riverside', addr: '48 Canal Rd', staff: 8, color: '#7c3aed' },
-    { name: 'Airport Kiosk', addr: 'Terminal 2', staff: 5, color: '#059669' },
-  ];
+const SHOPS = [
+  { id: 'downtown', name: 'Downtown', addr: '12 Market St', manager: 'Lena Fischer', staff: 11, hours: '06:00 – 22:00', filled: 5, needed: 6, color: '#4c6ef5' },
+  { id: 'riverside', name: 'Riverside', addr: '48 Canal Rd', manager: 'Nina Petrova', staff: 8, hours: '07:00 – 20:00', filled: 4, needed: 4, color: '#7c3aed' },
+  { id: 'airport', name: 'Airport Kiosk', addr: 'Terminal 2', manager: 'Jonas Weber', staff: 5, hours: '05:00 – 23:00', filled: 2, needed: 3, color: '#059669' },
+];
+
+const Mini = ({ icon: Icon, label, value }) => (
+  <div className="rounded-lg bg-surface-50 border border-surface-200/60 p-2.5 min-w-0">
+    <div className="flex items-center gap-1.5 text-[10px] text-surface-400 mb-0.5"><Icon className="w-3 h-3 flex-shrink-0" /> {label}</div>
+    <p className="text-[11px] font-medium text-surface-700 truncate">{value}</p>
+  </div>
+);
+
+function ShopsScreen({ onInteract }) {
+  const [openId, setOpenId] = useState('downtown');
   return (
     <Pad>
-      <Head title="Shops" sub="3 locations" right={<span className="btn-primary !py-1.5 !px-3 !text-xs pointer-events-none"><Plus className="w-3.5 h-3.5" /> Add Shop</span>} />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {shops.map((s) => (
-          <div key={s.name} className="rounded-xl border border-surface-200/70 bg-white p-4">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: s.color + '22' }}><Store className="w-5 h-5" style={{ color: s.color }} /></div>
-            <p className="text-sm font-semibold text-surface-800">{s.name}</p>
-            <p className="text-[11px] text-surface-400">{s.addr}</p>
-            <div className="mt-3 flex items-center gap-1.5 text-[11px] text-surface-500"><Users className="w-3.5 h-3.5" /> {s.staff} staff</div>
-          </div>
-        ))}
+      <Head title="Shops" sub="Bean & Brew Co. · 3 locations" right={<span className="btn-primary !py-1.5 !px-3 !text-xs pointer-events-none"><Plus className="w-3.5 h-3.5" /> Add</span>} />
+      <div className="space-y-2.5">
+        {SHOPS.map((s) => {
+          const open = openId === s.id;
+          const gap = s.needed - s.filled;
+          return (
+            <div key={s.id} className="rounded-xl border border-surface-200/70 bg-white overflow-hidden">
+              <button onClick={() => { onInteract(); setOpenId(open ? null : s.id); }} className="w-full p-3.5 flex items-center gap-3 text-left">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: s.color + '22' }}><Store className="w-5 h-5" style={{ color: s.color }} /></div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-semibold text-surface-800 truncate">{s.name}</p>
+                    <span className="badge bg-emerald-100 text-emerald-700 !text-[9px] !px-1.5 !py-0 flex-shrink-0">Open</span>
+                  </div>
+                  <p className="text-[11px] text-surface-400 flex items-center gap-1 truncate"><MapPin className="w-3 h-3 flex-shrink-0" /> {s.addr}</p>
+                </div>
+                {gap > 0
+                  ? <span className="badge bg-amber-100 text-amber-700 !text-[9px] flex-shrink-0">{gap} to fill</span>
+                  : <span className="badge bg-emerald-100 text-emerald-700 !text-[9px] flex-shrink-0">Covered</span>}
+                <ChevronDown className={cn('w-4 h-4 text-surface-400 flex-shrink-0 transition-transform', open && 'rotate-180')} />
+              </button>
+              {open && (
+                <div className="px-3.5 pb-3.5 animate-in">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Mini icon={Users} label="Team" value={`${s.staff} staff`} />
+                    <Mini icon={Clock} label="Hours" value={s.hours} />
+                    <Mini icon={Shield} label="Manager" value={s.manager} />
+                    <Mini icon={Calendar} label="Today" value={`${s.filled}/${s.needed} shifts`} />
+                  </div>
+                  {gap > 0 && (
+                    <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-2 flex items-center gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                      <p className="text-[11px] text-amber-800">{gap} shift{gap > 1 ? 's' : ''} open today — post it or auto-schedule.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </Pad>
   );
@@ -488,44 +516,90 @@ function TemplatesScreen() {
   );
 }
 
-/* ─── Calendar (owner week grid) ────────────────────────────── */
+/* ─── Calendar (owner) — interactive AI auto-scheduler ──────── */
 
-function CalendarScreen() {
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const rows = [
-    { name: 'Lena', shifts: { 0: ['m'], 1: ['m'], 3: ['a'], 4: ['a'] } },
-    { name: 'Marco', shifts: { 1: ['a'], 2: ['a'], 4: ['m'], 5: ['n'] } },
-    { name: 'Aisha', shifts: { 0: ['a'], 2: ['m'], 3: ['m'], 6: ['a'] } },
-  ];
-  const tint = { m: 'bg-amber-100 text-amber-700', a: 'bg-orange-100 text-orange-700', n: 'bg-indigo-100 text-indigo-700' };
-  const label = { m: 'AM', a: 'PM', n: 'Night' };
+const WEEK = [
+  { d: 'Mon', n: '25' }, { d: 'Tue', n: '26' }, { d: 'Wed', n: '27' }, { d: 'Thu', n: '28' },
+  { d: 'Fri', n: '29' }, { d: 'Sat', n: '30' }, { d: 'Sun', n: '31' },
+];
+const PLAN = {
+  Mon: [['Opening', 'Lena', 'm'], ['Closing', 'Marco', 'a']],
+  Tue: [['Opening', 'Aisha', 'm'], ['Mid', 'Nina', 'a']],
+  Wed: [['Opening', 'Marco', 'm'], ['Closing', 'Jonas', 'a']],
+  Thu: [['Mid', 'Lena', 'a'], ['Closing', 'Tomás', 'a']],
+  Fri: [['Opening', 'Nina', 'm'], ['Closing', 'Marco', 'a'], ['Night', 'Jonas', 'n']],
+  Sat: [['Mid', 'Aisha', 'a'], ['Closing', 'Lena', 'a']],
+  Sun: [['Mid', 'Tomás', 'a']],
+};
+const SHIFT_DOT = { m: 'bg-amber-400', a: 'bg-orange-400', n: 'bg-indigo-400' };
+
+function CalendarScreen({ onInteract }) {
+  const [scheduled, setScheduled] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const total = Object.values(PLAN).reduce((s, a) => s + a.length, 0);
+
+  const generate = () => {
+    onInteract();
+    setGenerating(true);
+    setTimeout(() => { setGenerating(false); setScheduled(true); }, 900);
+  };
+
   return (
     <Pad>
-      <Head title="Calendar" sub="Week of Aug 25" right={<span className="btn-primary !py-1.5 !px-3 !text-xs pointer-events-none"><Wand2 className="w-3.5 h-3.5" /> Auto-Schedule</span>} />
-      <div className="rounded-xl border border-surface-200/70 bg-white overflow-x-auto scrollbar-none">
-        <div className="min-w-[520px]">
-          <div className="grid grid-cols-8 border-b border-surface-100 text-[10px] font-semibold text-surface-400">
-            <div className="p-2" />
-            {days.map((d) => <div key={d} className="p-2 text-center">{d}</div>)}
-          </div>
-          {rows.map((r) => (
-            <div key={r.name} className="grid grid-cols-8 border-b border-surface-100 last:border-0 items-center">
-              <div className="p-2 text-[11px] font-medium text-surface-700">{r.name}</div>
-              {days.map((_, i) => (
-                <div key={i} className="p-1.5 min-h-[38px]">
-                  {r.shifts[i]?.map((sh, j) => (
-                    <div key={j} className={cn('rounded-md text-[9px] font-medium text-center py-1', tint[sh])}>{label[sh]}</div>
+      <Head title="Calendar" sub="Downtown · Week of Aug 25"
+        right={scheduled ? <button onClick={() => { onInteract(); setScheduled(false); }} className="text-[11px] font-medium text-surface-500 hover:text-surface-700">Reset</button> : null} />
+
+      {!scheduled && (
+        <div className="rounded-xl border border-brand-100 bg-gradient-to-br from-brand-50/80 to-brand-50/30 p-4 mb-3 text-center">
+          <div className="w-11 h-11 rounded-2xl bg-brand-100 flex items-center justify-center mx-auto mb-2"><Wand2 className="w-5 h-5 text-brand-600" /></div>
+          <p className="text-sm font-semibold text-surface-800">Let AI build your week</p>
+          <p className="text-[11px] text-surface-500 mt-0.5 mb-3">Assigns staff from their availability, target hours and your shift templates — no conflicts, no gaps.</p>
+          <button onClick={generate} disabled={generating}
+            className="inline-flex items-center gap-2 bg-gradient-to-b from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl active:scale-[0.98] transition-all disabled:opacity-70">
+            {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</> : <><Wand2 className="w-4 h-4" /> Auto-Schedule</>}
+          </button>
+        </div>
+      )}
+
+      {scheduled && (
+        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 mb-3 flex items-center gap-2 animate-in">
+          <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+          <p className="text-[11px] text-emerald-800"><span className="font-semibold">{total} shifts assigned</span> across 6 staff — balanced by availability.</p>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {WEEK.map((day) => {
+          const items = scheduled ? (PLAN[day.d] || []) : [];
+          return (
+            <div key={day.d} className="rounded-xl border border-surface-200/70 bg-white p-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-xs font-semibold text-surface-700">{day.d}</span>
+                <span className="text-[10px] text-surface-400 tabular-nums">Aug {day.n}</span>
+              </div>
+              {items.length === 0 ? (
+                <p className="text-[11px] text-surface-300">{generating ? 'Assigning…' : 'No shifts yet'}</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {items.map((it, i) => (
+                    <span key={i} className="inline-flex items-center gap-1.5 rounded-lg bg-surface-50 border border-surface-200/70 pl-2 pr-2.5 py-1 text-[11px] animate-in">
+                      <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', SHIFT_DOT[it[2]])} />
+                      <span className="font-medium text-surface-700">{it[0]}</span>
+                      <span className="text-surface-300">·</span>
+                      <span className="text-surface-600">{it[1]}</span>
+                    </span>
                   ))}
                 </div>
-              ))}
+              )}
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
+
       <div className="flex gap-3 mt-3 text-[10px] text-surface-500">
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-300" /> Morning</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-orange-300" /> Afternoon</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-indigo-300" /> Night</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400" /> Morning</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-400" /> Afternoon</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-indigo-400" /> Night</span>
       </div>
     </Pad>
   );
@@ -727,7 +801,7 @@ function KnowledgeScreen() {
   return (
     <Pad>
       <Head title="Knowledge Base" sub="Guides & SOPs for your team" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-2.5">
         {arts.map((a) => (
           <div key={a.t} className="rounded-xl border border-surface-200/70 bg-white p-3.5 flex items-center gap-3">
             <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', a.tint)}><a.icon className="w-5 h-5" /></div>
@@ -750,21 +824,21 @@ function CostsScreen() {
   return (
     <Pad>
       <Head title="Costs & Billing" sub="August 2026" />
-      <div className="rounded-xl border border-surface-200/70 bg-white p-4 mb-4 max-w-2xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="badge bg-brand-100 text-brand-700 !text-[11px]">Professional plan</span>
+      <div className="rounded-xl border border-surface-200/70 bg-white p-4 mb-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="badge bg-brand-100 text-brand-700 !text-[10px] flex-shrink-0">Professional</span>
             <span className="text-sm font-semibold text-surface-900">€1,240/mo</span>
           </div>
-          <span className="text-[11px] text-surface-500">24 workers · 3 shops</span>
+          <span className="text-[10px] text-surface-500 flex-shrink-0">24 workers · 3 shops</span>
         </div>
-        <div className="mt-3 pt-3 border-t border-surface-100 grid grid-cols-3 gap-2 text-[11px] text-surface-500">
-          <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> First 4 free</span>
-          <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-brand-500" /> €2/extra worker</span>
-          <span className="flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 text-purple-500" /> Save yearly</span>
+        <div className="mt-3 pt-3 border-t border-surface-100 flex flex-col gap-1.5 text-[11px] text-surface-500">
+          <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> First 4 workers &amp; 1 shop free</span>
+          <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-brand-500" /> €2 / extra worker per month</span>
+          <span className="flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 text-purple-500" /> Save ~17% with yearly billing</span>
         </div>
       </div>
-      <div className="rounded-xl border border-surface-200/70 bg-white p-4 max-w-2xl">
+      <div className="rounded-xl border border-surface-200/70 bg-white p-4">
         <p className="text-sm font-display font-semibold text-surface-800 mb-3">Labor cost by shop</p>
         <div className="space-y-2.5">
           {bars.map((b) => (
@@ -823,8 +897,8 @@ function RecipesScreen({ stock, setStock, onInteract }) {
   };
   return (
     <Pad>
-      <Head title="Recipes" sub="Cost every product and deduct stock in one tap." right={<span className="badge bg-brand-100 text-brand-700 !text-[10px]">{RECIPES.length} recipes</span>} />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <Head title="Recipes" sub="Cost every product and deduct stock in one tap." right={<span className="badge bg-brand-100 text-brand-700 !text-[10px]">{RECIPES.length}</span>} />
+      <div className="grid grid-cols-1 gap-2.5">
         {RECIPES.map((r) => {
           const open = expanded === r.id;
           return (
