@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Modal from '@/components/Modal';
 import { cn } from '@/utils/helpers';
-import { Camera, Keyboard, Sparkles, Loader2, ScanLine } from 'lucide-react';
+import { Camera, Keyboard, Sparkles, Loader2, ScanLine, X } from 'lucide-react';
 
 /**
  * Reusable barcode scanner.
@@ -19,7 +19,7 @@ import { Camera, Keyboard, Sparkles, Loader2, ScanLine } from 'lucide-react';
  *
  * Props: open, onClose, onDetected(code), allowSimulate?, simulateCodes?, title?
  */
-export default function BarcodeScanner({ open, onClose, onDetected, allowSimulate = false, simulateCodes = [], title = 'Scan a barcode' }) {
+export default function BarcodeScanner({ open, onClose, onDetected, allowSimulate = false, simulateCodes = [], title = 'Scan a barcode', inline = false }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const controlsRef = useRef(null); // ZXing controls
@@ -118,8 +118,9 @@ export default function BarcodeScanner({ open, onClose, onDetected, allowSimulat
 
   if (!open) return null;
 
-  return (
-    <Modal open={open} onClose={() => { stop(); onClose?.(); }} title={title}>
+  const close = () => { stop(); onClose?.(); };
+
+  const body = (
       <div className="space-y-4">
         {/* Camera viewport */}
         <div className="relative bg-surface-900 rounded-2xl overflow-hidden aspect-[4/3]">
@@ -165,6 +166,25 @@ export default function BarcodeScanner({ open, onClose, onDetected, allowSimulat
           </div>
         </form>
       </div>
+  );
+
+  // Contained overlay (used inside the homepage demo phone) — stays within the
+  // nearest positioned ancestor instead of covering the whole viewport.
+  if (inline) {
+    return (
+      <div className="absolute inset-0 z-50 bg-surface-50 flex flex-col animate-in">
+        <div className="h-11 flex items-center justify-between px-3.5 border-b border-surface-200/60 bg-white flex-shrink-0">
+          <span className="text-sm font-display font-semibold text-surface-800">{title}</span>
+          <button onClick={close} aria-label="Close" className="w-7 h-7 rounded-lg flex items-center justify-center text-surface-400 hover:bg-surface-100 transition-colors"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto scrollbar-none p-3">{body}</div>
+      </div>
+    );
+  }
+
+  return (
+    <Modal open={open} onClose={close} title={title}>
+      {body}
     </Modal>
   );
 }

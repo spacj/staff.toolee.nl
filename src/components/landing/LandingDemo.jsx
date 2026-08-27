@@ -166,6 +166,22 @@ function PhoneApp({ role, roleLabel }) {
   const showTip = tip && !dismissedTips.has(active);
   const dismissTip = () => setDismissedTips((prev) => new Set(prev).add(active));
 
+  // Barcode scanning — state lives here so the scanner renders inline inside the
+  // phone frame (contained, not a full-screen page modal).
+  const [scanOpen, setScanOpen] = useState(false);
+  const [flowCode, setFlowCode] = useState(null);
+  const onScan = (codeVal) => {
+    setScanOpen(false);
+    const match = findByBarcode(stock, codeVal);
+    if (match) {
+      const add = match.kind === 'box' ? boxUnits(match.item) : 1;
+      setStock((prev) => prev.map((s) => (s.id === match.item.id ? { ...s, qty: Math.round((s.qty + add) * 100) / 100 } : s)));
+    } else setFlowCode(codeVal);
+  };
+  const addSingle = (codeVal, name) => { setFlowCode(null); setStock((prev) => [...prev, { id: 'b' + Date.now(), name: name || 'New item', unit: 'pcs', qty: 1, min: 4, step: 1, barcode: codeVal }]); };
+  const addBoxNew = (codeVal, units, name) => { setFlowCode(null); setStock((prev) => [...prev, { id: 'b' + Date.now(), name: name || 'New item', unit: 'pcs', qty: units, min: Math.max(1, Math.round(units / 2)), step: units, boxBarcode: codeVal, unitsPerBox: units }]); };
+  const addBoxExisting = (item, codeVal, units) => { setFlowCode(null); setStock((prev) => prev.map((s) => (s.id === item.id ? { ...s, qty: s.qty + Number(units), boxBarcode: codeVal, unitsPerBox: Number(units) } : s))); };
+
   return (
     <div className="flex flex-col items-center">
       <div className={cn('inline-flex items-center gap-2 mb-4 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold shadow-sm', meta.pill)}>
@@ -188,7 +204,7 @@ function PhoneApp({ role, roleLabel }) {
         </div>
         {/* Content */}
         <div className="flex-1 overflow-y-auto scrollbar-none">
-          <Section role={role} active={active} stock={stock} setStock={setStock} onInteract={onInteract} go={go} />
+          <Section role={role} active={active} stock={stock} setStock={setStock} onInteract={onInteract} go={go} openScanner={() => setScanOpen(true)} />
         </div>
         {/* Bottom nav */}
         <div className="flex-shrink-0 border-t border-surface-200/60 bg-white/95 backdrop-blur">
@@ -207,7 +223,10 @@ function PhoneApp({ role, roleLabel }) {
           </div>
         </div>
         {/* Contextual pop-up tutorial for the current section */}
-        {showTip && <Coachmark tip={tip} onDismiss={dismissTip} />}
+        {showTip && !scanOpen && !flowCode && <Coachmark tip={tip} onDismiss={dismissTip} />}
+        {/* Barcode scanner + add flow — contained inside the phone */}
+        {scanOpen && <BarcodeScanner inline open onClose={() => setScanOpen(false)} onDetected={onScan} allowSimulate simulateCodes={DEMO_BARCODES} />}
+        {flowCode && <BarcodeAddFlow inline code={flowCode} items={stock} collectName onClose={() => setFlowCode(null)} onSingle={addSingle} onBoxNew={addBoxNew} onBoxExisting={addBoxExisting} />}
       </PhoneFrame>
     </div>
   );
@@ -239,7 +258,7 @@ function Coachmark({ tip, onDismiss }) {
 
 /* ─── Section router ─────────────────────────────────────────── */
 
-function Section({ role, active, stock, setStock, onInteract, go }) {
+function Section({ role, active, stock, setStock, onInteract, go, openScanner }) {
   const worker = role === 'worker';
   switch (active) {
     case 'dashboard': return worker ? <WorkerDashboard go={go} /> : <OwnerDashboard onInteract={onInteract} go={go} />;
@@ -254,7 +273,7 @@ function Section({ role, active, stock, setStock, onInteract, go }) {
     case 'checklists': return <ChecklistsScreen />;
     case 'my-checklists': return <MyChecklistsScreen onInteract={onInteract} />;
     case 'knowledge': return <KnowledgeScreen />;
-    case 'stock': return <StockScreen stock={stock} setStock={setStock} onInteract={onInteract} />;
+    case 'stock': return <StockScreen stock={stock} setStock={setStock} onInteract={onInteract} openScanner={openScanner} />;
     case 'recipes': return <RecipesScreen stock={stock} setStock={setStock} onInteract={onInteract} />;
     case 'costs': return <CostsScreen />;
     case 'time': return <WorkerTimeScreen onInteract={onInteract} />;
@@ -1016,40 +1035,14 @@ function RecipesScreen({ stock, setStock, onInteract }) {
 
 /* ─── Stock (shares live stock) ─────────────────────────────── */
 
-function StockScreen({ stock, setStock, onInteract }) {
+function StockScreen({ stock, setStock, onInteract, openScanner }) {
   const meta = {
     ok: { badge: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-500', label: 'In stock' },
     low: { badge: 'bg-amber-100 text-amber-700', bar: 'bg-amber-500', label: 'Low' },
     out: { badge: 'bg-red-100 text-red-700', bar: 'bg-red-500', label: 'Out' },
   };
-  const [scanOpen, setScanOpen] = useState(false);
-  const [flowCode, setFlowCode] = useState(null);
   const adjust = (id, delta) => { onInteract(); setStock((prev) => prev.map((s) => (s.id === id ? { ...s, qty: Math.max(0, Math.round((s.qty + delta) * 100) / 100) } : s))); };
   const refill = (id) => { onInteract(); setStock((prev) => prev.map((s) => (s.id === id ? { ...s, qty: s.min * 2 } : s))); };
-
-  const onScan = (code) => {
-    onInteract();
-    setScanOpen(false);
-    const match = findByBarcode(stock, code);
-    if (match) {
-      const add = match.kind === 'box' ? boxUnits(match.item) : 1;
-      setStock((prev) => prev.map((s) => (s.id === match.item.id ? { ...s, qty: Math.round((s.qty + add) * 100) / 100 } : s)));
-    } else {
-      setFlowCode(code);
-    }
-  };
-  const addSingle = (code, name) => {
-    setFlowCode(null);
-    setStock((prev) => [...prev, { id: 'b' + Date.now(), name: name || 'New item', unit: 'pcs', qty: 1, min: 4, step: 1, barcode: code }]);
-  };
-  const addBoxNew = (code, units, name) => {
-    setFlowCode(null);
-    setStock((prev) => [...prev, { id: 'b' + Date.now(), name: name || 'New item', unit: 'pcs', qty: units, min: Math.max(1, Math.round(units / 2)), step: units, boxBarcode: code, unitsPerBox: units }]);
-  };
-  const addBoxExisting = (item, code, units) => {
-    setFlowCode(null);
-    setStock((prev) => prev.map((s) => (s.id === item.id ? { ...s, qty: s.qty + Number(units), boxBarcode: code, unitsPerBox: Number(units) } : s)));
-  };
 
   const low = stock.filter((s) => stockStatus(s) === 'low').length;
   const out = stock.filter((s) => stockStatus(s) === 'out').length;
@@ -1058,11 +1051,9 @@ function StockScreen({ stock, setStock, onInteract }) {
     <Pad>
       <Head title="Stock" sub={`${stock.length} items · ${low} low · ${out} out`}
         right={<div className="flex items-center gap-1.5">
-          <button onClick={() => { onInteract(); setScanOpen(true); }} className="inline-flex items-center gap-1 bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg active:scale-95 transition-all"><ScanLine className="w-3.5 h-3.5" /> Scan</button>
+          <button onClick={() => { onInteract(); openScanner?.(); }} className="inline-flex items-center gap-1 bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg active:scale-95 transition-all"><ScanLine className="w-3.5 h-3.5" /> Scan</button>
           <span className={cn('inline-flex items-center gap-1 badge !text-[10px]', attention > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')}>{attention > 0 ? <><AlertTriangle className="w-3 h-3" /> {attention}</> : <CheckCircle className="w-3 h-3" />}</span>
         </div>} />
-      <BarcodeScanner open={scanOpen} onClose={() => setScanOpen(false)} onDetected={onScan} allowSimulate simulateCodes={DEMO_BARCODES} />
-      {flowCode && <BarcodeAddFlow code={flowCode} items={stock} collectName onClose={() => setFlowCode(null)} onSingle={addSingle} onBoxNew={addBoxNew} onBoxExisting={addBoxExisting} />}
       <div className="space-y-2.5">
         {stock.map((it) => {
           const st = stockStatus(it); const m = meta[st];

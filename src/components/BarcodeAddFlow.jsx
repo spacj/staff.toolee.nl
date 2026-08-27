@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Modal from '@/components/Modal';
-import { Barcode, Package, Boxes, Plus, Search } from 'lucide-react';
+import { Barcode, Package, Boxes, Plus, Search, X } from 'lucide-react';
 
 /**
  * "Barcode not recognised" flow, shared by the real Stock page and the demo.
@@ -18,7 +18,7 @@ import { Barcode, Package, Boxes, Plus, Search } from 'lucide-react';
  * demo, which has no separate add form). In the real app it's false because the
  * name is captured by the existing Add-Item modal.
  */
-export default function BarcodeAddFlow({ code, items = [], onClose, onSingle, onBoxNew, onBoxExisting, collectName = false }) {
+export default function BarcodeAddFlow({ code, items = [], onClose, onSingle, onBoxNew, onBoxExisting, collectName = false, inline = false }) {
   const [step, setStep] = useState('choose'); // choose | single-name | box | box-name
   const [units, setUnits] = useState('');
   const [name, setName] = useState('');
@@ -32,8 +32,7 @@ export default function BarcodeAddFlow({ code, items = [], onClose, onSingle, on
   const chooseSingle = () => { if (collectName) setStep('single-name'); else onSingle(code); };
   const chooseBoxNew = () => { if (collectName) setStep('box-name'); else onBoxNew(code, n); };
 
-  return (
-    <Modal open onClose={onClose} title="Barcode not recognised">
+  const body = (
       <div className="space-y-4">
         <div className="rounded-xl bg-surface-50 border border-surface-200 p-3 flex items-center gap-2">
           <Barcode className="w-4 h-4 text-surface-500 flex-shrink-0" />
@@ -132,6 +131,24 @@ export default function BarcodeAddFlow({ code, items = [], onClose, onSingle, on
           </div>
         )}
       </div>
+  );
+
+  // Contained overlay for the homepage demo phone.
+  if (inline) {
+    return (
+      <div className="absolute inset-0 z-50 bg-surface-50 flex flex-col animate-in">
+        <div className="h-11 flex items-center justify-between px-3.5 border-b border-surface-200/60 bg-white flex-shrink-0">
+          <span className="text-sm font-display font-semibold text-surface-800">Barcode not recognised</span>
+          <button onClick={onClose} aria-label="Close" className="w-7 h-7 rounded-lg flex items-center justify-center text-surface-400 hover:bg-surface-100 transition-colors"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto scrollbar-none p-3">{body}</div>
+      </div>
+    );
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Barcode not recognised">
+      {body}
     </Modal>
   );
 }
