@@ -6,8 +6,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getShops, createShop, updateShop, deleteShop, getWorkers, syncOrgPlan } from '@/lib/firestore';
 import { formatCurrency, PRICE_PER_SHOP, canAddShop } from '@/lib/pricing';
 import { cn } from '@/utils/helpers';
-import { Store, Plus, Pencil, Trash2, MapPin, Users, MoreVertical, Lock, Phone } from 'lucide-react';
+import { Store, Plus, Pencil, Trash2, MapPin, Users, Lock, Phone, ChevronDown, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+const Mini = ({ icon: Icon, label, value }) => (
+  <div className="rounded-lg bg-surface-50 border border-surface-200/60 p-2.5 min-w-0">
+    <div className="flex items-center gap-1.5 text-[10px] text-surface-400 mb-0.5"><Icon className="w-3 h-3 flex-shrink-0" /> {label}</div>
+    <p className="text-[12px] font-medium text-surface-700 truncate">{value}</p>
+  </div>
+);
 
 export default function ShopsPage() {
   const { orgId, isAdmin, isManager } = useAuth();
@@ -15,7 +22,7 @@ export default function ShopsPage() {
   const [workers, setWorkers] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [edit, setEdit] = useState(null);
-  const [menuId, setMenuId] = useState(null);
+  const [openId, setOpenId] = useState(null);
   const [form, setForm] = useState({ name: '', address: '', color: '#4c6ef5', phone: '', manager: '' });
   const [saving, setSaving] = useState(false);
   const [shopCheck, setShopCheck] = useState(null);
@@ -67,45 +74,46 @@ export default function ShopsPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {shops.map((s, idx) => {
             const shopWorkers = workers.filter(w => w.shopId === s.id);
             const clr = s.color || '#4c6ef5';
+            const open = openId === s.id;
             return (
-              <div key={s.id} className="card-hover relative overflow-hidden group">
-                <div className="h-2" style={{ background: `linear-gradient(135deg, ${clr}, ${clr}88)` }} />
-                <div className="p-5">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: clr + '18' }}>
-                        <Store className="w-5 h-5" style={{ color: clr }} />
-                      </div>
-                      <div>
-                        <h3 className="font-display font-semibold text-surface-900">{s.name}</h3>
-                        {s.address && <p className="text-xs text-surface-400 flex items-center gap-1 mt-1"><MapPin className="w-3 h-3" /> {s.address}</p>}
-                        {s.phone && <p className="text-xs text-surface-400 flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3" /> {s.phone}</p>}
-                      </div>
+              <div key={s.id} className="card overflow-hidden self-start">
+                <div className="h-1.5" style={{ background: `linear-gradient(135deg, ${clr}, ${clr}88)` }} />
+                <button type="button" onClick={() => setOpenId(open ? null : s.id)} className="w-full text-left p-4 flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: clr + '18' }}>
+                    <Store className="w-5 h-5" style={{ color: clr }} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="font-display font-semibold text-surface-900 truncate">{s.name}</h3>
+                      <span className="badge bg-emerald-100 text-emerald-700 !text-[9px] !px-1.5 !py-0 flex-shrink-0">Open</span>
+                    </div>
+                    {s.address
+                      ? <p className="text-xs text-surface-400 flex items-center gap-1 truncate mt-0.5"><MapPin className="w-3 h-3 flex-shrink-0" /> {s.address}</p>
+                      : <p className="text-xs text-surface-400 flex items-center gap-1 mt-0.5"><Users className="w-3 h-3" /> {shopWorkers.length} staff</p>}
+                  </div>
+                  <span className={cn('text-[11px] font-medium flex-shrink-0', idx === 0 ? 'text-emerald-600' : 'text-surface-400')}>{idx === 0 ? 'Free' : `${formatCurrency(PRICE_PER_SHOP)}/mo`}</span>
+                  <ChevronDown className={cn('w-4 h-4 text-surface-400 flex-shrink-0 transition-transform', open && 'rotate-180')} />
+                </button>
+                {open && (
+                  <div className="px-4 pb-4 animate-in">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Mini icon={Users} label="Team" value={`${shopWorkers.length} staff`} />
+                      <Mini icon={Shield} label="Manager" value={s.manager || '—'} />
+                      <Mini icon={Phone} label="Phone" value={s.phone || '—'} />
+                      <Mini icon={idx === 0 ? Store : MapPin} label={idx === 0 ? 'Billing' : 'Address'} value={idx === 0 ? 'Free shop' : (s.address || '—')} />
                     </div>
                     {isAdmin && (
-                      <div className="relative">
-                        <button onClick={() => setMenuId(menuId === s.id ? null : s.id)} className="btn-icon !w-8 !h-8 opacity-0 group-hover:opacity-100 transition-opacity"><MoreVertical className="w-4 h-4" /></button>
-                        {menuId === s.id && (
-                          <>
-                            <div className="dropdown-backdrop" onClick={() => setMenuId(null)} />
-                            <div className="dropdown-menu">
-                              <button onClick={() => { openEdit(s); setMenuId(null); }} className="dropdown-item"><Pencil className="w-3.5 h-3.5" /> Edit</button>
-                              <button onClick={() => { handleDelete(s.id); setMenuId(null); }} className="dropdown-item-danger"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
-                            </div>
-                          </>
-                        )}
+                      <div className="flex gap-2 mt-3">
+                        <button onClick={() => openEdit(s)} className="btn-secondary flex-1 !py-2 !text-sm"><Pencil className="w-4 h-4" /> Edit</button>
+                        <button onClick={() => handleDelete(s.id)} className="btn-secondary !py-2 !text-sm !text-red-600 hover:!bg-red-50 hover:!border-red-200"><Trash2 className="w-4 h-4" /> Delete</button>
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 mt-4 pt-3 border-t border-surface-100 text-sm">
-                    <span className="flex items-center gap-1.5 text-surface-500"><Users className="w-3.5 h-3.5" /> {shopWorkers.length} staff</span>
-                    <span className={idx === 0 ? 'text-emerald-600 font-semibold text-xs' : 'text-surface-400 text-xs'}>{idx === 0 ? '✓ Free' : `${formatCurrency(PRICE_PER_SHOP)}/mo`}</span>
-                  </div>
-                </div>
+                )}
               </div>
             );
           })}

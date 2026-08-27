@@ -79,6 +79,7 @@ export default function AttendancePage() {
   // ─── Helpers ────────────────────────
   const activeWorkers = workers.filter(w => w.status === 'active');
   const workerName = (id) => { const w = workers.find(x => x.id === id); return w ? `${w.firstName} ${w.lastName}` : id; };
+  const workerInitials = (id) => { const w = workers.find(x => x.id === id); return w ? `${w.firstName?.[0] || ''}${w.lastName?.[0] || ''}`.toUpperCase() : String(id).slice(0, 2).toUpperCase(); };
   const shopName = (id) => shops.find(s => s.id === id)?.name || '';
   const workerRate = (id) => { const w = workers.find(x => x.id === id); return w?.payType === 'hourly' ? (w.costPerHour || 0) : 0; };
   const getDateStr = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -559,9 +560,12 @@ export default function AttendancePage() {
                   return (
                     <div key={a.id} className="px-4 sm:px-5 py-4">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-surface-800 truncate">{workerName(a.workerId)}</p>
-                          <p className="text-xs text-surface-400 truncate">{shopName(a.shopId)}</p>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center text-[11px] font-bold flex-shrink-0">{workerInitials(a.workerId)}</div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-surface-800 truncate">{workerName(a.workerId)}</p>
+                            <p className="text-xs text-surface-400 truncate">{shopName(a.shopId) || (a.date)}</p>
+                          </div>
                         </div>
                         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                           <span className="text-sm font-semibold text-surface-700">{(a.totalHours || 0).toFixed(1)}h</span>

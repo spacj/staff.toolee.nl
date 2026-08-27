@@ -8,7 +8,7 @@ import {
 } from '@/lib/firestore';
 import {
   ClipboardCheck, CheckCircle2, Circle, Clock, AlertCircle, ChevronDown,
-  ChevronRight, MessageSquare, QrCode, Calendar, Filter, Building, Users,
+  ChevronRight, MessageSquare, QrCode, Calendar, Filter, Building, Users, Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -321,15 +321,15 @@ function ChecklistItem({ item, index, disabled, isShopWide, onToggle, onNote }) 
         <button
           onClick={onToggle}
           disabled={disabled}
-          className={cn(
-            'mt-0.5 flex-shrink-0 transition-all',
-            disabled && 'cursor-not-allowed'
+          className={cn('mt-0.5 flex-shrink-0 transition-all active:scale-90', disabled && 'cursor-not-allowed')}>
+          <span className={cn(
+            'w-5 h-5 rounded-md border flex items-center justify-center transition-all',
+            item.checked
+              ? 'bg-emerald-500 border-emerald-500 text-white'
+              : item.required ? 'border-danger-300 text-transparent' : 'border-surface-300 text-transparent'
           )}>
-          {item.checked ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-          ) : (
-            <Circle className={cn('w-5 h-5', item.required ? 'text-danger-300' : 'text-surface-300')} />
-          )}
+            <Check className="w-3.5 h-3.5" />
+          </span>
         </button>
 
         <div className="flex-1 min-w-0">
@@ -352,7 +352,7 @@ function ChecklistItem({ item, index, disabled, isShopWide, onToggle, onNote }) 
 
         {!disabled && (
           <button onClick={() => setShowNote(!showNote)}
-            className="opacity-0 group-hover:opacity-100 text-surface-300 hover:text-surface-500 transition-all flex-shrink-0">
+            className="text-surface-300 hover:text-surface-500 transition-all flex-shrink-0">
             <MessageSquare className="w-3.5 h-3.5" />
           </button>
         )}

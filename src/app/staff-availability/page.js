@@ -115,6 +115,14 @@ export default function StaffAvailabilityPage() {
     });
   }, [workers, availability]);
 
+  // Availability heatmap lookup: `${workerId}|${date}` → shiftType
+  const availMap = useMemo(() => {
+    const m = {};
+    availability.forEach(a => { m[`${a.workerId}|${a.date}`] = a.shiftType; });
+    return m;
+  }, [availability]);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
   // ─── Save deadline settings ─────────────────────────
   const handleSaveSettings = async () => {
     setSavingSettings(true);
@@ -396,57 +404,48 @@ export default function StaffAvailabilityPage() {
               </div>
             </div>
 
-            {/* Staff table */}
+            {/* Availability heatmap — workers × days, coloured by shift */}
             <div className="card overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-surface-50 border-b border-surface-100">
-                      <th className="text-left px-4 py-3 font-medium text-surface-600">Staff Member</th>
-                      <th className="text-center px-3 py-3 font-medium text-surface-600">Total</th>
-                      <th className="text-center px-3 py-3 font-medium text-amber-600">
-                        <Sun className="w-3.5 h-3.5 mx-auto" />
-                      </th>
-                      <th className="text-center px-3 py-3 font-medium text-orange-600">
-                        <Sunset className="w-3.5 h-3.5 mx-auto" />
-                      </th>
-                      <th className="text-center px-3 py-3 font-medium text-indigo-600">
-                        <Moon className="w-3.5 h-3.5 mx-auto" />
-                      </th>
-                      <th className="text-center px-3 py-3 font-medium text-emerald-600">
-                        <Clock className="w-3.5 h-3.5 mx-auto" />
-                      </th>
-                      <th className="text-center px-3 py-3 font-medium text-surface-600">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {workerStats.length === 0 && (
-                      <tr><td colSpan={7} className="px-4 py-8 text-center text-surface-400">No active staff found</td></tr>
-                    )}
-                    {workerStats.map(stat => (
-                      <tr key={stat.id} className="border-b border-surface-50 hover:bg-surface-50">
-                        <td className="px-4 py-3 font-medium text-surface-800">{stat.name}</td>
-                        <td className="px-3 py-3 text-center font-semibold text-brand-600">{stat.total}</td>
-                        <td className="px-3 py-3 text-center text-amber-700">{stat.morning || '-'}</td>
-                        <td className="px-3 py-3 text-center text-orange-700">{stat.afternoon || '-'}</td>
-                        <td className="px-3 py-3 text-center text-indigo-700">{stat.evening || '-'}</td>
-                        <td className="px-3 py-3 text-center text-emerald-700">{stat.full || '-'}</td>
-                        <td className="px-3 py-3 text-center">
-                          {stat.total > 0 ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">
-                              <Check className="w-3 h-3" /> Done
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-red-100 text-red-600 rounded-full px-2 py-0.5">
-                              <X className="w-3 h-3" /> Pending
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="px-4 py-3 border-b border-surface-100 flex items-center justify-between">
+                <h3 className="text-sm font-display font-semibold text-surface-800">Availability heatmap</h3>
+                <span className="text-[11px] text-surface-400">{currentDate.toLocaleString('default', { month: 'long' })} · tap a day in Calendar to assign</span>
               </div>
+              {workers.length === 0 ? (
+                <p className="px-4 py-8 text-center text-surface-400 text-sm">No active staff found</p>
+              ) : (
+                <div className="overflow-x-auto scrollbar-none">
+                  <div className="min-w-max">
+                    {/* Day header */}
+                    <div className="flex border-b border-surface-100">
+                      <div className="w-28 sm:w-36 flex-shrink-0 px-3 py-2 text-[10px] font-semibold text-surface-400 sticky left-0 bg-white z-10">Staff</div>
+                      {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => {
+                        const ds = getDateStr(year, month, d);
+                        const isToday = ds === todayStr;
+                        return <div key={d} className={cn('w-6 py-2 text-center text-[9px] font-medium', isToday ? 'text-brand-600 font-bold' : 'text-surface-400')}>{d}</div>;
+                      })}
+                    </div>
+                    {/* Worker rows */}
+                    {workers.map(w => (
+                      <div key={w.id} className="flex items-center border-b border-surface-50 last:border-0 hover:bg-surface-50/50">
+                        <div className="w-28 sm:w-36 flex-shrink-0 px-3 py-1.5 text-xs font-medium text-surface-700 truncate sticky left-0 bg-white z-10">{w.firstName} {w.lastName}</div>
+                        {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => {
+                          const ds = getDateStr(year, month, d);
+                          const st = availMap[`${w.id}|${ds}`];
+                          const info = st ? getShiftInfo(st) : null;
+                          return (
+                            <div key={d} className="w-6 flex items-center justify-center py-1.5">
+                              <span
+                                className={cn('w-4 h-4 rounded transition-colors', info ? info.dot : 'bg-surface-100')}
+                                title={info ? `${ds} · ${info.label}` : ds}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Shift legend */}

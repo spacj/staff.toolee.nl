@@ -72,7 +72,7 @@ export default function StaffPage() {
           </div>
           {isManager && (
             <div className="relative">
-              <button onClick={() => setMenuId(menuId === w.id ? null : w.id)} className="btn-icon !w-8 !h-8 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => setMenuId(menuId === w.id ? null : w.id)} className="btn-icon !w-8 !h-8 text-surface-400 hover:text-surface-600">
                 <MoreVertical className="w-4 h-4" />
               </button>
               {menuId === w.id && (
