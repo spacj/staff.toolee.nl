@@ -21,6 +21,12 @@ const ENTERPRISE_PRICE_MONTHLY = 299;
 const ENTERPRISE_DISCOUNTED_PRICE = 189;
 const YEARLY_MULTIPLIER = 10; // ×10 = pay for 10 months, get 12
 
+// ─── Inventory (Stock + Recipes) add-on & services ───
+const STOCK_ADDON_MONTHLY = 19;       // €19/mo per org (free on Enterprise)
+const INVENTORY_SETUP_FEE = 199;      // one-time done-for-you setup service
+// Orgs created before this date keep Stock & Recipes for free (grandfathered).
+const INVENTORY_LAUNCH = '2026-08-28';
+
 export const TIERS = { FREE: 'free', STANDARD: 'standard', ENTERPRISE: 'enterprise' };
 export const CYCLES = { MONTHLY: 'monthly', YEARLY: 'yearly' };
 
@@ -46,22 +52,34 @@ export function getTierInfo(tier) {
 }
 
 /**
- * Calculate cost for a given billing cycle
+ * Calculate cost for a given billing cycle.
+ * @param {object} opts - { inventoryAddon } paid Stock+Recipes module (€19/mo, free on Enterprise)
  */
-export function calculateCost(workerCount, shopCount, cycle = 'monthly', freeLimit = FREE_WORKER_LIMIT) {
+export function calculateCost(workerCount, shopCount, cycle = 'monthly', freeLimit = FREE_WORKER_LIMIT, opts = {}) {
   const tier = getTier(workerCount, freeLimit);
   const isYearly = cycle === 'yearly';
+  const wantsAddon = !!opts.inventoryAddon;
+  // Enterprise includes Inventory; other tiers pay the monthly add-on.
+  const addonMonthly = wantsAddon && tier !== TIERS.ENTERPRISE ? STOCK_ADDON_MONTHLY : 0;
+  const addonCost = isYearly ? addonMonthly * YEARLY_MULTIPLIER : addonMonthly;
 
   if (tier === TIERS.FREE) {
-    return { total: 0, monthlyEquivalent: 0, workerCost: 0, shopCost: 0, tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings: 0, freeLimit };
+    const monthlyTotal = addonMonthly;
+    const total = addonCost;
+    const savings = isYearly ? (addonMonthly * 12) - addonCost : 0;
+    return {
+      total: Math.round(total * 100) / 100, monthlyEquivalent: Math.round((isYearly ? total / 12 : total) * 100) / 100,
+      workerCost: 0, shopCost: 0, addonCost: Math.round(addonCost * 100) / 100, addonMonthly,
+      monthlyTotal, billableShops: 0, billableWorkers: 0,
+      tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings, freeLimit, inventoryAddon: wantsAddon,
+    };
   }
 
   if (tier === TIERS.ENTERPRISE) {
     const monthly = isYearly ? ENTERPRISE_DISCOUNTED_PRICE : ENTERPRISE_PRICE_MONTHLY;
-    const total = monthly;
-    const monthlyEquiv = total;
+    const total = monthly; // Inventory bundled free
     const savings = ENTERPRISE_PRICE_MONTHLY - ENTERPRISE_DISCOUNTED_PRICE;
-    return { total, monthlyEquivalent: Math.round(monthlyEquiv * 100) / 100, workerCost: 0, shopCost: 0, tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings, freeLimit };
+    return { total, monthlyEquivalent: Math.round(total * 100) / 100, workerCost: 0, shopCost: 0, addonCost: 0, addonMonthly: 0, monthlyTotal: total, tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings, freeLimit, inventoryAddon: wantsAddon };
   }
 
   // Standard — first `freeLimit` workers are free, additional workers €2/mo each
@@ -70,7 +88,7 @@ export function calculateCost(workerCount, shopCount, cycle = 'monthly', freeLim
   const workerCostMonthly = billableWorkers * PRICE_PER_WORKER;
   const billableShops = Math.max(0, shopCount - 1);
   const shopCostMonthly = billableShops * PRICE_PER_SHOP;
-  const monthlyTotal = workerCostMonthly + shopCostMonthly;
+  const monthlyTotal = workerCostMonthly + shopCostMonthly + addonMonthly;
   const total = isYearly ? monthlyTotal * YEARLY_MULTIPLIER : monthlyTotal;
   const monthlyEquiv = isYearly ? total / 12 : monthlyTotal;
   const savings = isYearly ? (monthlyTotal * 12) - total : 0;
@@ -80,8 +98,9 @@ export function calculateCost(workerCount, shopCount, cycle = 'monthly', freeLim
     monthlyEquivalent: Math.round(monthlyEquiv * 100) / 100,
     workerCost: isYearly ? Math.round(workerCostMonthly * YEARLY_MULTIPLIER * 100) / 100 : workerCostMonthly,
     shopCost: isYearly ? Math.round(shopCostMonthly * YEARLY_MULTIPLIER * 100) / 100 : shopCostMonthly,
+    addonCost: Math.round(addonCost * 100) / 100, addonMonthly,
     monthlyTotal, billableShops, billableWorkers,
-    tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings, freeLimit,
+    tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings, freeLimit, inventoryAddon: wantsAddon,
   };
 }
 
@@ -95,14 +114,31 @@ export function calculateMonthlyCost(workerCount, shopCount) {
  * Standard: quantity = monthly cost in whole euros (€1/unit pricing).
  * Enterprise: null (fixed price plan).
  */
-export function getSubscriptionQuantity(workerCount, shopCount, freeLimit = FREE_WORKER_LIMIT) {
+export function getSubscriptionQuantity(workerCount, shopCount, freeLimit = FREE_WORKER_LIMIT, opts = {}) {
   const tier = getTier(workerCount, freeLimit);
-  if (tier !== TIERS.STANDARD) return null;
+  if (tier === TIERS.ENTERPRISE) return null; // fixed-price plan
+  const addonMonthly = opts.inventoryAddon ? STOCK_ADDON_MONTHLY : 0;
   const billableShops = Math.max(0, shopCount - 1);
   const billableWorkers = Math.max(0, workerCount - freeLimit);
-  const total = billableWorkers * PRICE_PER_WORKER + billableShops * PRICE_PER_SHOP;
-  // Return total cost in cents as PayPal quantity expects an integer
+  const total = billableWorkers * PRICE_PER_WORKER + billableShops * PRICE_PER_SHOP + addonMonthly;
+  if (total <= 0) return null; // truly free — no subscription
+  // Return total monthly cost in cents; billed on the €0.01/unit Standard plan.
   return Math.round(total * 100);
+}
+
+/**
+ * Whether an organization can access the Inventory module (Stock + Recipes).
+ * True if they bought the add-on, are on Enterprise, or were grandfathered
+ * (created before the add-on launched).
+ */
+export function hasInventoryAccess(org) {
+  if (!org) return false;
+  if (org.inventoryAddon) return true;
+  if (org.subscriptionTier === 'enterprise' && org.subscriptionStatus === 'active') return true;
+  const raw = org.createdAt;
+  const created = raw?.toDate ? raw.toDate() : raw ? new Date(raw) : null;
+  if (created && !Number.isNaN(created.getTime()) && created < new Date(INVENTORY_LAUNCH)) return true;
+  return false;
 }
 
 /**
@@ -213,5 +249,5 @@ export function calculateProration(oldCost, newCost) {
 export {
   PRICE_PER_WORKER, PRICE_PER_SHOP, FREE_WORKER_LIMIT, FREE_SHOP_LIMIT,
   ENTERPRISE_THRESHOLD, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE, YEARLY_MULTIPLIER,
-  PROMO_WORKER_LIMIT,
+  PROMO_WORKER_LIMIT, STOCK_ADDON_MONTHLY, INVENTORY_SETUP_FEE, INVENTORY_LAUNCH,
 };

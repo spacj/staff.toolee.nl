@@ -15,7 +15,9 @@ import {
 import { cn } from '@/utils/helpers';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import BarcodeAddFlow from '@/components/BarcodeAddFlow';
+import InventoryUpgrade from '@/components/InventoryUpgrade';
 import { findByBarcode, boxUnits } from '@/lib/stock-barcode';
+import { hasInventoryAccess } from '@/lib/pricing';
 import {
   Package, Plus, Pencil, Trash2, AlertTriangle, CheckCircle, XCircle,
   ChevronDown, ChevronUp, Minus, ClipboardList, Bell, Search, Filter, RefreshCw,
@@ -147,7 +149,7 @@ export default function StockPage() {
 }
 
 function StockPageInner() {
-  const { orgId: authOrgId, user, userProfile, isManager, isAdmin, isInventory } = useAuth();
+  const { orgId: authOrgId, user, userProfile, isManager, isAdmin, isInventory, organization } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const autoHandledRef = useRef(false);
@@ -648,6 +650,12 @@ function StockPageInner() {
         </div>
       </Layout>
     );
+  }
+
+  // Inventory add-on gate — internal inventory-role staff and grandfathered/
+  // subscribed/Enterprise orgs pass through; others see the upgrade screen.
+  if (!isInventory && !hasInventoryAccess(organization)) {
+    return <Layout><InventoryUpgrade feature="Stock" /></Layout>;
   }
 
   return (

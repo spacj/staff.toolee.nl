@@ -24,7 +24,7 @@ const PLAN_IDS = {
   },
 };
 
-export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess }) {
+export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess, inventoryAddon = false }) {
   const { orgId, user, organization } = useAuth();
   const [cycle, setCycle] = useState(CYCLES.MONTHLY);
   const [status, setStatus] = useState('idle'); // idle | success | error
@@ -34,12 +34,15 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   const freeLimit = organization?.freeWorkerLimit || FREE_WORKER_LIMIT;
-  const cost = calculateCost(workerCount, shopCount, cycle, freeLimit);
-  const quantity = getSubscriptionQuantity(workerCount, shopCount, freeLimit);
-  const planId = PLAN_IDS[tier]?.[cycle];
+  const opts = { inventoryAddon };
+  const cost = calculateCost(workerCount, shopCount, cycle, freeLimit, opts);
+  const quantity = getSubscriptionQuantity(workerCount, shopCount, freeLimit, opts);
+  // A free-tier org buying only the add-on is billed on the Standard €0.01/unit plan.
+  const effectiveTier = (tier === 'free' && inventoryAddon) ? 'standard' : tier;
+  const planId = PLAN_IDS[effectiveTier]?.[cycle];
   const isMonthly = cycle === CYCLES.MONTHLY;
-  const monthlyAlt = calculateCost(workerCount, shopCount, 'monthly', freeLimit);
-  const yearlyAlt = calculateCost(workerCount, shopCount, 'yearly', freeLimit);
+  const monthlyAlt = calculateCost(workerCount, shopCount, 'monthly', freeLimit, opts);
+  const yearlyAlt = calculateCost(workerCount, shopCount, 'yearly', freeLimit, opts);
 
   // Calculate proration if upgrading an active subscription
   const previousCost = organization?.monthlyCost
@@ -156,6 +159,12 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
             )}
           </>
         )}
+        {cost.addonCost > 0 && (
+          <div className="flex justify-between">
+            <span className="text-surface-500">Inventory add-on (Stock + Recipes){!isMonthly ? ' × 10' : ''}</span>
+            <span className="text-surface-700">{formatCurrency(cost.addonCost)}</span>
+          </div>
+        )}
         {cost.savings > 0 && (
           <div className="flex justify-between text-emerald-600">
             <span>Yearly savings</span><span className="font-semibold">−{formatCurrency(cost.savings)}</span>
@@ -196,12 +205,12 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
         <PayPalButtons
           style={{ layout: 'vertical', color: 'blue', shape: 'rect', label: 'subscribe', height: 48 }}
           createSubscription={(data, actions) => {
-            const opts = { plan_id: planId };
-            // Standard plans: set quantity = total cost in cents (€0.01/unit)
-            if (tier === 'standard' && quantity) {
-              opts.quantity = String(quantity);
+            const createOpts = { plan_id: planId };
+            // Metered plans (Standard, or Free+add-on): quantity = total cost in cents (€0.01/unit)
+            if (effectiveTier === 'standard' && quantity) {
+              createOpts.quantity = String(quantity);
             }
-            return actions.subscription.create(opts);
+            return actions.subscription.create(createOpts);
           }}
           onApprove={async (data) => {
             try {
@@ -215,6 +224,7 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
                 subscriptionStartTime: new Date().toISOString(),
                 monthlyCost: cost.monthlyTotal || cost.total,
                 pendingSubscriptionId: null,
+                ...(inventoryAddon ? { inventoryAddon: true } : {}),
               });
               // Record the subscription event
               await createPayment({

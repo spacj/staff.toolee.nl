@@ -3,7 +3,9 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
+import InventoryUpgrade from '@/components/InventoryUpgrade';
 import { useAuth } from '@/contexts/AuthContext';
+import { hasInventoryAccess } from '@/lib/pricing';
 import { getRecipes, createRecipe, updateRecipe, deleteRecipe, executeRecipe, getStockItems, getOrganization } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
 import {
@@ -56,7 +58,7 @@ export default function RecipesPage() {
 }
 
 function RecipesPageInner() {
-  const { orgId: authOrgId, user, userProfile, isManager, isAdmin, isInventory } = useAuth();
+  const { orgId: authOrgId, user, userProfile, isManager, isAdmin, isInventory, organization } = useAuth();
   const searchParams = useSearchParams();
   const orgIdOverride = searchParams?.get('orgId') || '';
   const orgId = isInventory && orgIdOverride ? orgIdOverride : authOrgId;
@@ -270,6 +272,11 @@ function RecipesPageInner() {
     } catch { toast.error('Failed to execute recipe'); }
     finally { setExecuting(false); }
   };
+
+  // Inventory add-on gate (grandfathered/subscribed/Enterprise + internal inventory role pass through)
+  if (!isInventory && !hasInventoryAccess(organization)) {
+    return <Layout><InventoryUpgrade feature="Recipes" /></Layout>;
+  }
 
   return (
     <Layout>

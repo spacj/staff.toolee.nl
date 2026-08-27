@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { PRICE_PER_WORKER, PRICE_PER_SHOP, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE, ENTERPRISE_THRESHOLD, FREE_WORKER_LIMIT } from '@/lib/pricing';
+import { PRICE_PER_WORKER, PRICE_PER_SHOP, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE, ENTERPRISE_THRESHOLD, FREE_WORKER_LIMIT, STOCK_ADDON_MONTHLY, INVENTORY_SETUP_FEE } from '@/lib/pricing';
 import { createSupportTicket } from '@/lib/firestore';
 import Modal from '@/components/Modal';
 import LandingDemo from '@/components/landing/LandingDemo';
 import toast from 'react-hot-toast';
-import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ChevronDown, ExternalLink, HelpCircle, Send, Loader2, Building2, Users as UsersIcon, Mail, Phone, Menu, X, Download, Smartphone, Coffee, UtensilsCrossed, ShoppingBag, Scissors, TrendingUp } from 'lucide-react';
+import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ChevronDown, ExternalLink, HelpCircle, Send, Loader2, Building2, Users as UsersIcon, Mail, Phone, Menu, X, Download, Smartphone, Coffee, UtensilsCrossed, ShoppingBag, Scissors, TrendingUp, Package, Wrench, ScanLine } from 'lucide-react';
 
 const features = [
   { icon: Store, title: 'Multi-Shop Management', desc: 'Manage multiple locations from one dashboard with separate schedules and staff.', color: 'from-brand-500 to-brand-600' },
@@ -20,12 +20,15 @@ const features = [
 ];
 
 const plans = [
-  { name: 'Starter', price: '€0', period: 'forever', desc: 'Perfect for small teams', badge: 'bg-emerald-100 text-emerald-700',
-    features: [`${FREE_WORKER_LIMIT} workers included`, '1 shop', 'Shift scheduling', 'Clock in/out', 'Calendar view', 'Basic support'], cta: 'Get Started Free', href: '/register' },
-  { name: 'Professional', price: `€${PRICE_PER_WORKER}`, period: '/worker/mo', desc: 'For growing businesses', badge: 'bg-brand-100 text-brand-700', popular: true,
-    features: [`${FREE_WORKER_LIMIT + 1}–${ENTERPRISE_THRESHOLD - 1} workers`, `1st shop free, +€${PRICE_PER_SHOP}/shop`, 'Save ~17% with yearly billing', 'Full analytics dashboard', 'AI scheduling assistant', 'Priority support'], cta: 'Start Free Trial', href: '/register' },
-  { name: 'Enterprise', price: `€${ENTERPRISE_DISCOUNTED_PRICE}`, period: '/month', desc: 'For large operations', badge: 'bg-purple-100 text-purple-700',
-    features: ['Unlimited workers & shops', `€${ENTERPRISE_PRICE_MONTHLY}/mo (€${ENTERPRISE_DISCOUNTED_PRICE} with discount)`, 'Dedicated support', 'Custom integrations', 'SLA guarantee', 'Everything included'], cta: 'Contact Sales', href: '/register' },
+  { name: 'Starter', desc: 'Perfect for small teams', badge: 'bg-emerald-100 text-emerald-700',
+    monthly: { price: '€0', period: 'forever' }, yearly: { price: '€0', period: 'forever' },
+    features: [`${FREE_WORKER_LIMIT} workers included`, '1 shop', 'Shift scheduling', 'Clock in/out', 'Calendar view'], cta: 'Get Started Free', href: '/register' },
+  { name: 'Professional', desc: 'For growing businesses', badge: 'bg-brand-100 text-brand-700', popular: true,
+    monthly: { price: `€${PRICE_PER_WORKER}`, period: '/worker/mo' }, yearly: { price: `€${PRICE_PER_WORKER * 10}`, period: '/worker/yr' },
+    features: [`${FREE_WORKER_LIMIT + 1}–${ENTERPRISE_THRESHOLD - 1} workers`, `1st shop free, +€${PRICE_PER_SHOP}/shop`, 'Full analytics dashboard', 'AI scheduling assistant', 'Priority support'], cta: 'Start Free', href: '/register' },
+  { name: 'Enterprise', desc: 'For large operations', badge: 'bg-purple-100 text-purple-700',
+    monthly: { price: `€${ENTERPRISE_PRICE_MONTHLY}`, period: '/mo' }, yearly: { price: `€${ENTERPRISE_DISCOUNTED_PRICE}`, period: '/mo, billed yearly' },
+    features: ['Unlimited workers & shops', 'Inventory module included', 'Dedicated support', 'Custom integrations', 'SLA guarantee'], cta: 'Contact Sales', href: '/register' },
 ];
 
 const stats = [
@@ -330,10 +333,89 @@ function ContactSalesForm({ onClose }) {
   );
 }
 
+function SetupServiceForm({ onClose }) {
+  const [form, setForm] = useState({ name: '', email: '', company: '', phone: '', message: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim() || !form.company.trim()) {
+      toast.error('Please fill in name, email, and company');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await createSupportTicket({
+        subject: `[Inventory Setup] ${form.company}`,
+        message: `Company: ${form.company}\nName: ${form.name}\nEmail: ${form.email}\nPhone: ${form.phone}\n\nWhat they need:\n${form.message}`,
+        category: 'inventory_setup',
+        priority: 'high',
+        source: 'website',
+        senderName: form.name.trim(),
+        senderEmail: form.email.trim(),
+        senderRole: 'prospect',
+        orgName: form.company.trim(),
+      });
+      setSubmitted(true);
+      toast.success('Request received! We’ll be in touch within 24 hours.');
+    } catch (err) {
+      console.error('Setup form error:', err);
+      toast.error('Failed to submit. Please try again.');
+    }
+    setSubmitting(false);
+  };
+
+  if (submitted) {
+    return (
+      <div className="text-center py-8">
+        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Check className="w-8 h-8 text-emerald-600" />
+        </div>
+        <h3 className="text-xl font-display font-bold text-slate-900 mb-2">Request Received!</h3>
+        <p className="text-slate-600 mb-4">Our team will contact you within 24 hours to scope your inventory setup.</p>
+        <button onClick={onClose} className="btn-primary !py-2 !px-6">Close</button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label">Full Name *</label>
+          <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="John Smith" className="input-field" required />
+        </div>
+        <div>
+          <label className="label">Work Email *</label>
+          <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="john@company.com" className="input-field" required />
+        </div>
+        <div>
+          <label className="label">Company Name *</label>
+          <input type="text" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} placeholder="Bean & Brew Co." className="input-field" required />
+        </div>
+        <div>
+          <label className="label">Phone Number</label>
+          <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+31 6 12345678" className="input-field" />
+        </div>
+      </div>
+      <div>
+        <label className="label">What do you sell / need set up?</label>
+        <textarea value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder="e.g. Café with ~120 products and 15 recipes across 2 shops…" className="input-field min-h-[100px] resize-none" />
+      </div>
+      <button type="submit" disabled={submitting} className="btn-primary w-full !py-3">
+        {submitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : <>Request Setup <Send className="w-4 h-4 ml-2" /></>}
+      </button>
+    </form>
+  );
+}
+
 export default function HomePage() {
   const { user, userProfile, loading, isWebmaster } = useAuth();
   const router = useRouter();
   const [showSalesModal, setShowSalesModal] = useState(false);
+  const [showSetupModal, setShowSetupModal] = useState(false);
+  const [billingCycle, setBillingCycle] = useState('yearly'); // default to yearly to surface savings
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -660,22 +742,41 @@ export default function HomePage() {
       {/* Pricing */}
       <section id="pricing" className="py-24 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
+          <div className="text-center mb-8 sm:mb-10">
             <p className="text-sm font-semibold text-brand-600 uppercase tracking-wider mb-3">Pricing</p>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-slate-900 mb-4">Simple, transparent pricing</h2>
-            <p className="text-lg text-slate-600">No hidden fees. Scale up or down anytime.</p>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-slate-900 mb-4">Only pay for what you use</h2>
+            <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto">No seat minimums, no per-location gouging — usually cheaper than Homebase, Deputy or When I Work.</p>
           </div>
+
+          {/* Billing cycle toggle */}
+          <div className="flex justify-center mb-10">
+            <div className="inline-flex items-center gap-1 bg-slate-100 rounded-full p-1">
+              {['monthly', 'yearly'].map((c) => (
+                <button key={c} onClick={() => setBillingCycle(c)}
+                  className={`px-4 sm:px-5 py-2 rounded-full text-sm font-semibold capitalize transition-all ${billingCycle === c ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                  {c}
+                  {c === 'yearly' && <span className="ml-1.5 text-[10px] font-bold text-emerald-600">2 MONTHS FREE</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {plans.map((plan) => (
-              <div key={plan.name} className={`bg-white rounded-2xl border-2 p-8 relative transition-all duration-300 hover:-translate-y-2 ${plan.popular ? 'border-brand-500 shadow-2xl shadow-brand-500/20 scale-105' : 'border-slate-200 hover:border-slate-300 hover:shadow-xl'}`}>
+            {plans.map((plan) => {
+              const p = plan[billingCycle];
+              return (
+              <div key={plan.name} className={`bg-white rounded-2xl border-2 p-8 relative transition-all duration-300 hover:-translate-y-2 ${plan.popular ? 'border-brand-500 shadow-2xl shadow-brand-500/20 md:scale-105' : 'border-slate-200 hover:border-slate-300 hover:shadow-xl'}`}>
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-brand-500 to-brand-600 text-white text-xs font-bold px-5 py-2 rounded-full shadow-lg shadow-brand-500/30">Most Popular</div>
                 )}
                 <span className={`text-xs font-semibold px-3 py-1 rounded-full ${plan.badge}`}>{plan.name}</span>
                 <div className="mt-5 mb-2">
-                  <span className="text-5xl font-display font-bold text-slate-900">{plan.price}</span>
-                  <span className="text-base text-slate-500">{plan.period}</span>
+                  <span className="text-5xl font-display font-bold text-slate-900">{p.price}</span>
+                  <span className="text-base text-slate-500">{p.period}</span>
                 </div>
+                {billingCycle === 'yearly' && plan.name === 'Professional' && (
+                  <p className="text-xs text-emerald-600 font-medium mb-2">≈ €{PRICE_PER_WORKER}/worker/mo — 2 months free</p>
+                )}
                 <p className="text-slate-600 mb-8">{plan.desc}</p>
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((f) => (
@@ -694,7 +795,67 @@ export default function HomePage() {
                   </Link>
                 )}
               </div>
-            ))}
+              );
+            })}
+          </div>
+
+          {/* Inventory add-on */}
+          <div className="mt-6 rounded-2xl border-2 border-orange-200 bg-gradient-to-br from-orange-50/60 to-rose-50/40 p-6 sm:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-rose-500/20">
+                <Package className="w-7 h-7 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-lg sm:text-xl font-display font-bold text-slate-900">Inventory module</h3>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">Add-on</span>
+                </div>
+                <p className="text-sm text-slate-600 mt-1">Stock + Recipes: barcode scanning, low-stock alerts, recipe costing with automatic stock deduction. <span className="text-slate-500">Free on Enterprise.</span></p>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-slate-500">
+                  <span className="flex items-center gap-1.5"><ScanLine className="w-3.5 h-3.5 text-brand-500" /> Barcode scanning</span>
+                  <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-brand-500" /> Low-stock alerts</span>
+                  <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-brand-500" /> Recipe costing</span>
+                </div>
+              </div>
+              <div className="text-center sm:text-right flex-shrink-0">
+                <p className="text-3xl font-display font-bold text-slate-900">€{STOCK_ADDON_MONTHLY}<span className="text-sm font-normal text-slate-500">/mo</span></p>
+                <p className="text-xs text-slate-500">or €{STOCK_ADDON_MONTHLY * 10}/yr</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Sponsored: Inventory Setup Service */}
+      <section id="inventory-service" className="py-16 sm:py-20 px-4 sm:px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 p-8 sm:p-12 shadow-2xl">
+            <div className="absolute inset-0 opacity-30 pointer-events-none">
+              <div className="absolute -top-16 -right-10 w-72 h-72 bg-orange-400 rounded-full blur-3xl" />
+              <div className="absolute -bottom-10 -left-10 w-60 h-60 bg-brand-400 rounded-full blur-3xl" />
+            </div>
+            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center gap-8">
+              <div className="flex-1">
+                <div className="inline-flex items-center gap-2 bg-white/10 text-white text-xs font-semibold px-3 py-1.5 rounded-full mb-4">
+                  <Wrench className="w-3.5 h-3.5" /> Done-for-you · First-timers welcome
+                </div>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold text-white mb-3">We’ll set up your inventory for you</h2>
+                <p className="text-white/70 text-sm sm:text-base max-w-xl">Our team imports your products, sets par levels, builds your recipes with accurate costing, and trains your staff — so you go live in days, not weeks.</p>
+                <div className="flex flex-wrap gap-x-5 gap-y-2 mt-5 text-sm text-white/80">
+                  {['Product import & barcodes', 'Par levels & alerts', 'Recipe costing', 'Team training'].map((t) => (
+                    <span key={t} className="flex items-center gap-1.5"><Check className="w-4 h-4 text-emerald-400" /> {t}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="flex-shrink-0 text-center bg-white/5 border border-white/10 rounded-2xl p-6 min-w-[220px]">
+                <p className="text-white/50 text-xs uppercase tracking-wider">One-time</p>
+                <p className="text-4xl font-display font-bold text-white mt-1">€{INVENTORY_SETUP_FEE}</p>
+                <button onClick={() => setShowSetupModal(true)} className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-white text-slate-900 font-semibold px-5 py-3 rounded-xl hover:bg-brand-50 transition-all">
+                  Request setup <ArrowRight className="w-4 h-4" />
+                </button>
+                <p className="text-white/40 text-[11px] mt-2">No commitment — we’ll scope it with you first.</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -758,6 +919,14 @@ export default function HomePage() {
         <div className="p-2">
           <p className="text-sm text-surface-500 mb-4">Get a custom quote for your enterprise needs. Our team will get back to you within 24 hours.</p>
           <ContactSalesForm onClose={() => setShowSalesModal(false)} />
+        </div>
+      </Modal>
+
+      {/* Inventory Setup Service Modal */}
+      <Modal open={showSetupModal} onClose={() => setShowSetupModal(false)} title="Request Inventory Setup">
+        <div className="p-2">
+          <p className="text-sm text-surface-500 mb-4">Tell us about your business and we’ll scope your done-for-you inventory setup (€{INVENTORY_SETUP_FEE} one-time). We’ll reply within 24 hours.</p>
+          <SetupServiceForm onClose={() => setShowSetupModal(false)} />
         </div>
       </Modal>
 

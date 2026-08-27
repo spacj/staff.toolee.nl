@@ -9,12 +9,12 @@ import PageIntro from '@/components/help/PageIntro';
 import HelpTip from '@/components/help/HelpTip';
 import { useAuth } from '@/contexts/AuthContext';
 import { getWorkers, getShops, getShifts, getPayments, getOrganization, getPublicHolidays, getOvertimeRules } from '@/lib/firestore';
-import { calculateCost, formatCurrency, getTierInfo, FREE_WORKER_LIMIT } from '@/lib/pricing';
+import { calculateCost, formatCurrency, getTierInfo, FREE_WORKER_LIMIT, STOCK_ADDON_MONTHLY, hasInventoryAccess } from '@/lib/pricing';
 import { calculateWorkerCostWithOvertime } from '@/lib/scheduling';
 import { cn } from '@/utils/helpers';
 import {
   CreditCard, TrendingUp, Users, Store, CheckCircle, AlertTriangle,
-  XCircle, Loader2, Clock, Euro, ChevronDown, ChevronUp, CalendarDays
+  XCircle, Loader2, Clock, Euro, ChevronDown, ChevronUp, CalendarDays, Package
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -156,12 +156,15 @@ function CostsContent() {
   // Derived data
   const activeWorkers = workers.filter(w => w.status === 'active');
   const freeLimit = orgData?.freeWorkerLimit || organization?.freeWorkerLimit;
+  const [addonWanted, setAddonWanted] = useState(!!(orgData?.inventoryAddon || organization?.inventoryAddon));
+  useEffect(() => { if (orgData?.inventoryAddon) setAddonWanted(true); }, [orgData?.inventoryAddon]);
   const cost = useMemo(
-    () => calculateCost(activeWorkers.length, shops.length, 'monthly', freeLimit),
-    [activeWorkers.length, shops.length, freeLimit]
+    () => calculateCost(activeWorkers.length, shops.length, 'monthly', freeLimit, { inventoryAddon: addonWanted }),
+    [activeWorkers.length, shops.length, freeLimit, addonWanted]
   );
 
   const sub = orgData || organization || {};
+  const inventoryIncluded = getTierInfo(cost.tier).name === 'Enterprise';
   const hasActiveSubscription = sub.subscriptionStatus === 'active';
   const hasSuspendedSubscription = sub.subscriptionStatus === 'suspended';
   const hasCancelledSubscription = sub.subscriptionStatus === 'cancelled';
@@ -237,6 +240,42 @@ function CostsContent() {
             <p className="flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" /> Save with yearly billing <HelpTip tip="yearly-billing" align="right" /></p>
           </div>
         </div>
+
+        {/* ── Inventory add-on ── */}
+        {isAdmin && (
+          <div className={cn('card p-4 sm:p-5', addonWanted && !inventoryIncluded && 'border-brand-300 bg-brand-50/30')}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center flex-shrink-0">
+                  <Package className="w-5 h-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-display font-semibold text-surface-900">Inventory add-on <span className="text-surface-400 font-normal">· Stock + Recipes</span></p>
+                  <p className="text-xs text-surface-500 mt-0.5">Track stock with barcodes, low-stock alerts, recipe costing and auto stock deduction.</p>
+                  <p className="text-xs mt-1.5">
+                    {inventoryIncluded
+                      ? <span className="inline-flex items-center gap-1 text-emerald-600 font-medium"><CheckCircle className="w-3.5 h-3.5" /> Included free on Enterprise</span>
+                      : <span className="font-semibold text-surface-800">{formatCurrency(STOCK_ADDON_MONTHLY)}/mo <span className="text-surface-400 font-normal">· or {formatCurrency(STOCK_ADDON_MONTHLY * 10)}/yr (2 months free)</span></span>}
+                  </p>
+                </div>
+              </div>
+              {!inventoryIncluded && (
+                <button
+                  type="button"
+                  onClick={() => setAddonWanted(v => !v)}
+                  role="switch"
+                  aria-checked={addonWanted}
+                  className={cn('relative w-11 h-6 rounded-full transition-colors flex-shrink-0 mt-0.5', addonWanted ? 'bg-brand-600' : 'bg-surface-300')}
+                >
+                  <span className={cn('absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform', addonWanted ? 'translate-x-[22px]' : 'translate-x-0.5')} />
+                </button>
+              )}
+            </div>
+            {!inventoryIncluded && addonWanted && !hasInventoryAccess(sub) && (
+              <p className="text-[11px] text-brand-700 mt-3 pt-3 border-t border-brand-100">Added to your plan below — subscribe to activate. Want it set up for you? Ask about our one-time setup service.</p>
+            )}
+          </div>
+        )}
 
         {/* ── Month Carousel ── */}
         <div className="card p-4 sm:p-5">
@@ -471,6 +510,7 @@ function CostsContent() {
               tier={cost.tier}
               workerCount={activeWorkers.length}
               shopCount={shops.length}
+              inventoryAddon={addonWanted}
               onSuccess={() => { setShowSubscribe(false); loadBase(); }}
             />
           </Modal>
