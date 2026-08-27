@@ -164,68 +164,79 @@ export default function AvailabilityPage() {
 
         {settings.enabled && (
           <>
+            {/* Month switcher */}
             <div className="flex items-center justify-between">
-              <button onClick={() => nav(-1)} className="btn-icon !w-8 !h-8"><ChevronLeft className="w-5 h-5" /></button>
-              <h2 className="text-base font-display font-semibold text-surface-900">
+              <button onClick={() => nav(-1)} className="w-9 h-9 rounded-xl bg-white border border-surface-200 flex items-center justify-center text-surface-600 hover:bg-surface-50 hover:border-surface-300 active:scale-95 transition-all"><ChevronLeft className="w-5 h-5" /></button>
+              <h2 className="text-base sm:text-lg font-display font-semibold text-surface-900">
                 {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
               </h2>
-              <button onClick={() => nav(1)} className="btn-icon !w-8 !h-8"><ChevronRight className="w-5 h-5" /></button>
+              <button onClick={() => nav(1)} className="w-9 h-9 rounded-xl bg-white border border-surface-200 flex items-center justify-center text-surface-600 hover:bg-surface-50 hover:border-surface-300 active:scale-95 transition-all"><ChevronRight className="w-5 h-5" /></button>
             </div>
 
-            <div className="card overflow-hidden">
-              <div className="grid grid-cols-7 text-center text-[10px] sm:text-xs font-medium text-surface-500 border-b border-surface-100">
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
-                  <div key={d} className="py-1.5 sm:py-2"><span className="hidden sm:inline">{d}</span><span className="sm:hidden">{d[0]}</span></div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7">
-                {monthDays().map((d, i) => {
-                  if (!d) return <div key={`e${i}`} className="h-16 sm:h-20 bg-surface-50/50 border-b border-r border-surface-100" />;
-                  
-                  const dateStr = getDateStr(year, month, d);
-                  const dayAvailability = getAvailabilityForDate(dateStr);
-                  const isToday = dateStr === todayStr;
-                  const isSelectable = isDateSelectable(dateStr);
-                  const isPast = dateStr < todayStr;
-                  
-                  return (
-                    <div
-                      key={d}
-                      onClick={() => !isPast && openAvailabilityModal(dateStr)}
-                      className={cn(
-                        'h-16 sm:h-20 p-1 border-b border-r border-surface-100 cursor-pointer transition-colors',
-                        isToday ? 'bg-brand-50/50' : '',
-                        isSelectable ? 'hover:bg-brand-50' : isPast ? 'bg-surface-50/30 cursor-not-allowed' : ''
-                      )}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className={cn('text-[10px] sm:text-xs font-medium', isToday ? 'text-brand-600 font-bold' : 'text-surface-600')}>{d}</span>
-                        {dayAvailability && (
-                          <span className="text-[8px] sm:text-[9px] bg-emerald-100 text-emerald-700 rounded-full px-1">
-                            <Check className="w-2.5 h-2.5" />
-                          </span>
-                        )}
-                      </div>
-                      {dayAvailability && (
-                        <div className={cn('mt-1 text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded truncate', getShiftTypeInfo(dayAvailability.shiftType).color)}>
-                          {getShiftTypeInfo(dayAvailability.shiftType).label}
-                        </div>
-                      )}
-                      {!isSelectable && !isPast && !dayAvailability && (
-                        <span className="text-[8px] text-surface-300 block mt-1">locked</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+            {/* Weekday header */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5 text-center text-[10px] sm:text-xs font-semibold text-surface-400">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
+                <div key={d}><span className="hidden sm:inline">{d}</span><span className="sm:hidden">{d[0]}</span></div>
+              ))}
             </div>
 
+            {/* Day cards */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+              {monthDays().map((d, i) => {
+                if (!d) return <div key={`e${i}`} className="aspect-square" />;
+
+                const dateStr = getDateStr(year, month, d);
+                const dayAvailability = getAvailabilityForDate(dateStr);
+                const isToday = dateStr === todayStr;
+                const isSelectable = isDateSelectable(dateStr);
+                const isPast = dateStr < todayStr;
+                const info = dayAvailability ? getShiftTypeInfo(dayAvailability.shiftType) : null;
+
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    disabled={isPast}
+                    onClick={() => !isPast && openAvailabilityModal(dateStr)}
+                    title={dayAvailability ? `Available · ${info.label}` : undefined}
+                    className={cn(
+                      'aspect-square rounded-xl border flex flex-col items-center justify-center gap-0.5 p-1 transition-all',
+                      dayAvailability
+                        ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-300'
+                        : isPast
+                          ? 'bg-surface-50/50 border-surface-100 opacity-50 cursor-not-allowed'
+                          : isSelectable
+                            ? 'bg-white border-surface-200 hover:border-brand-300 hover:bg-brand-50/50 active:scale-95'
+                            : 'bg-surface-50 border-surface-100',
+                      isToday && !dayAvailability && 'ring-2 ring-brand-400 ring-offset-1'
+                    )}
+                  >
+                    <span className={cn(
+                      'text-xs sm:text-sm font-semibold leading-none',
+                      dayAvailability ? 'text-emerald-700' : isToday ? 'text-brand-600' : isSelectable ? 'text-surface-700' : 'text-surface-300'
+                    )}>
+                      {d}
+                    </span>
+                    {dayAvailability ? (
+                      <span className={cn('inline-flex items-center justify-center w-4 h-4 rounded-full', info.color)}><info.icon className="w-2.5 h-2.5" /></span>
+                    ) : (!isSelectable && !isPast) ? (
+                      <span className="text-[7px] text-surface-300 uppercase tracking-wide">locked</span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Legend */}
             <div className="card p-4">
-              <h3 className="text-sm font-semibold text-surface-700 mb-3">Shift Types</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-display font-semibold text-surface-800">Shift types</h3>
+                <span className="text-[11px] text-surface-400">Tap a day to set yours</span>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {SHIFT_TYPES.map(type => (
-                  <div key={type.id} className={cn('flex items-center gap-2 p-2 rounded-lg', type.color)}>
-                    <type.icon className="w-4 h-4" />
+                  <div key={type.id} className={cn('flex items-center gap-2 p-2.5 rounded-xl', type.color)}>
+                    <type.icon className="w-4 h-4 flex-shrink-0" />
                     <span className="text-xs font-medium">{type.label}</span>
                   </div>
                 ))}
@@ -246,21 +257,23 @@ export default function AvailabilityPage() {
             <div>
               <label className="label">Preferred Shift</label>
               <div className="grid grid-cols-2 gap-2">
-                {SHIFT_TYPES.map(type => (
-                  <button
-                    key={type.id}
-                    onClick={() => setSelectedShift(type.id)}
-                    className={cn(
-                      'flex items-center gap-2 p-3 rounded-xl border-2 transition-all',
-                      selectedShift === type.id 
-                        ? 'border-brand-500 bg-brand-50' 
-                        : 'border-surface-200 hover:border-surface-300'
-                    )}
-                  >
-                    <type.icon className="w-4 h-4" />
-                    <span className="text-sm font-medium">{type.label}</span>
-                  </button>
-                ))}
+                {SHIFT_TYPES.map(type => {
+                  const active = selectedShift === type.id;
+                  return (
+                    <button
+                      key={type.id}
+                      onClick={() => setSelectedShift(type.id)}
+                      className={cn(
+                        'relative flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all active:scale-[0.98]',
+                        active ? 'border-brand-500 bg-brand-50' : 'border-surface-200 hover:border-surface-300'
+                      )}
+                    >
+                      <span className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0', type.color)}><type.icon className="w-4 h-4" /></span>
+                      <span className="text-sm font-medium text-surface-800">{type.label}</span>
+                      {active && <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-brand-500 text-white flex items-center justify-center"><Check className="w-3 h-3" /></span>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
