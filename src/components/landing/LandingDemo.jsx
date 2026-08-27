@@ -5,7 +5,7 @@ import {
   LayoutDashboard, MessageCircle, Users, Store, ClipboardList, Calendar, Clock,
   CalendarCheck, ClipboardCheck, BookOpen, Package, CookingPot, CreditCard, Settings,
   Shield, Search, Bell, Play, Square, Check, X, CheckCircle, AlertTriangle, BarChart3,
-  DollarSign, TrendingUp, ChevronDown, RotateCw, Send, Star, Hand, Wand2, Coffee, Plus,
+  DollarSign, TrendingUp, ChevronDown, RotateCw, Send, Wand2, Coffee, Plus, Smartphone,
 } from 'lucide-react';
 
 /**
@@ -20,37 +20,36 @@ import {
  */
 
 const OWNER_NAV = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'chat', label: 'Chat', icon: MessageCircle },
-  { id: 'staff', label: 'Staff', icon: Users },
-  { id: 'shops', label: 'Shops', icon: Store },
-  { id: 'shifts', label: 'Shift Templates', icon: ClipboardList },
-  { id: 'calendar', label: 'Calendar', icon: Calendar },
-  { id: 'staff-availability', label: 'Staff Availability', icon: CalendarCheck },
-  { id: 'attendance', label: 'Attendance', icon: Clock },
-  { id: 'checklists', label: 'Checklists', icon: ClipboardCheck },
-  { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen },
-  { id: 'stock', label: 'Stock', icon: Package },
-  { id: 'recipes', label: 'Recipes', icon: CookingPot },
-  { id: 'costs', label: 'Costs & Billing', icon: CreditCard },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'dashboard', label: 'Dashboard', short: 'Home', icon: LayoutDashboard },
+  { id: 'chat', label: 'Chat', short: 'Chat', icon: MessageCircle },
+  { id: 'staff', label: 'Staff', short: 'Staff', icon: Users },
+  { id: 'shops', label: 'Shops', short: 'Shops', icon: Store },
+  { id: 'shifts', label: 'Shift Templates', short: 'Shifts', icon: ClipboardList },
+  { id: 'calendar', label: 'Calendar', short: 'Calendar', icon: Calendar },
+  { id: 'staff-availability', label: 'Staff Availability', short: 'Avail', icon: CalendarCheck },
+  { id: 'attendance', label: 'Attendance', short: 'Hours', icon: Clock },
+  { id: 'checklists', label: 'Checklists', short: 'Lists', icon: ClipboardCheck },
+  { id: 'knowledge', label: 'Knowledge Base', short: 'Guides', icon: BookOpen },
+  { id: 'stock', label: 'Stock', short: 'Stock', icon: Package },
+  { id: 'recipes', label: 'Recipes', short: 'Recipes', icon: CookingPot },
+  { id: 'costs', label: 'Costs & Billing', short: 'Costs', icon: CreditCard },
+  { id: 'settings', label: 'Settings', short: 'Settings', icon: Settings },
 ];
 
 const WORKER_NAV = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'chat', label: 'Chat', icon: MessageCircle },
-  { id: 'time', label: 'My Time', icon: Clock },
-  { id: 'calendar', label: 'My Schedule', icon: Calendar },
-  { id: 'availability', label: 'My Availability', icon: CalendarCheck },
-  { id: 'my-checklists', label: 'My Checklists', icon: ClipboardCheck },
-  { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen },
-  { id: 'stock', label: 'Stock', icon: Package },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'dashboard', label: 'Dashboard', short: 'Home', icon: LayoutDashboard },
+  { id: 'time', label: 'My Time', short: 'Time', icon: Clock },
+  { id: 'calendar', label: 'My Schedule', short: 'Schedule', icon: Calendar },
+  { id: 'availability', label: 'My Availability', short: 'Avail', icon: CalendarCheck },
+  { id: 'my-checklists', label: 'My Checklists', short: 'Tasks', icon: ClipboardCheck },
+  { id: 'chat', label: 'Chat', short: 'Chat', icon: MessageCircle },
+  { id: 'knowledge', label: 'Knowledge Base', short: 'Guides', icon: BookOpen },
+  { id: 'stock', label: 'Stock', short: 'Stock', icon: Package },
+  { id: 'settings', label: 'Settings', short: 'Settings', icon: Settings },
 ];
 
-const URLS = { dashboard: 'dashboard', chat: 'chat', staff: 'staff', shops: 'shops', shifts: 'shifts', calendar: 'calendar', 'staff-availability': 'staff-availability', attendance: 'attendance', checklists: 'checklists', knowledge: 'knowledge', stock: 'stock', recipes: 'recipes', costs: 'costs', settings: 'settings', time: 'time', availability: 'availability', 'my-checklists': 'my-checklists' };
-
 const OWNER_TOUR = ['dashboard', 'calendar', 'staff', 'stock', 'recipes', 'costs'];
+const WORKER_TOUR = ['time', 'calendar', 'availability', 'my-checklists'];
 
 const INITIAL_STOCK = [
   { id: 'beans', name: 'Arabica Coffee Beans', unit: 'kg', qty: 4.2, min: 6 },
@@ -71,38 +70,13 @@ const stockPct = (it) => Math.max(0, Math.min(100, Math.round((it.qty / (it.min 
 const initials = (n) => n.split(' ').map((w) => w[0]).join('').slice(0, 2);
 
 export default function LandingDemo() {
-  const [role, setRole] = useState('owner');
-  const [active, setActive] = useState('dashboard');
-  const [interacted, setInteracted] = useState(false);
-  const [stock, setStock] = useState(INITIAL_STOCK);
-  const timer = useRef(null);
-
-  const nav = role === 'owner' ? OWNER_NAV : WORKER_NAV;
-  const onInteract = () => setInteracted(true);
-
-  useEffect(() => {
-    if (interacted) return;
-    timer.current = setInterval(() => {
-      setActive((cur) => {
-        const i = OWNER_TOUR.indexOf(cur);
-        return OWNER_TOUR[(i + 1) % OWNER_TOUR.length];
-      });
-    }, 4200);
-    return () => clearInterval(timer.current);
-  }, [interacted]);
-
-  const go = (id) => { onInteract(); setActive(id); };
-  const switchRole = (r) => { onInteract(); setRole(r); setActive(r === 'worker' ? 'time' : 'dashboard'); };
-  const attention = stock.filter((s) => stockStatus(s) !== 'ok').length;
-  const current = nav.find((n) => n.id === active) || nav[0];
-
   return (
     <section id="demo" className="py-16 sm:py-24 px-4 sm:px-6 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-brand-200/25 rounded-full blur-3xl" />
       </div>
       <div className="max-w-6xl mx-auto relative z-10">
-        <div className="text-center mb-6 sm:mb-10">
+        <div className="text-center mb-8 sm:mb-12">
           <div className="inline-flex items-center gap-2 bg-white border border-brand-200 text-brand-700 text-xs sm:text-sm font-medium px-4 py-2 rounded-full mb-4 shadow-sm">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -110,99 +84,95 @@ export default function LandingDemo() {
             </span>
             Live, interactive demo
           </div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-display font-bold text-slate-900 mb-3 sm:mb-4">Explore the whole app</h2>
-          <p className="text-sm sm:text-lg text-slate-600 max-w-2xl mx-auto">Navigate every section from the sidebar, switch between the owner and worker views, and actually try it — clock in, approve leave, refill stock, make a recipe.</p>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-display font-bold text-slate-900 mb-3 sm:mb-4">Two apps, one platform</h2>
+          <p className="text-sm sm:text-lg text-slate-600 max-w-2xl mx-auto">Owners run the whole business; your team gets a focused app for their shifts — both on their phone. Tap the bottom bar to browse sections, and actually try it: clock in, approve leave, refill stock, make a recipe.</p>
         </div>
 
-        <BrowserFrame url={`staffhub.app/${URLS[active] || active}`}>
-          <div className="flex h-[520px] sm:h-[540px]">
-            {/* Sidebar */}
-            <aside className="w-[52px] sm:w-56 flex-shrink-0 flex flex-col bg-gradient-to-b from-surface-900 to-surface-950 text-white">
-              <div className="h-12 flex items-center gap-2.5 px-3 sm:px-4 border-b border-white/10 flex-shrink-0">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center flex-shrink-0">
-                  <Shield className="w-4 h-4 text-white" />
-                </div>
-                <span className="hidden sm:block text-sm font-display font-bold tracking-tight">Staff<span className="text-brand-400">Hub</span></span>
-              </div>
-              <nav className="flex-1 overflow-y-auto scrollbar-none py-2 px-1.5 sm:px-2 space-y-0.5">
-                {nav.map((item) => {
-                  const on = item.id === active;
-                  return (
-                    <button key={item.id} onClick={() => go(item.id)} title={item.label}
-                      className={cn('w-full flex items-center gap-2.5 px-2 sm:px-2.5 py-2 rounded-lg text-xs font-medium transition-all',
-                        on ? 'bg-white/10 text-white' : 'text-white/55 hover:bg-white/5 hover:text-white/90')}>
-                      <item.icon className={cn('w-[18px] h-[18px] flex-shrink-0', on ? 'text-brand-400' : 'text-white/40')} />
-                      <span className="hidden sm:block truncate">{item.label}</span>
-                      {on && <span className="hidden sm:block ml-auto w-1.5 h-1.5 rounded-full bg-brand-400" />}
-                    </button>
-                  );
-                })}
-              </nav>
-              <div className="p-2 sm:p-2.5 border-t border-white/10 flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-[11px] font-bold flex-shrink-0">
-                  {role === 'owner' ? 'S' : 'A'}
-                </div>
-                <div className="hidden sm:block min-w-0">
-                  <p className="text-xs font-medium text-white/90 truncate">{role === 'owner' ? 'Sofia Marin' : 'Alex Novak'}</p>
-                  <p className="text-[10px] text-white/40 capitalize">{role === 'owner' ? 'admin' : 'worker'}</p>
-                </div>
-              </div>
-            </aside>
+        <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-10 lg:gap-16">
+          <PhoneApp role="owner" name="Sofia Marin" roleLabel="Owner / Manager" tour={OWNER_TOUR} />
+          <PhoneApp role="worker" name="Alex Novak" roleLabel="Worker" tour={WORKER_TOUR} />
+        </div>
 
-            {/* Main column */}
-            <div className="flex-1 flex flex-col min-w-0 bg-surface-50">
-              {/* Topbar */}
-              <div className="h-12 flex items-center justify-between gap-2 px-3 sm:px-4 bg-white/80 backdrop-blur border-b border-surface-200/60 flex-shrink-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <current.icon className="w-4 h-4 text-surface-400 flex-shrink-0" />
-                  <span className="text-sm font-display font-semibold text-surface-800 truncate">{current.label}</span>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <div className="hidden sm:flex items-center bg-surface-100 rounded-lg p-0.5">
-                    {['owner', 'worker'].map((r) => (
-                      <button key={r} onClick={() => switchRole(r)}
-                        className={cn('px-2.5 py-1 rounded-md text-[11px] font-semibold capitalize transition-all',
-                          role === r ? 'bg-white shadow-sm text-surface-900' : 'text-surface-500 hover:text-surface-700')}>
-                        {r}
-                      </button>
-                    ))}
-                  </div>
-                  <button onClick={() => switchRole(role === 'owner' ? 'worker' : 'owner')} className="sm:hidden badge bg-brand-100 text-brand-700 !text-[10px] capitalize">{role} ↔</button>
-                  <span className="w-7 h-7 rounded-lg hidden sm:flex items-center justify-center text-surface-400"><Search className="w-4 h-4" /></span>
-                  <span className="w-7 h-7 rounded-lg flex items-center justify-center text-surface-400 relative"><Bell className="w-4 h-4" /><span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500" /></span>
-                </div>
-              </div>
-
-              {/* Content */}
-              <main className="flex-1 overflow-y-auto scrollbar-none">
-                <Section role={role} active={active} stock={stock} setStock={setStock} onInteract={onInteract} go={go} />
-              </main>
-            </div>
-          </div>
-        </BrowserFrame>
-
-        <p className="text-center text-xs text-slate-400 mt-4">A real, interactive preview — nothing is saved. Managers run this on desktop; your team gets the same on mobile. <a href="/register" className="text-brand-600 font-medium hover:underline">Create your free account →</a></p>
+        <p className="text-center text-xs text-slate-400 mt-8">A real, interactive preview — nothing is saved. This is exactly what managers and staff see on their phones. <a href="/register" className="text-brand-600 font-medium hover:underline">Create your free account →</a></p>
       </div>
     </section>
   );
 }
 
-function BrowserFrame({ url, children }) {
+/* ─── Phone app (per role) ──────────────────────────────────── */
+
+function PhoneApp({ role, name, roleLabel, tour }) {
+  const nav = role === 'owner' ? OWNER_NAV : WORKER_NAV;
+  const [active, setActive] = useState(role === 'owner' ? 'dashboard' : 'time');
+  const [interacted, setInteracted] = useState(false);
+  const [stock, setStock] = useState(INITIAL_STOCK);
+  const timer = useRef(null);
+
+  const onInteract = () => setInteracted(true);
+  useEffect(() => {
+    if (interacted || !tour) return;
+    timer.current = setInterval(() => {
+      setActive((cur) => { const i = tour.indexOf(cur); return tour[(i + 1) % tour.length]; });
+    }, 4200);
+    return () => clearInterval(timer.current);
+  }, [interacted, tour]);
+
+  const go = (id) => { onInteract(); setActive(id); };
+  const current = nav.find((n) => n.id === active) || nav[0];
+
   return (
-    <div className="w-full rounded-2xl bg-slate-900 shadow-2xl shadow-slate-900/25 border border-slate-800 overflow-hidden animate-in">
-      <div className="flex items-center gap-2 px-4 h-9 bg-slate-800/80 border-b border-slate-700/60">
-        <div className="flex gap-1.5">
-          <span className="w-3 h-3 rounded-full bg-red-400" />
-          <span className="w-3 h-3 rounded-full bg-amber-400" />
-          <span className="w-3 h-3 rounded-full bg-emerald-400" />
+    <div className="flex flex-col items-center">
+      <div className={cn('inline-flex items-center gap-2 mb-4 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold shadow-sm',
+        role === 'owner' ? 'bg-brand-600 text-white' : 'bg-slate-900 text-white')}>
+        {role === 'owner' ? <LayoutDashboard className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
+        {roleLabel}
+      </div>
+      <PhoneFrame>
+        {/* Status bar */}
+        <div className="h-7 flex items-center justify-between px-4 flex-shrink-0 text-[10px] font-semibold text-surface-500">
+          <span className="tabular-nums">9:41</span>
+          <span className="flex items-center gap-1"><span className="w-3.5 h-2 rounded-[2px] border border-surface-400" /></span>
         </div>
-        <div className="flex-1 flex justify-center">
-          <div className="flex items-center gap-1.5 bg-slate-700/50 rounded-md px-3 py-0.5 text-[11px] text-slate-300 max-w-[70%] truncate">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/70 flex-shrink-0" /> {url}
+        {/* App top bar */}
+        <div className="h-11 flex items-center justify-between px-3.5 bg-white/90 backdrop-blur border-b border-surface-200/60 flex-shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center flex-shrink-0"><Shield className="w-3.5 h-3.5 text-white" /></div>
+            <span className="text-sm font-display font-semibold text-surface-800 truncate">{current.label}</span>
+          </div>
+          <span className="w-7 h-7 rounded-lg flex items-center justify-center text-surface-400 relative"><Bell className="w-4 h-4" /><span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500" /></span>
+        </div>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto scrollbar-none">
+          <Section role={role} active={active} stock={stock} setStock={setStock} onInteract={onInteract} go={go} />
+        </div>
+        {/* Bottom nav */}
+        <div className="flex-shrink-0 border-t border-surface-200/60 bg-white/95 backdrop-blur">
+          <div className="flex overflow-x-auto scrollbar-none gap-0 px-1 py-1.5">
+            {nav.map((item) => {
+              const on = item.id === active;
+              return (
+                <button key={item.id} onClick={() => go(item.id)}
+                  className={cn('flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-lg text-[9px] font-medium flex-shrink-0 transition-all',
+                    on ? 'text-brand-600 bg-brand-50' : 'text-surface-400 hover:text-surface-600')}>
+                  <item.icon className="w-[18px] h-[18px]" />
+                  {item.short}
+                </button>
+              );
+            })}
           </div>
         </div>
+      </PhoneFrame>
+    </div>
+  );
+}
+
+function PhoneFrame({ children }) {
+  return (
+    <div className="relative w-[300px] sm:w-[330px] rounded-[2.75rem] bg-slate-900 p-2.5 shadow-2xl shadow-slate-900/30 border border-slate-800 animate-in">
+      <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-28 h-5 bg-slate-900 rounded-b-2xl z-20" />
+      <div className="rounded-[2.25rem] overflow-hidden bg-surface-50 h-[580px] flex flex-col">
+        {children}
       </div>
-      {children}
     </div>
   );
 }
