@@ -8,7 +8,7 @@ import { createSupportTicket } from '@/lib/firestore';
 import Modal from '@/components/Modal';
 import LandingDemo from '@/components/landing/LandingDemo';
 import toast from 'react-hot-toast';
-import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ExternalLink, HelpCircle, Send, Loader2, Building2, Users as UsersIcon, Mail, Phone, Menu, X, Download, Smartphone } from 'lucide-react';
+import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ChevronDown, ExternalLink, HelpCircle, Send, Loader2, Building2, Users as UsersIcon, Mail, Phone, Menu, X, Download, Smartphone, Coffee, UtensilsCrossed, ShoppingBag, Scissors, TrendingUp } from 'lucide-react';
 
 const features = [
   { icon: Store, title: 'Multi-Shop Management', desc: 'Manage multiple locations from one dashboard with separate schedules and staff.', color: 'from-brand-500 to-brand-600' },
@@ -27,6 +27,48 @@ const plans = [
   { name: 'Enterprise', price: `€${ENTERPRISE_DISCOUNTED_PRICE}`, period: '/month', desc: 'For large operations', badge: 'bg-purple-100 text-purple-700',
     features: ['Unlimited workers & shops', `€${ENTERPRISE_PRICE_MONTHLY}/mo (€${ENTERPRISE_DISCOUNTED_PRICE} with discount)`, 'Dedicated support', 'Custom integrations', 'SLA guarantee', 'Everything included'], cta: 'Contact Sales', href: '/register' },
 ];
+
+const stats = [
+  { value: '~3 min', label: 'to set up your first shop' },
+  { value: '€0', label: `free for up to ${FREE_WORKER_LIMIT} workers` },
+  { value: '1 app', label: 'schedule, time, costs & stock' },
+  { value: 'Any phone', label: 'installs as an app — no store' },
+];
+
+const industries = [
+  { icon: Coffee, name: 'Cafés & Coffee', desc: 'Baristas, shift swaps, stock & recipe costing.' },
+  { icon: UtensilsCrossed, name: 'Restaurants & Bars', desc: 'FOH/BOH rotas, tips and compliance checklists.' },
+  { icon: ShoppingBag, name: 'Retail & Shops', desc: 'Multi-location cover and peak-hour staffing.' },
+  { icon: Scissors, name: 'Salons & Services', desc: 'Flexible scheduling, availability and leave.' },
+];
+
+const testimonials = [
+  { quote: "Auto-Schedule builds our week in seconds. I used to lose a whole evening to the rota — now it's a two-minute review.", name: 'Sofia M.', role: 'Owner, Bean & Brew', color: 'bg-brand-500' },
+  { quote: 'Clock-in from their phones ended our timesheet arguments. Approving hours is one tap and payroll is finally painless.', name: 'David L.', role: 'Manager · 3 locations', color: 'bg-emerald-500' },
+  { quote: 'Stock and recipes in the same app means we always know our margins. Low-stock alerts have saved us mid-rush more than once.', name: 'Amara K.', role: 'Founder, Two Birds Kitchen', color: 'bg-purple-500' },
+];
+
+const faqs = [
+  { q: 'Do I need a credit card to start?', a: `No. Create an account and manage up to ${FREE_WORKER_LIMIT} workers completely free, forever. You only upgrade when your team grows.` },
+  { q: 'How long does setup take?', a: 'Most owners are scheduling within minutes — add a shop, invite your team with a code or QR, and let Auto-Schedule draft the week for you.' },
+  { q: 'Does it work on phones?', a: 'Yes. StaffHub installs as an app on any iPhone, Android or desktop — no app store needed. Your team clocks in, checks shifts and gets notifications on their own phone.' },
+  { q: 'Can I manage multiple shops or locations?', a: 'Absolutely. Run every location from one dashboard with its own staff, schedule, stock and costs — and see the whole business at a glance.' },
+  { q: 'What if I need to cancel?', a: 'Plans are month-to-month with no lock-in. Cancel anytime and keep access until the end of your billing period.' },
+  { q: 'Is my data secure?', a: 'Your data is stored securely with per-organization isolation and role-based access, so people only ever see what they need.' },
+];
+
+function FaqItem({ q, a }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <button onClick={() => setOpen(o => !o)} className="w-full text-left bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 hover:border-slate-300 transition-colors">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm sm:text-base font-semibold text-slate-900">{q}</span>
+        <ChevronDown className={`w-5 h-5 text-slate-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </div>
+      {open && <p className="text-sm text-slate-600 leading-relaxed mt-3">{a}</p>}
+    </button>
+  );
+}
 
 const CATEGORIES = [
   { value: 'general', label: 'General Question' },
@@ -355,6 +397,8 @@ export default function HomePage() {
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-1">
             <a href="#demo" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2 rounded-lg hover:bg-slate-100">Live Demo</a>
+            <a href="#pricing" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2 rounded-lg hover:bg-slate-100">Pricing</a>
+            <a href="#faq" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2 rounded-lg hover:bg-slate-100">FAQ</a>
             <a href="#contact" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2 rounded-lg hover:bg-slate-100">Contact</a>
             <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors px-4 py-2 rounded-lg hover:bg-slate-100">Sign In</Link>
             <Link href="/register" className="btn-primary !py-2 !px-5 !text-sm !shadow-lg !shadow-brand-500/30 ml-2">Get Started</Link>
@@ -390,6 +434,7 @@ export default function HomePage() {
                   { href: '#demo', icon: Smartphone, label: 'Live Demo', desc: 'Try the app on every screen' },
                   { href: '#features', icon: Sparkles, label: 'Features', desc: 'What StaffHub can do' },
                   { href: '#pricing', icon: BarChart3, label: 'Pricing', desc: 'Simple per-worker plans' },
+                  { href: '#faq', icon: HelpCircle, label: 'FAQ', desc: 'Answers to common questions' },
                   { href: '#contact', icon: Mail, label: 'Contact', desc: 'Get in touch with our team' },
                 ].map(item => (
                   <a
@@ -492,19 +537,31 @@ export default function HomePage() {
             <span className="flex items-center gap-1.5 sm:gap-2"><Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" /> No credit card required</span>
             <span className="flex items-center gap-1.5 sm:gap-2"><Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" /> Cancel anytime</span>
           </div>
+
+          {/* Social proof */}
+          <div className="mt-8 sm:mt-10 flex items-center justify-center gap-3">
+            <div className="flex -space-x-2.5">
+              {['bg-brand-500', 'bg-emerald-500', 'bg-purple-500', 'bg-amber-500'].map((c, i) => (
+                <div key={i} className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full ring-2 ring-white ${c} flex items-center justify-center text-white text-xs font-bold`}>{['S', 'D', 'A', 'M'][i]}</div>
+              ))}
+            </div>
+            <div className="text-left">
+              <div className="flex text-amber-400">{[...Array(5)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-current" />)}</div>
+              <p className="text-xs text-slate-500 mt-0.5">Built for busy hospitality &amp; retail teams</p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Trusted By */}
-      <section className="py-12 px-4 sm:px-6 border-y border-slate-200/60 bg-white/50">
-        <div className="max-w-5xl mx-auto text-center">
-          <p className="text-sm font-medium text-slate-500 mb-6">Built with care by</p>
-          <div className="flex items-center justify-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
-              <Shield className="w-4 h-4 text-white" />
+      {/* Stats strip */}
+      <section className="py-8 sm:py-10 px-4 sm:px-6 border-y border-slate-200/60 bg-white/60">
+        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+          {stats.map((s) => (
+            <div key={s.label} className="text-center">
+              <p className="text-2xl sm:text-3xl md:text-4xl font-display font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-600 to-purple-500">{s.value}</p>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-snug">{s.label}</p>
             </div>
-            <span className="text-xl font-display font-bold text-slate-900">toolee.nl</span>
-          </div>
+          ))}
         </div>
       </section>
 
@@ -533,6 +590,25 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Built for your business */}
+      <section className="py-16 sm:py-20 px-4 sm:px-6 bg-white/50 border-y border-slate-200/60">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-10 sm:mb-14">
+            <p className="text-xs sm:text-sm font-semibold text-brand-600 uppercase tracking-wider mb-2 sm:mb-3">Built for your business</p>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold text-slate-900">Made for teams that run on shifts</h2>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {industries.map((i) => (
+              <div key={i.name} className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 hover:shadow-lg hover:border-slate-300/80 hover:-translate-y-1 transition-all duration-300">
+                <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4"><i.icon className="w-6 h-6" /></div>
+                <h3 className="text-sm sm:text-base font-display font-semibold text-slate-900 mb-1">{i.name}</h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">{i.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* How it works */}
       <section className="py-24 px-4 sm:px-6 bg-gradient-to-br from-slate-50 to-brand-50/30">
         <div className="max-w-5xl mx-auto">
@@ -550,6 +626,31 @@ export default function HomePage() {
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xl font-bold flex items-center justify-center mx-auto mb-6 shadow-xl shadow-brand-500/30">{s.step}</div>
                 <h3 className="font-display font-bold text-slate-900 text-xl mb-3">{s.title}</h3>
                 <p className="text-slate-600 leading-relaxed">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="py-20 sm:py-24 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12 sm:mb-16">
+            <p className="text-sm font-semibold text-brand-600 uppercase tracking-wider mb-3">Loved by managers</p>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-slate-900">Less admin, happier teams</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {testimonials.map((t) => (
+              <div key={t.name} className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 flex flex-col hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div className="flex text-amber-400 mb-4">{[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-current" />)}</div>
+                <p className="text-sm sm:text-base text-slate-700 leading-relaxed flex-1">“{t.quote}”</p>
+                <div className="flex items-center gap-3 mt-6 pt-5 border-t border-slate-100">
+                  <div className={`w-10 h-10 rounded-full ${t.color} text-white flex items-center justify-center text-sm font-bold flex-shrink-0`}>{t.name[0]}</div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{t.name}</p>
+                    <p className="text-xs text-slate-500">{t.role}</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -598,6 +699,20 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* FAQ */}
+      <section id="faq" className="py-20 sm:py-24 px-4 sm:px-6 bg-gradient-to-br from-slate-50 to-brand-50/30 border-y border-slate-200/60">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-10 sm:mb-14">
+            <p className="text-sm font-semibold text-brand-600 uppercase tracking-wider mb-3">FAQ</p>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-slate-900">Everything you need to know</h2>
+          </div>
+          <div className="space-y-3">
+            {faqs.map((f) => <FaqItem key={f.q} q={f.q} a={f.a} />)}
+          </div>
+          <p className="text-center text-sm text-slate-500 mt-8">Still have a question? <a href="#contact" className="text-brand-600 font-semibold hover:underline">Talk to us →</a></p>
+        </div>
+      </section>
+
       {/* Contact Section */}
       <section id="contact" className="py-24 px-4 sm:px-6 bg-gradient-to-br from-slate-50 to-brand-50/30">
         <div className="max-w-4xl mx-auto">
@@ -628,6 +743,11 @@ export default function HomePage() {
               <Link href="/register" className="inline-flex items-center gap-2 bg-white text-slate-900 font-semibold px-8 sm:px-10 py-3 sm:py-4 rounded-xl hover:bg-brand-50 transition-all shadow-xl hover:-translate-y-1 text-sm sm:text-base">
                 Get Started for Free <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
               </Link>
+              <p className="text-white/50 text-xs sm:text-sm mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+                <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /> No credit card</span>
+                <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /> Free up to {FREE_WORKER_LIMIT} workers</span>
+                <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /> Cancel anytime</span>
+              </p>
             </div>
           </div>
         </div>
