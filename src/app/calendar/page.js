@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import PageIntro from '@/components/help/PageIntro';
+import ScheduleTabs from '@/components/ScheduleTabs';
 import HelpTip from '@/components/help/HelpTip';
 import { useAuth } from '@/contexts/AuthContext';
 import { getShifts, getWorkers, getShops, getShiftTemplates, getPermits, bulkCreateShifts, deleteShift, createShift, getPublicHolidays, savePublicHolidays, getOpenShifts, createOpenShift, claimOpenShift, deleteOpenShift, getShiftSwaps, createShiftSwap, reviewShiftSwap, notifyManagers, notifyWorker } from '@/lib/firestore';
@@ -457,6 +458,8 @@ export default function CalendarPage() {
             </div>
           )}
         </div>
+
+        <ScheduleTabs />
 
         <PageIntro page="calendar" />
 

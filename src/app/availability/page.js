@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
+import ScheduleTabs from '@/components/ScheduleTabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { getStaffAvailability, setStaffAvailability, removeStaffAvailability, getAvailabilitySettings } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
@@ -152,6 +153,8 @@ export default function AvailabilityPage() {
             </p>
           </div>
         </div>
+
+        <ScheduleTabs />
 
         {!settings.enabled && (
           <div className="card p-4 bg-amber-50 border border-amber-200">

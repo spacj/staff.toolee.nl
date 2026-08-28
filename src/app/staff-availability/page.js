@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
+import ScheduleTabs from '@/components/ScheduleTabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { getStaffAvailability, getWorkers, getAvailabilitySettings, saveAvailabilitySettings, getShops, createShift, getShifts, getOpenShifts } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
@@ -237,6 +238,8 @@ export default function StaffAvailabilityPage() {
             </p>
           </div>
         </div>
+
+        <ScheduleTabs />
 
         {/* ── Disabled warning ──────────────────────── */}
         {!settings.enabled && (
