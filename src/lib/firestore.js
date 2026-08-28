@@ -566,6 +566,13 @@ export async function getAllUsers() {
   return getAll(C.USERS);
 }
 
+// Org members from the users collection (owner/admins/managers who may not have
+// a worker record) — used so staff can start a chat with the owner/management.
+export async function getUsersByOrg(orgId) {
+  if (!orgId) return [];
+  return getAll(C.USERS, where('orgId', '==', orgId));
+}
+
 // ─── Webmaster: All Referrals (cross-org) ─────────────
 export async function getAllReferrals() {
   return getAll(C.REFERRALS, orderBy('createdAt', 'desc'));

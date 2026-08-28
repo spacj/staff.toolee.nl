@@ -5,17 +5,18 @@ import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getMessages, createMessage, markMessageRead, getWorkers, getConversations, getOrganization, createSupportTicket, getSupportTicketsByOrg, updateSupportTicket, addSupportTicketReply } from '@/lib/firestore';
+import { getMessages, createMessage, markMessageRead, getWorkers, getConversations, getOrganization, getUsersByOrg, createSupportTicket, getSupportTicketsByOrg, updateSupportTicket, addSupportTicketReply } from '@/lib/firestore';
 import { cn, formatDate } from '@/utils/helpers';
-import { MessageCircle, Send, Plus, Search, ArrowLeft, User, Users, HelpCircle, Loader2, AlertCircle, Check } from 'lucide-react';
+import { MessageCircle, Send, Plus, Search, ArrowLeft, User, Users, HelpCircle, Loader2, AlertCircle, Check, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function ChatPage() {
   const router = useRouter();
-  const { orgId, user, userProfile, isManager, isAdmin } = useAuth();
+  const { orgId, user, userProfile, isManager, isAdmin, organization } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [ticketConversations, setTicketConversations] = useState([]);
   const [workers, setWorkers] = useState([]);
+  const [orgMembers, setOrgMembers] = useState([]); // owner/admins/managers from users collection
   const [selectedConv, setSelectedConv] = useState(null);
   const [isTicket, setIsTicket] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -62,6 +63,7 @@ export default function ChatPage() {
     try {
       const w = await getWorkers({ orgId });
       setWorkers(w || []);
+      getUsersByOrg(orgId).then(setOrgMembers).catch(() => setOrgMembers([]));
       const workerId = await resolveWorkerId();
       if (!workerId) return;
       const convs = await getConversations(workerId, orgId, isManager ? 'manager' : 'worker', w || []);
@@ -212,10 +214,25 @@ export default function ChatPage() {
     }
   };
 
-  const filteredWorkers = workers.filter(w => 
-    user && w.id !== user.uid &&
-    `${w.firstName} ${w.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
+  // People a user can start a chat with — management (owner/admins/managers)
+  // first so staff can always reach the owner, then coworkers.
+  const managementMembers = orgMembers.filter(m =>
+    (m.role === 'admin' || m.role === 'manager') &&
+    m.id !== user?.uid &&
+    !workers.some(w => w.userId === m.id) // avoid duplicating someone already listed as a worker
   );
+  const people = [
+    ...managementMembers.map(m => ({
+      id: m.id,
+      name: (m.displayName || m.email || 'Management') + (organization?.ownerId === m.id ? ' · Owner' : ''),
+      role: m.role,
+      management: true,
+    })),
+    ...workers
+      .filter(w => user && w.id !== user.uid && w.userId !== user?.uid)
+      .map(w => ({ id: w.id, name: `${w.firstName} ${w.lastName}`, role: w.role || 'worker', management: false })),
+  ];
+  const filteredPeople = people.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const formatTime = (dateStr) => {
     if (!dateStr) return '';
@@ -447,25 +464,25 @@ export default function ChatPage() {
             />
           </div>
           <div className="max-h-64 overflow-y-auto space-y-1">
-            {filteredWorkers.length === 0 ? (
+            {filteredPeople.length === 0 ? (
               <p className="text-center text-surface-400 py-4">No people found</p>
             ) : (
-              filteredWorkers.map(w => (
+              filteredPeople.map(p => (
                 <button
-                  key={w.id}
+                  key={p.id}
                   onClick={() => {
-                    setSelectedConv({ partnerId: w.id, partnerName: `${w.firstName} ${w.lastName}`, partnerRole: w.role || 'worker' });
+                    setSelectedConv({ partnerId: p.id, partnerName: p.name, partnerRole: p.role });
                     setShowNewChat(false);
                     setSearchQuery('');
                   }}
                   className="w-full p-3 flex items-center gap-3 hover:bg-surface-50 rounded-xl text-left"
                 >
-                  <div className="w-10 h-10 rounded-full bg-surface-200 flex items-center justify-center">
-                    <User className="w-5 h-5 text-surface-500" />
+                  <div className={cn('w-10 h-10 rounded-full flex items-center justify-center', p.management ? 'bg-brand-100' : 'bg-surface-200')}>
+                    {p.management ? <Shield className="w-5 h-5 text-brand-600" /> : <User className="w-5 h-5 text-surface-500" />}
                   </div>
                   <div>
-                    <p className="font-medium text-surface-800">{w.firstName} {w.lastName}</p>
-                    <p className="text-xs text-surface-400 capitalize">{w.role || 'worker'}</p>
+                    <p className="font-medium text-surface-800">{p.name}</p>
+                    <p className="text-xs text-surface-400 capitalize">{p.management ? 'Management' : (p.role || 'worker')}</p>
                   </div>
                 </button>
               ))

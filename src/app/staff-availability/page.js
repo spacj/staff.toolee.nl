@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getStaffAvailability, getWorkers, getAvailabilitySettings, saveAvailabilitySettings, getShops, createShift, getShifts } from '@/lib/firestore';
+import { getStaffAvailability, getWorkers, getAvailabilitySettings, saveAvailabilitySettings, getShops, createShift, getShifts, getOpenShifts } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
 import {
   ChevronLeft, ChevronRight, Calendar, Users, Sun, Sunset, Moon, Clock,
@@ -37,7 +37,8 @@ export default function StaffAvailabilityPage() {
 
   // Shift creation
   const [shops, setShops] = useState([]);
-  const [existingShifts, setExistingShifts] = useState([]);   // to check for duplicates
+  const [existingShifts, setExistingShifts] = useState([]);   // assigned shifts (to compare/check duplicates)
+  const [openShifts, setOpenShifts] = useState([]);           // unassigned open shifts to fill
   const [creatingShiftFor, setCreatingShiftFor] = useState(null); // availability entry being scheduled
   const [shiftForm, setShiftForm] = useState({ startTime: '09:00', endTime: '17:00', shopId: '', notes: '' });
   const [savingShift, setSavingShift] = useState(false);
@@ -58,7 +59,8 @@ export default function StaffAvailabilityPage() {
       getAvailabilitySettings(orgId).catch(() => ({ deadlineDays: 7, enabled: true })),
       getShops(orgId).catch(() => []),
       getShifts({ orgId, startDate: loadRange.start, endDate: loadRange.end }).catch(() => []),
-    ]).then(([avail, workersList, s, shopsList, shifts]) => {
+      getOpenShifts({ orgId, status: 'open' }).catch(() => []),
+    ]).then(([avail, workersList, s, shopsList, shifts, openList]) => {
       setAvailability(avail || []);
       setWorkers(workersList || []);
       const sett = s || { deadlineDays: 7, enabled: true };
@@ -66,6 +68,7 @@ export default function StaffAvailabilityPage() {
       setLocalSettings(sett);
       setShops(shopsList || []);
       setExistingShifts(shifts || []);
+      setOpenShifts((openList || []).filter(o => o.date >= loadRange.start && o.date <= loadRange.end));
     }).finally(() => setLoading(false));
   }, [orgId, loadRange.start, loadRange.end]);
 
@@ -84,6 +87,10 @@ export default function StaffAvailabilityPage() {
   const filteredAvailability = selectedWorker === 'all'
     ? availability
     : availability.filter(a => a.workerId === selectedWorker);
+
+  const assignedForDate = (ds) => existingShifts.filter(s =>
+    s.date === ds && (selectedWorker === 'all' || s.workerId === selectedWorker));
+  const openForDate = (ds) => openShifts.filter(o => o.date === ds);
 
   const availForDate = (ds) => filteredAvailability.filter(a => a.date === ds);
 
@@ -183,6 +190,17 @@ export default function StaffAvailabilityPage() {
         type: 'from-availability',
       });
       toast.success(`Shift created for ${creatingShiftFor.workerName || 'Staff'}`);
+      // Reflect the new assignment immediately in the comparison view
+      setExistingShifts(prev => [...prev, {
+        id: `tmp-${Date.now()}`,
+        workerId: creatingShiftFor.workerId,
+        workerName: creatingShiftFor.workerName || 'Staff',
+        date: creatingShiftFor.date,
+        startTime: shiftForm.startTime,
+        endTime: shiftForm.endTime,
+        shopId: shiftForm.shopId || '',
+        shopName: shops.find(s => s.id === shiftForm.shopId)?.name || '',
+      }]);
       setCreatingShiftFor(null);
     } catch (err) {
       toast.error('Failed to create shift: ' + err.message);
@@ -289,8 +307,13 @@ export default function StaffAvailabilityPage() {
         ════════════════════════════════════════════ */}
         {!loading && viewMode === 'calendar' && (
           <>
-            {/* Shift legend */}
-            <div className="flex flex-wrap gap-3">
+            {/* Compare legend — available vs assigned vs open, then shift types */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-surface-400">Compare</span>
+              <div className="flex items-center gap-1.5 text-xs text-surface-600"><span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 rounded px-1">3</span> Available</div>
+              <div className="flex items-center gap-1.5 text-xs text-surface-600"><span className="text-[10px] font-bold bg-blue-100 text-blue-700 rounded px-1">2</span> Assigned</div>
+              <div className="flex items-center gap-1.5 text-xs text-surface-600"><span className="text-[10px] font-bold bg-amber-100 text-amber-700 rounded px-1">1</span> Open shifts</div>
+              <span className="text-surface-200">·</span>
               {SHIFT_TYPES.map(t => (
                 <div key={t.id} className="flex items-center gap-1.5 text-xs text-surface-600">
                   <span className={cn('w-2.5 h-2.5 rounded-full', t.dot)} />
@@ -323,30 +346,33 @@ export default function StaffAvailabilityPage() {
                   const isPast = dateStr < todayStr;
                   const inDeadline = dateStr >= todayStr && dateStr < deadlineDate;
                   const count = dayEntries.length;
+                  const assignedCount = assignedForDate(dateStr).length;
+                  const openCount = openForDate(dateStr).length;
+                  const hasAny = count > 0 || assignedCount > 0 || openCount > 0;
 
                   return (
                     <div
                       key={d}
-                      onClick={() => { if (count > 0) setSelectedDate(dateStr); }}
+                      onClick={() => { if (hasAny) setSelectedDate(dateStr); }}
                       className={cn(
                         'h-20 sm:h-28 p-1 sm:p-1.5 border-b border-r border-surface-100 transition-colors overflow-hidden',
                         isToday && 'bg-brand-50/60',
                         isPast && 'bg-surface-50/30',
                         inDeadline && !isToday && 'bg-red-50/40',
-                        count > 0 && 'cursor-pointer hover:bg-brand-50',
+                        hasAny && 'cursor-pointer hover:bg-brand-50',
                       )}
                     >
-                      {/* Day number + badge */}
-                      <div className="flex items-center justify-between">
+                      {/* Day number + compare indicators (available / assigned / open) */}
+                      <div className="flex items-center justify-between gap-1">
                         <span className={cn(
                           'text-[10px] sm:text-xs font-medium leading-none',
                           isToday ? 'text-brand-600 font-bold' : isPast ? 'text-surface-400' : 'text-surface-700',
                         )}>{d}</span>
-                        {count > 0 && (
-                          <span className="text-[9px] sm:text-[10px] font-semibold bg-brand-100 text-brand-700 rounded-full px-1.5 leading-4">
-                            {count}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-0.5">
+                          {count > 0 && <span title={`${count} available`} className="text-[8px] sm:text-[9px] font-bold bg-emerald-100 text-emerald-700 rounded px-1 leading-4">{count}</span>}
+                          {assignedCount > 0 && <span title={`${assignedCount} assigned`} className="text-[8px] sm:text-[9px] font-bold bg-blue-100 text-blue-700 rounded px-1 leading-4">{assignedCount}</span>}
+                          {openCount > 0 && <span title={`${openCount} open shift(s)`} className="text-[8px] sm:text-[9px] font-bold bg-amber-100 text-amber-700 rounded px-1 leading-4">{openCount}</span>}
+                        </div>
                       </div>
 
                       {/* Shift dots / names */}
@@ -566,72 +592,105 @@ export default function StaffAvailabilityPage() {
       <Modal
         open={!!selectedDate && !creatingShiftFor}
         onClose={() => setSelectedDate(null)}
-        title={`Availability — ${selectedDate}`}
+        title={`Day overview — ${selectedDate}`}
         size="lg"
       >
         {selectedDate && !creatingShiftFor && (() => {
           const entries = availForDate(selectedDate);
+          const assigned = assignedForDate(selectedDate);
+          const open = openForDate(selectedDate);
           const inDeadline = selectedDate >= todayStr && selectedDate < deadlineDate;
+          const shopNameById = (id) => shops.find(s => s.id === id)?.name || '';
 
           return (
             <div className="space-y-4">
-              {/* Summary bar */}
-              <div className="flex items-center gap-3 p-3 bg-surface-50 rounded-xl">
-                <Users className="w-5 h-5 text-brand-600" />
+              {/* Compare summary */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-2.5 text-center">
+                  <p className="text-xl font-display font-bold text-emerald-700 leading-none">{entries.length}</p>
+                  <p className="text-[10px] text-emerald-600 mt-1">Available</p>
+                </div>
+                <div className="rounded-xl bg-blue-50 border border-blue-100 p-2.5 text-center">
+                  <p className="text-xl font-display font-bold text-blue-700 leading-none">{assigned.length}</p>
+                  <p className="text-[10px] text-blue-600 mt-1">Assigned</p>
+                </div>
+                <div className="rounded-xl bg-amber-50 border border-amber-100 p-2.5 text-center">
+                  <p className="text-xl font-display font-bold text-amber-700 leading-none">{open.length}</p>
+                  <p className="text-[10px] text-amber-600 mt-1">Open shifts</p>
+                </div>
+              </div>
+              {inDeadline && (
+                <p className="text-xs text-red-600 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" /> Within the {settings.deadlineDays}-day deadline window</p>
+              )}
+
+              {/* Assigned shifts */}
+              {assigned.length > 0 && (
                 <div>
-                  <p className="text-sm font-semibold text-surface-800">
-                    {entries.length} staff {entries.length === 1 ? 'member' : 'members'} available
-                  </p>
-                  {inDeadline && (
-                    <p className="text-xs text-red-600 mt-0.5">
-                      This date is within the {settings.deadlineDays}-day deadline window
-                    </p>
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">Assigned</p>
+                  <div className="space-y-1.5">
+                    {assigned.map(s => (
+                      <div key={s.id} className="flex items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/40 px-3 py-2">
+                        <span className="text-sm text-surface-800 truncate">{s.workerName || 'Staff'}</span>
+                        <span className="text-xs text-surface-500 tabular-nums flex-shrink-0">{s.startTime}–{s.endTime}{s.shopName ? ` · ${s.shopName}` : ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Open shifts to fill */}
+              {open.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Open shifts to fill</p>
+                  <div className="space-y-1.5">
+                    {open.map(o => (
+                      <div key={o.id} className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2">
+                        <span className="text-sm text-surface-800 truncate">{o.templateName || 'Open shift'}{shopNameById(o.shopId) ? ` · ${shopNameById(o.shopId)}` : ''}</span>
+                        <span className="text-xs text-amber-700 tabular-nums flex-shrink-0">{o.startTime}–{o.endTime} · {entries.length} avail.</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Available staff — assign from here */}
+              <div>
+                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">Available staff</p>
+                <div className="divide-y divide-surface-100">
+                  {entries.map(entry => {
+                    const info = getShiftInfo(entry.shiftType);
+                    const hasExistingShift = assigned.some(s => s.workerId === entry.workerId);
+                    return (
+                      <div key={entry.id} className="flex items-center justify-between py-2.5 gap-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {(entry.workerName || 'S')[0].toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-surface-800 truncate">{entry.workerName || 'Staff'}</p>
+                            <div className={cn('inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded', info.color)}>
+                              <info.icon className="w-3 h-3" />
+                              {info.label}
+                            </div>
+                          </div>
+                        </div>
+                        {hasExistingShift ? (
+                          <span className="text-xs text-blue-600 bg-blue-50 border border-blue-100 px-2 py-1 rounded flex-shrink-0">Scheduled ✓</span>
+                        ) : (
+                          <button onClick={() => openShiftForm(entry)} className="btn-primary !py-1.5 !px-3 !text-xs flex items-center gap-1.5 flex-shrink-0">
+                            <Plus className="w-3.5 h-3.5" /> Assign
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {entries.length === 0 && (
+                    <p className="text-center text-surface-400 py-4 text-sm">No availability submitted for this date.</p>
                   )}
                 </div>
               </div>
 
-              {/* Staff list with assign button */}
-              <div className="divide-y divide-surface-100">
-                {entries.map(entry => {
-                  const info = getShiftInfo(entry.shiftType);
-                  const hasExistingShift = existingShifts.some(s => s.workerId === entry.workerId && s.date === entry.date);
-                  return (
-                    <div key={entry.id} className="flex items-center justify-between py-3 gap-2">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                          {(entry.workerName || 'S')[0].toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-surface-800 truncate">
-                            {entry.workerName || 'Staff'}
-                          </p>
-                          <div className={cn('inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded', info.color)}>
-                            <info.icon className="w-3 h-3" />
-                            {info.label}
-                          </div>
-                        </div>
-                      </div>
-                      {hasExistingShift ? (
-                        <span className="text-xs text-surface-400 bg-surface-100 px-2 py-1 rounded">Already scheduled</span>
-                      ) : (
-                        <button
-                          onClick={() => openShiftForm(entry)}
-                          className="btn-primary !py-1.5 !px-3 !text-xs flex items-center gap-1.5 flex-shrink-0"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          Assign Shift
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {entries.length === 0 && (
-                <p className="text-center text-surface-400 py-4">No availability submitted for this date.</p>
-              )}
-
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-end pt-2 border-t border-surface-100">
                 <button onClick={() => setSelectedDate(null)} className="btn-secondary">Close</button>
               </div>
             </div>
