@@ -332,15 +332,15 @@ export default function WebmasterDashboard() {
                     </div>
                     <div className="p-5 space-y-4">
                       {[
-                        { plan: 'free', count: stats.planCounts.free, color: 'bg-surface-400', barColor: 'bg-surface-200' },
-                        { plan: 'standard', count: stats.planCounts.standard, color: 'bg-brand-500', barColor: 'bg-brand-100' },
-                        { plan: 'enterprise', count: stats.planCounts.enterprise, color: 'bg-purple-500', barColor: 'bg-purple-100' },
+                        { plan: 'free', label: 'Free', count: stats.planCounts.free, color: 'bg-surface-400', barColor: 'bg-surface-200' },
+                        { plan: 'standard', label: 'Basic', count: stats.planCounts.standard, color: 'bg-brand-500', barColor: 'bg-brand-100' },
+                        { plan: 'enterprise', label: 'Pro', count: stats.planCounts.enterprise, color: 'bg-purple-500', barColor: 'bg-purple-100' },
                       ].map((p) => {
                         const pct = stats.totalCompanies > 0 ? (p.count / stats.totalCompanies) * 100 : 0;
                         return (
                           <div key={p.plan} className="space-y-1.5">
                             <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-surface-700 capitalize">{p.plan}</span>
+                              <span className="text-sm font-medium text-surface-700">{p.label}</span>
                               <span className="text-sm font-semibold text-surface-800">{p.count} <span className="text-surface-400 font-normal">({Math.round(pct)}%)</span></span>
                             </div>
                             <div className={cn('w-full h-2.5 rounded-full', p.barColor)}>
@@ -438,8 +438,8 @@ export default function WebmasterDashboard() {
                     >
                       <option value="all">All Plans</option>
                       <option value="free">Free</option>
-                      <option value="standard">Standard</option>
-                      <option value="enterprise">Enterprise</option>
+                      <option value="standard">Basic</option>
+                      <option value="enterprise">Pro</option>
                     </select>
                     <select
                       value={companySortBy}

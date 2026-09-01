@@ -44,7 +44,7 @@ export default function InventoryUpgrade({ feature = 'Inventory' }) {
             <span className="text-3xl font-display font-bold text-surface-900">{formatCurrency(STOCK_ADDON_MONTHLY)}</span>
             <span className="text-sm text-surface-500">/month</span>
           </div>
-          <p className="text-xs text-surface-400 mt-0.5">or {formatCurrency(STOCK_ADDON_MONTHLY * 10)}/year — 2 months free · free on Enterprise</p>
+          <p className="text-xs text-surface-400 mt-0.5">or {formatCurrency(STOCK_ADDON_MONTHLY * 10)}/year — 2 months free · included free on Pro</p>
 
           <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-2.5">
             {isManager ? (
@@ -63,7 +63,7 @@ export default function InventoryUpgrade({ feature = 'Inventory' }) {
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-surface-800">Prefer done-for-you? Inventory Setup Service</p>
-              <p className="text-xs text-surface-500">We import your products, set par levels, build your recipes and train your team — {formatCurrency(INVENTORY_SETUP_FEE)} one-time.</p>
+              <p className="text-xs text-surface-500">We import your products, set par levels, build your recipes and train your team — from {formatCurrency(INVENTORY_SETUP_FEE)}, quoted to your business.</p>
             </div>
           </div>
         </div>

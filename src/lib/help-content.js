@@ -123,10 +123,11 @@ export const HELP_TIPS = {
   'auto-schedule': 'Generates a draft week from your templates and each worker’s availability and target hours. Review the preview before you apply it.',
 
   // Costs page
-  'plan-tiers': 'Your plan is chosen automatically from your active worker count. Add enough workers and you move up a tier; the price updates to match.',
-  'price-drivers': 'On the Standard plan you pay per billable worker plus per extra shop. The Free tier and your first shop cost nothing.',
+  'plan-tiers': 'Your plan is chosen automatically from your active employee count: Free up to 4, Basic up to 30 (€2/employee), and Pro from 31 (€249/mo, up to 50 employees included). The price updates to match.',
+  'price-drivers': 'On the Basic plan you pay €2 per billable employee plus €15 per extra shop. Your first 4 employees and first shop are free. Pro is a flat €249/mo with Stock, Checklists and Knowledge Base included.',
   'yearly-billing': 'Pay yearly to get roughly two months free versus paying every month.',
   'proration': 'Change your team mid-month and we only charge the difference for the days left in the current month.',
+  'services': 'Fixed-price help (like Staff setup) can be paid right away. Larger jobs (Inventory setup, Knowledge base) are quoted to your business first — asking is free.',
 };
 
 // ─── Onboarding steps ─────────────────────────────────────────

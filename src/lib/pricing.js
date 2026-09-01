@@ -1,29 +1,48 @@
 /**
  * StaffHub Pricing & Tier Enforcement
  *
- * Free:       0–4 workers, 1 shop  → €0
- * Standard:   5–29 workers         → €2/worker + €15/extra shop (1st shop free)
- * Enterprise: 30+ workers          → €299/month (€189 with discount)
+ * Free:   0–4 employees, 1 shop     → €0
+ * Basic:  5–30 employees            → €2/employee + €15/extra shop (1st shop free)
+ * Pro:    31+ employees             → €249/mo flat up to 50 employees,
+ *                                      then +€4/employee beyond 50.
+ *                                      Includes Stock, Checklists & Knowledge Base.
  *
- * Yearly billing for Standard = monthly × 10 (2 months free, ~17% discount)
- * Enterprise has a fixed discounted price of €189/month
+ * Yearly billing = monthly × 10 (2 months free, ~17% discount) on every paid tier.
  *
- * Payment: PayPal Orders API (one-time capture per period).
- * No subscriptions/plans needed. Just pay → store receipt → check period.
+ * Recurring billing (subscription): PayPal metered plan at €0.01/unit — the
+ * subscription "quantity" equals the total monthly (or yearly) cost in cents, so
+ * any tier (including Pro's variable price) bills correctly on a single plan.
+ *
+ * One-time fixed-price purchases (e.g. Staff Setup €50) use the PayPal Orders API
+ * (capture intent) — buy on the spot. Variable services (Inventory Setup from €199,
+ * Knowledge Base from €399) open a ticket for a quote.
+ *
+ * NOTE: internal tier keys stay 'free' / 'standard' / 'enterprise' for data
+ * compatibility with existing organization documents; display names are
+ * Free / Basic / Pro.
  */
 const PRICE_PER_WORKER = 2;
 const PRICE_PER_SHOP = 15;
 const FREE_WORKER_LIMIT = 4;
 const PROMO_WORKER_LIMIT = 10;
 const FREE_SHOP_LIMIT = 1;
-const ENTERPRISE_THRESHOLD = 30;
-const ENTERPRISE_PRICE_MONTHLY = 299;
-const ENTERPRISE_DISCOUNTED_PRICE = 189;
-const YEARLY_MULTIPLIER = 10; // ×10 = pay for 10 months, get 12
+const BASIC_MAX_WORKERS = 30;          // Basic covers up to 30 employees
+const ENTERPRISE_THRESHOLD = 31;       // Pro required at 31+ employees
+const PRO_PRICE_MONTHLY = 249;         // Pro flat price (up to PRO_INCLUDED_WORKERS)
+const PRO_INCLUDED_WORKERS = 50;       // employees included in the flat Pro price
+const PRO_EXTRA_WORKER = 4;            // €/employee beyond PRO_INCLUDED_WORKERS
+const YEARLY_MULTIPLIER = 10;          // ×10 = pay for 10 months, get 12
+
+// Back-compat aliases for old "Enterprise" naming used across the app.
+const ENTERPRISE_PRICE_MONTHLY = PRO_PRICE_MONTHLY;
+const ENTERPRISE_DISCOUNTED_PRICE = PRO_PRICE_MONTHLY;
 
 // ─── Inventory (Stock + Recipes) add-on & services ───
-const STOCK_ADDON_MONTHLY = 19;       // €19/mo per org (free on Enterprise)
-const INVENTORY_SETUP_FEE = 199;      // one-time done-for-you setup service
+const STOCK_ADDON_MONTHLY = 19.99;    // €19.99/mo per org (free on Pro)
+const STAFF_SETUP_FEE = 50;           // fixed one-time — buy on the spot
+const INVENTORY_SETUP_FROM = 199;     // variable done-for-you service — request a quote
+const KB_SETUP_FROM = 399;            // variable knowledge-base build — request a quote
+const INVENTORY_SETUP_FEE = INVENTORY_SETUP_FROM; // back-compat alias
 // Orgs created before this date keep Stock & Recipes for free (grandfathered).
 const INVENTORY_LAUNCH = '2026-08-28';
 
@@ -32,28 +51,28 @@ export const CYCLES = { MONTHLY: 'monthly', YEARLY: 'yearly' };
 
 export function getTier(workerCount, freeLimit = FREE_WORKER_LIMIT) {
   if (workerCount <= freeLimit) return TIERS.FREE;
-  if (workerCount < ENTERPRISE_THRESHOLD) return TIERS.STANDARD;
+  if (workerCount <= BASIC_MAX_WORKERS) return TIERS.STANDARD;
   return TIERS.ENTERPRISE;
 }
 
 export function getTierInfo(tier) {
   const tiers = {
     free: { name: 'Free', badge: 'bg-emerald-100 text-emerald-700', price: '€0', period: '',
-      tagline: `Up to ${FREE_WORKER_LIMIT} workers & ${FREE_SHOP_LIMIT} shop`,
-      features: [`Up to ${FREE_WORKER_LIMIT} workers`, `${FREE_SHOP_LIMIT} shop included`, 'Shift scheduling', 'Clock in/out', 'Calendar'] },
-    standard: { name: 'Standard', badge: 'bg-brand-100 text-brand-700', price: `€${PRICE_PER_WORKER}`, period: '/worker/mo',
-      tagline: `${FREE_WORKER_LIMIT + 1}–${ENTERPRISE_THRESHOLD - 1} workers`,
-      features: ['Everything in Free', `€${PRICE_PER_WORKER}/worker/month`, '1st shop free, then €' + PRICE_PER_SHOP + '/shop/mo', 'Save ~17% with yearly billing', 'Attendance tracking', 'Cost analytics'] },
-    enterprise: { name: 'Enterprise', badge: 'bg-purple-100 text-purple-700', price: `€${ENTERPRISE_DISCOUNTED_PRICE}`, period: '/mo (€299 reg)',
-      tagline: `${ENTERPRISE_THRESHOLD}+ workers`,
-      features: ['Everything in Standard', 'Unlimited workers & shops', 'Flat pricing', `€${ENTERPRISE_DISCOUNTED_PRICE}/mo (was €${ENTERPRISE_PRICE_MONTHLY})`, 'Priority support'] },
+      tagline: `Up to ${FREE_WORKER_LIMIT} employees & ${FREE_SHOP_LIMIT} shop`,
+      features: [`Up to ${FREE_WORKER_LIMIT} employees`, `${FREE_SHOP_LIMIT} shop included`, 'Shift scheduling', 'Clock in/out', 'Calendar'] },
+    standard: { name: 'Basic', badge: 'bg-brand-100 text-brand-700', price: `€${PRICE_PER_WORKER}`, period: '/employee/mo',
+      tagline: `${FREE_WORKER_LIMIT + 1}–${BASIC_MAX_WORKERS} employees`,
+      features: ['Everything in Free', `€${PRICE_PER_WORKER}/employee/month`, `1st shop free, then €${PRICE_PER_SHOP}/shop/mo`, 'Save ~17% with yearly billing', 'Attendance tracking', 'Cost analytics'] },
+    enterprise: { name: 'Pro', badge: 'bg-purple-100 text-purple-700', price: `€${PRO_PRICE_MONTHLY}`, period: '/mo',
+      tagline: `${ENTERPRISE_THRESHOLD}+ employees`,
+      features: ['Everything in Basic', `Up to ${PRO_INCLUDED_WORKERS} employees included`, `+€${PRO_EXTRA_WORKER}/employee beyond ${PRO_INCLUDED_WORKERS}`, 'Stock & Recipes included', 'Checklists & Knowledge Base', 'Priority support'] },
   };
   return tiers[tier] || tiers.free;
 }
 
 /**
  * Calculate cost for a given billing cycle.
- * @param {object} opts - { inventoryAddon } paid Stock+Recipes module (€19/mo, free on Enterprise)
+ * @param {object} opts - { inventoryAddon } paid Stock+Recipes module (€19.99/mo, free on Pro)
  */
 export function calculateCost(workerCount, shopCount, cycle = 'monthly', freeLimit = FREE_WORKER_LIMIT, opts = {}) {
   const tier = getTier(workerCount, freeLimit);
@@ -76,10 +95,22 @@ export function calculateCost(workerCount, shopCount, cycle = 'monthly', freeLim
   }
 
   if (tier === TIERS.ENTERPRISE) {
-    const monthly = isYearly ? ENTERPRISE_DISCOUNTED_PRICE : ENTERPRISE_PRICE_MONTHLY;
-    const total = monthly; // Inventory bundled free
-    const savings = ENTERPRISE_PRICE_MONTHLY - ENTERPRISE_DISCOUNTED_PRICE;
-    return { total, monthlyEquivalent: Math.round(total * 100) / 100, workerCost: 0, shopCost: 0, addonCost: 0, addonMonthly: 0, monthlyTotal: total, tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings, freeLimit, inventoryAddon: wantsAddon };
+    // Pro: €249 flat up to PRO_INCLUDED_WORKERS, then +€4/employee. Inventory bundled free.
+    const extraWorkers = Math.max(0, workerCount - PRO_INCLUDED_WORKERS);
+    const extraMonthly = extraWorkers * PRO_EXTRA_WORKER;
+    const monthly = PRO_PRICE_MONTHLY + extraMonthly;
+    const total = isYearly ? monthly * YEARLY_MULTIPLIER : monthly;
+    const monthlyEquiv = isYearly ? total / 12 : monthly;
+    const savings = isYearly ? (monthly * 12) - total : 0;
+    return {
+      total: Math.round(total * 100) / 100,
+      monthlyEquivalent: Math.round(monthlyEquiv * 100) / 100,
+      workerCost: isYearly ? Math.round(extraMonthly * YEARLY_MULTIPLIER * 100) / 100 : extraMonthly,
+      shopCost: 0, addonCost: 0, addonMonthly: 0,
+      proBase: PRO_PRICE_MONTHLY, extraWorkers,
+      monthlyTotal: monthly, billableShops: 0, billableWorkers: extraWorkers,
+      tier, cycle, tierInfo: getTierInfo(tier), workerCount, shopCount, savings, freeLimit, inventoryAddon: wantsAddon,
+    };
   }
 
   // Standard — first `freeLimit` workers are free, additional workers €2/mo each
@@ -110,20 +141,18 @@ export function calculateMonthlyCost(workerCount, shopCount) {
 }
 
 /**
- * Get the PayPal subscription quantity.
- * Standard: quantity = monthly cost in whole euros (€1/unit pricing).
- * Enterprise: null (fixed price plan).
+ * Get the PayPal subscription "quantity" for the €0.01/unit metered plan.
+ * Every paid tier (Basic and Pro) bills on the same metered plan, so the
+ * quantity is simply the recurring cost for the chosen cycle expressed in cents.
+ * Returns null when there is nothing to charge (truly free).
+ *
+ * @param {string} cycle - 'monthly' (default) or 'yearly'
  */
-export function getSubscriptionQuantity(workerCount, shopCount, freeLimit = FREE_WORKER_LIMIT, opts = {}) {
-  const tier = getTier(workerCount, freeLimit);
-  if (tier === TIERS.ENTERPRISE) return null; // fixed-price plan
-  const addonMonthly = opts.inventoryAddon ? STOCK_ADDON_MONTHLY : 0;
-  const billableShops = Math.max(0, shopCount - 1);
-  const billableWorkers = Math.max(0, workerCount - freeLimit);
-  const total = billableWorkers * PRICE_PER_WORKER + billableShops * PRICE_PER_SHOP + addonMonthly;
-  if (total <= 0) return null; // truly free — no subscription
-  // Return total monthly cost in cents; billed on the €0.01/unit Standard plan.
-  return Math.round(total * 100);
+export function getSubscriptionQuantity(workerCount, shopCount, freeLimit = FREE_WORKER_LIMIT, opts = {}, cycle = 'monthly') {
+  const cost = calculateCost(workerCount, shopCount, cycle, freeLimit, opts);
+  const total = cycle === 'yearly' ? cost.total : cost.monthlyTotal;
+  if (!total || total <= 0) return null;
+  return Math.round(total * 100); // cents, billed on the €0.01/unit plan
 }
 
 /**
@@ -187,14 +216,14 @@ export function canAddWorker(currentActiveWorkers, currentShopCount, orgPlan, fr
   if (currentTier === TIERS.FREE && newTier === TIERS.STANDARD) {
     return {
       allowed: true, requiresUpgrade: true,
-      message: `Adding a ${freeLimit + 1}th worker upgrades you to Standard at ${formatCurrency(newCost.total)}/month.`,
+      message: `Adding a ${freeLimit + 1}th employee moves you to the Basic plan at ${formatCurrency(newCost.total)}/month.`,
       newTier: TIERS.STANDARD, newCost,
     };
   }
   if (currentTier === TIERS.STANDARD && newTier === TIERS.ENTERPRISE) {
     return {
       allowed: true, requiresUpgrade: true,
-      message: `Adding a ${ENTERPRISE_THRESHOLD}st worker upgrades you to Enterprise at ${formatCurrency(ENTERPRISE_PRICE_MONTHLY)}/month flat.`,
+      message: `Adding a ${ENTERPRISE_THRESHOLD}th employee moves you to the Pro plan at ${formatCurrency(PRO_PRICE_MONTHLY)}/month (includes Stock, Checklists & Knowledge Base).`,
       newTier: TIERS.ENTERPRISE, newCost,
     };
   }
@@ -204,7 +233,7 @@ export function canAddWorker(currentActiveWorkers, currentShopCount, orgPlan, fr
 export function canAddShop(currentShopCount, currentActiveWorkers, freeLimit = FREE_WORKER_LIMIT) {
   const tier = getTier(currentActiveWorkers, freeLimit);
   if (tier === TIERS.FREE && currentShopCount >= FREE_SHOP_LIMIT) {
-    return { allowed: false, message: `Free plan includes ${FREE_SHOP_LIMIT} shop. Add more workers to unlock Standard.` };
+    return { allowed: false, message: `Free plan includes ${FREE_SHOP_LIMIT} shop. Add more employees to unlock the Basic plan.` };
   }
   if (tier === TIERS.STANDARD) {
     return { allowed: true, message: currentShopCount === 0 ? 'Your first shop is free!' : `Additional shops cost ${formatCurrency(PRICE_PER_SHOP)}/month each.` };
@@ -248,6 +277,8 @@ export function calculateProration(oldCost, newCost) {
 
 export {
   PRICE_PER_WORKER, PRICE_PER_SHOP, FREE_WORKER_LIMIT, FREE_SHOP_LIMIT,
-  ENTERPRISE_THRESHOLD, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE, YEARLY_MULTIPLIER,
-  PROMO_WORKER_LIMIT, STOCK_ADDON_MONTHLY, INVENTORY_SETUP_FEE, INVENTORY_LAUNCH,
+  BASIC_MAX_WORKERS, ENTERPRISE_THRESHOLD, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE,
+  PRO_PRICE_MONTHLY, PRO_INCLUDED_WORKERS, PRO_EXTRA_WORKER, YEARLY_MULTIPLIER,
+  PROMO_WORKER_LIMIT, STOCK_ADDON_MONTHLY, STAFF_SETUP_FEE,
+  INVENTORY_SETUP_FROM, KB_SETUP_FROM, INVENTORY_SETUP_FEE, INVENTORY_LAUNCH,
 };

@@ -19,6 +19,10 @@ const CATEGORIES = [
   { value: 'technical', label: 'Technical' },
   { value: 'feature', label: 'Feature' },
   { value: 'account', label: 'Account' },
+  { value: 'sales', label: 'Sales' },
+  { value: 'staff_setup', label: 'Staff Setup (paid)' },
+  { value: 'inventory_setup', label: 'Inventory Setup' },
+  { value: 'knowledge_base_setup', label: 'Knowledge Base' },
 ];
 
 const STATUSES = [

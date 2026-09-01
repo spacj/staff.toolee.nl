@@ -307,7 +307,7 @@ function OwnerDashboard({ onInteract, go }) {
     { label: 'Active Staff', value: '24', sub: '18 clocked in', icon: Users, tint: 'from-brand-500 to-brand-700' },
     { label: 'Shops', value: '3', sub: 'locations', icon: Store, tint: 'from-purple-500 to-purple-700' },
     { label: "Today's Shifts", value: '12', sub: 'scheduled', icon: Calendar, tint: 'from-emerald-500 to-emerald-700' },
-    { label: 'Monthly Cost', value: '€1,240', sub: 'Professional plan', icon: TrendingUp, tint: 'from-amber-500 to-amber-700' },
+    { label: 'Monthly Cost', value: '€1,240', sub: 'Basic plan', icon: TrendingUp, tint: 'from-amber-500 to-amber-700' },
   ];
   return (
     <Pad>

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { PRICE_PER_WORKER, PRICE_PER_SHOP, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE, ENTERPRISE_THRESHOLD, FREE_WORKER_LIMIT, STOCK_ADDON_MONTHLY, INVENTORY_SETUP_FEE } from '@/lib/pricing';
+import { PRICE_PER_WORKER, PRICE_PER_SHOP, PRO_PRICE_MONTHLY, PRO_INCLUDED_WORKERS, PRO_EXTRA_WORKER, BASIC_MAX_WORKERS, ENTERPRISE_THRESHOLD, FREE_WORKER_LIMIT, STOCK_ADDON_MONTHLY, INVENTORY_SETUP_FROM } from '@/lib/pricing';
 import { createSupportTicket } from '@/lib/firestore';
 import Modal from '@/components/Modal';
 import LandingDemo from '@/components/landing/LandingDemo';
@@ -20,15 +20,15 @@ const features = [
 ];
 
 const plans = [
-  { name: 'Starter', desc: 'Perfect for small teams', badge: 'bg-emerald-100 text-emerald-700',
+  { name: 'Free', desc: 'Perfect for small teams', badge: 'bg-emerald-100 text-emerald-700',
     monthly: { price: '€0', period: 'forever' }, yearly: { price: '€0', period: 'forever' },
-    features: [`${FREE_WORKER_LIMIT} workers included`, '1 shop', 'Shift scheduling', 'Clock in/out', 'Calendar view'], cta: 'Get Started Free', href: '/register' },
-  { name: 'Professional', desc: 'For growing businesses', badge: 'bg-brand-100 text-brand-700', popular: true,
-    monthly: { price: `€${PRICE_PER_WORKER}`, period: '/worker/mo' }, yearly: { price: `€${PRICE_PER_WORKER * 10}`, period: '/worker/yr' },
-    features: [`${FREE_WORKER_LIMIT + 1}–${ENTERPRISE_THRESHOLD - 1} workers`, `1st shop free, +€${PRICE_PER_SHOP}/shop`, 'Full analytics dashboard', 'AI scheduling assistant', 'Priority support'], cta: 'Start Free', href: '/register' },
-  { name: 'Enterprise', desc: 'For large operations', badge: 'bg-purple-100 text-purple-700',
-    monthly: { price: `€${ENTERPRISE_PRICE_MONTHLY}`, period: '/mo' }, yearly: { price: `€${ENTERPRISE_DISCOUNTED_PRICE}`, period: '/mo, billed yearly' },
-    features: ['Unlimited workers & shops', 'Inventory module included', 'Dedicated support', 'Custom integrations', 'SLA guarantee'], cta: 'Contact Sales', href: '/register' },
+    features: [`Up to ${FREE_WORKER_LIMIT} employees`, '1 shop', 'Shift scheduling', 'Clock in/out', 'Calendar view'], cta: 'Get Started Free', href: '/register' },
+  { name: 'Basic', desc: 'For growing businesses', badge: 'bg-brand-100 text-brand-700', popular: true,
+    monthly: { price: `€${PRICE_PER_WORKER}`, period: '/employee/mo' }, yearly: { price: `€${PRICE_PER_WORKER * 10}`, period: '/employee/yr' },
+    features: [`${FREE_WORKER_LIMIT + 1}–${BASIC_MAX_WORKERS} employees`, `1st shop free, +€${PRICE_PER_SHOP}/shop`, 'Full analytics dashboard', 'AI scheduling assistant', 'Priority support'], cta: 'Start Free', href: '/register' },
+  { name: 'Pro', desc: 'For larger operations', badge: 'bg-purple-100 text-purple-700',
+    monthly: { price: `€${PRO_PRICE_MONTHLY}`, period: '/mo' }, yearly: { price: `€${PRO_PRICE_MONTHLY * 10}`, period: '/yr' },
+    features: [`${ENTERPRISE_THRESHOLD}+ employees — up to ${PRO_INCLUDED_WORKERS} included`, `+€${PRO_EXTRA_WORKER}/employee beyond ${PRO_INCLUDED_WORKERS}`, 'Stock & Recipes included', 'Checklists & Knowledge Base', 'Priority support'], cta: 'Start Free', href: '/register' },
 ];
 
 const stats = [
@@ -774,8 +774,11 @@ export default function HomePage() {
                   <span className="text-5xl font-display font-bold text-slate-900">{p.price}</span>
                   <span className="text-base text-slate-500">{p.period}</span>
                 </div>
-                {billingCycle === 'yearly' && plan.name === 'Professional' && (
-                  <p className="text-xs text-emerald-600 font-medium mb-2">≈ €{PRICE_PER_WORKER}/worker/mo — 2 months free</p>
+                {billingCycle === 'yearly' && plan.name === 'Basic' && (
+                  <p className="text-xs text-emerald-600 font-medium mb-2">≈ €{PRICE_PER_WORKER}/employee/mo — 2 months free</p>
+                )}
+                {billingCycle === 'yearly' && plan.name === 'Pro' && (
+                  <p className="text-xs text-emerald-600 font-medium mb-2">≈ €{Math.round(PRO_PRICE_MONTHLY * 10 / 12)}/mo billed yearly — 2 months free</p>
                 )}
                 <p className="text-slate-600 mb-8">{plan.desc}</p>
                 <ul className="space-y-3 mb-8">
@@ -785,15 +788,9 @@ export default function HomePage() {
                     </li>
                   ))}
                 </ul>
-                {plan.name === 'Enterprise' ? (
-                  <button onClick={() => setShowSalesModal(true)} className="block w-full text-center py-4 rounded-xl text-sm font-semibold transition-all bg-purple-100 text-purple-700 hover:bg-purple-200">
-                    {plan.cta}
-                  </button>
-                ) : (
-                  <Link href={plan.href} className={`block w-full text-center py-4 rounded-xl text-sm font-semibold transition-all ${plan.popular ? 'bg-gradient-to-b from-brand-500 to-brand-600 text-white hover:from-brand-600 hover:to-brand-700 shadow-lg shadow-brand-500/30' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                    {plan.cta}
-                  </Link>
-                )}
+                <Link href={plan.href} className={`block w-full text-center py-4 rounded-xl text-sm font-semibold transition-all ${plan.popular ? 'bg-gradient-to-b from-brand-500 to-brand-600 text-white hover:from-brand-600 hover:to-brand-700 shadow-lg shadow-brand-500/30' : plan.name === 'Pro' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                  {plan.cta}
+                </Link>
               </div>
               );
             })}
@@ -810,7 +807,7 @@ export default function HomePage() {
                   <h3 className="text-lg sm:text-xl font-display font-bold text-slate-900">Inventory module</h3>
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">Add-on</span>
                 </div>
-                <p className="text-sm text-slate-600 mt-1">Stock + Recipes: barcode scanning, low-stock alerts, recipe costing with automatic stock deduction. <span className="text-slate-500">Free on Enterprise.</span></p>
+                <p className="text-sm text-slate-600 mt-1">Stock + Recipes: barcode scanning, low-stock alerts, recipe costing with automatic stock deduction. <span className="text-slate-500">Free on Pro.</span></p>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-slate-500">
                   <span className="flex items-center gap-1.5"><ScanLine className="w-3.5 h-3.5 text-brand-500" /> Barcode scanning</span>
                   <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-brand-500" /> Low-stock alerts</span>
@@ -819,7 +816,7 @@ export default function HomePage() {
               </div>
               <div className="text-center sm:text-right flex-shrink-0">
                 <p className="text-3xl font-display font-bold text-slate-900">€{STOCK_ADDON_MONTHLY}<span className="text-sm font-normal text-slate-500">/mo</span></p>
-                <p className="text-xs text-slate-500">or €{STOCK_ADDON_MONTHLY * 10}/yr</p>
+                <p className="text-xs text-slate-500">or €{(STOCK_ADDON_MONTHLY * 10).toFixed(2)}/yr</p>
               </div>
             </div>
           </div>
@@ -848,8 +845,8 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="flex-shrink-0 text-center bg-white/5 border border-white/10 rounded-2xl p-6 min-w-[220px]">
-                <p className="text-white/50 text-xs uppercase tracking-wider">One-time</p>
-                <p className="text-4xl font-display font-bold text-white mt-1">€{INVENTORY_SETUP_FEE}</p>
+                <p className="text-white/50 text-xs uppercase tracking-wider">One-time · from</p>
+                <p className="text-4xl font-display font-bold text-white mt-1">€{INVENTORY_SETUP_FROM}</p>
                 <button onClick={() => setShowSetupModal(true)} className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-white text-slate-900 font-semibold px-5 py-3 rounded-xl hover:bg-brand-50 transition-all">
                   Request setup <ArrowRight className="w-4 h-4" />
                 </button>
@@ -925,7 +922,7 @@ export default function HomePage() {
       {/* Inventory Setup Service Modal */}
       <Modal open={showSetupModal} onClose={() => setShowSetupModal(false)} title="Request Inventory Setup">
         <div className="p-2">
-          <p className="text-sm text-surface-500 mb-4">Tell us about your business and we’ll scope your done-for-you inventory setup (€{INVENTORY_SETUP_FEE} one-time). We’ll reply within 24 hours.</p>
+          <p className="text-sm text-surface-500 mb-4">Tell us about your business and we’ll scope your done-for-you inventory setup (from €{INVENTORY_SETUP_FROM}). We’ll reply within 24 hours.</p>
           <SetupServiceForm onClose={() => setShowSetupModal(false)} />
         </div>
       </Modal>

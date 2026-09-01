@@ -36,10 +36,14 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
   const freeLimit = organization?.freeWorkerLimit || FREE_WORKER_LIMIT;
   const opts = { inventoryAddon };
   const cost = calculateCost(workerCount, shopCount, cycle, freeLimit, opts);
-  const quantity = getSubscriptionQuantity(workerCount, shopCount, freeLimit, opts);
-  // A free-tier org buying only the add-on is billed on the Standard €0.01/unit plan.
+  const quantity = getSubscriptionQuantity(workerCount, shopCount, freeLimit, opts, cycle);
+  // Every paid tier (Basic and Pro) bills on the €0.01/unit metered plan, so the
+  // subscription quantity carries the exact price. Fixed-price plans are only used
+  // as a fallback when there is no metered quantity.
+  const useMetered = quantity != null;
   const effectiveTier = (tier === 'free' && inventoryAddon) ? 'standard' : tier;
-  const planId = PLAN_IDS[effectiveTier]?.[cycle];
+  const planKey = useMetered ? 'standard' : effectiveTier;
+  const planId = PLAN_IDS[planKey]?.[cycle];
   const isMonthly = cycle === CYCLES.MONTHLY;
   const monthlyAlt = calculateCost(workerCount, shopCount, 'monthly', freeLimit, opts);
   const yearlyAlt = calculateCost(workerCount, shopCount, 'yearly', freeLimit, opts);
@@ -59,7 +63,7 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
         <CheckCircle className="w-6 h-6 text-emerald-600 flex-shrink-0" />
         <div>
           <p className="text-sm font-semibold text-emerald-800">Free plan — no payment needed!</p>
-          <p className="text-xs text-emerald-600 mt-0.5">Add more workers to unlock Standard features.</p>
+          <p className="text-xs text-emerald-600 mt-0.5">Add more employees to unlock the Basic plan.</p>
         </div>
       </div>
     );
@@ -131,8 +135,26 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
       <div className="p-4 bg-surface-50 border border-surface-200 rounded-xl space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-surface-500">Plan</span>
-          <span className="font-semibold capitalize text-surface-800">{cost.tier}</span>
+          <span className="font-semibold text-surface-800">{cost.tierInfo.name}</span>
         </div>
+        {cost.tier === 'enterprise' && (
+          <>
+            <div className="flex justify-between">
+              <span className="text-surface-500">Pro plan — up to 50 employees{!isMonthly ? ' × 10' : ''}</span>
+              <span className="text-surface-700">{formatCurrency(isMonthly ? cost.proBase : cost.proBase * 10)}</span>
+            </div>
+            {cost.extraWorkers > 0 && (
+              <div className="flex justify-between">
+                <span className="text-surface-500">{cost.extraWorkers} extra employee{cost.extraWorkers > 1 ? 's' : ''} × €4/mo{!isMonthly ? ' × 10' : ''}</span>
+                <span className="text-surface-700">{formatCurrency(cost.workerCost)}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-surface-500">Stock, Checklists &amp; Knowledge Base</span>
+              <span className="text-emerald-600 font-medium">Included</span>
+            </div>
+          </>
+        )}
         {cost.tier === 'standard' && (
           <>
             <div className="flex justify-between">
@@ -206,8 +228,8 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
           style={{ layout: 'vertical', color: 'blue', shape: 'rect', label: 'subscribe', height: 48 }}
           createSubscription={(data, actions) => {
             const createOpts = { plan_id: planId };
-            // Metered plans (Standard, or Free+add-on): quantity = total cost in cents (€0.01/unit)
-            if (effectiveTier === 'standard' && quantity) {
+            // Metered plan: quantity = total cost for the cycle in cents (€0.01/unit)
+            if (useMetered && quantity) {
               createOpts.quantity = String(quantity);
             }
             return actions.subscription.create(createOpts);

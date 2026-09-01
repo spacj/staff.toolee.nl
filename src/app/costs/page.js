@@ -5,16 +5,18 @@ import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import MonthCarousel from '@/components/MonthCarousel';
 import PayPalCheckout from '@/components/PayPalCheckout';
+import ServiceCheckout from '@/components/ServiceCheckout';
 import PageIntro from '@/components/help/PageIntro';
 import HelpTip from '@/components/help/HelpTip';
 import { useAuth } from '@/contexts/AuthContext';
-import { getWorkers, getShops, getShifts, getPayments, getOrganization, getPublicHolidays, getOvertimeRules } from '@/lib/firestore';
-import { calculateCost, formatCurrency, getTierInfo, FREE_WORKER_LIMIT, STOCK_ADDON_MONTHLY, hasInventoryAccess } from '@/lib/pricing';
+import { getWorkers, getShops, getShifts, getPayments, getOrganization, getPublicHolidays, getOvertimeRules, createSupportTicket } from '@/lib/firestore';
+import { calculateCost, formatCurrency, getTierInfo, FREE_WORKER_LIMIT, STOCK_ADDON_MONTHLY, STAFF_SETUP_FEE, INVENTORY_SETUP_FROM, KB_SETUP_FROM, hasInventoryAccess } from '@/lib/pricing';
 import { calculateWorkerCostWithOvertime } from '@/lib/scheduling';
 import { cn } from '@/utils/helpers';
 import {
   CreditCard, TrendingUp, Users, Store, CheckCircle, AlertTriangle,
-  XCircle, Loader2, Clock, Euro, ChevronDown, ChevronUp, CalendarDays, Package
+  XCircle, Loader2, Clock, Euro, ChevronDown, ChevronUp, CalendarDays, Package,
+  Wrench, BookOpen, ArrowRight, MessageSquare
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -86,6 +88,8 @@ function CostsContent() {
   // UI state
   const [showSubscribe, setShowSubscribe] = useState(false);
   const [expandedWorker, setExpandedWorker] = useState(null);
+  const [buyService, setBuyService] = useState(null);     // fixed-price → instant checkout
+  const [requestService, setRequestService] = useState(null); // variable → open a ticket
 
   // Month carousel state
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -164,7 +168,7 @@ function CostsContent() {
   );
 
   const sub = orgData || organization || {};
-  const inventoryIncluded = getTierInfo(cost.tier).name === 'Enterprise';
+  const inventoryIncluded = cost.tier === 'enterprise'; // Pro bundles Inventory free
   const hasActiveSubscription = sub.subscriptionStatus === 'active';
   const hasSuspendedSubscription = sub.subscriptionStatus === 'suspended';
   const hasCancelledSubscription = sub.subscriptionStatus === 'cancelled';
@@ -254,7 +258,7 @@ function CostsContent() {
                   <p className="text-xs text-surface-500 mt-0.5">Track stock with barcodes, low-stock alerts, recipe costing and auto stock deduction.</p>
                   <p className="text-xs mt-1.5">
                     {inventoryIncluded
-                      ? <span className="inline-flex items-center gap-1 text-emerald-600 font-medium"><CheckCircle className="w-3.5 h-3.5" /> Included free on Enterprise</span>
+                      ? <span className="inline-flex items-center gap-1 text-emerald-600 font-medium"><CheckCircle className="w-3.5 h-3.5" /> Included free on Pro</span>
                       : <span className="font-semibold text-surface-800">{formatCurrency(STOCK_ADDON_MONTHLY)}/mo <span className="text-surface-400 font-normal">· or {formatCurrency(STOCK_ADDON_MONTHLY * 10)}/yr (2 months free)</span></span>}
                   </p>
                 </div>
@@ -274,6 +278,48 @@ function CostsContent() {
             {!inventoryIncluded && addonWanted && !hasInventoryAccess(sub) && (
               <p className="text-[11px] text-brand-700 mt-3 pt-3 border-t border-brand-100">Added to your plan below — subscribe to activate. Want it set up for you? Ask about our one-time setup service.</p>
             )}
+          </div>
+        )}
+
+        {/* ── Services & one-time help ── */}
+        {isAdmin && (
+          <div className="card p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="section-title">Services &amp; one-time help</h3>
+              <HelpTip tip="services" />
+            </div>
+            <p className="text-xs text-surface-500 mb-3">Fixed-price help you can buy right away. Bigger jobs are quoted to your business first.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <ServiceCard
+                icon={Users}
+                title="Staff setup"
+                desc="We add your team, shops and first schedule for you."
+                priceLabel={`${formatCurrency(STAFF_SETUP_FEE)}`}
+                priceSub="one-time · fixed"
+                cta="Buy now"
+                onClick={() => setBuyService({ key: 'staff_setup', label: 'Staff setup service', amount: STAFF_SETUP_FEE, description: 'We add your team, shops and build your first schedule with you.' })}
+              />
+              <ServiceCard
+                icon={Wrench}
+                title="Inventory setup"
+                desc="Import products, barcodes, par levels & recipe costs."
+                priceLabel={`from ${formatCurrency(INVENTORY_SETUP_FROM)}`}
+                priceSub="quoted to your business"
+                cta="Request a quote"
+                variant="request"
+                onClick={() => setRequestService({ key: 'inventory_setup', label: 'Inventory setup service', from: INVENTORY_SETUP_FROM })}
+              />
+              <ServiceCard
+                icon={BookOpen}
+                title="Knowledge base"
+                desc="We build your guides, SOPs & training articles."
+                priceLabel={`from ${formatCurrency(KB_SETUP_FROM)}`}
+                priceSub="quoted to your business"
+                cta="Request a quote"
+                variant="request"
+                onClick={() => setRequestService({ key: 'knowledge_base_setup', label: 'Knowledge base build', from: KB_SETUP_FROM })}
+              />
+            </div>
           </div>
         )}
 
@@ -515,6 +561,31 @@ function CostsContent() {
             />
           </Modal>
         )}
+
+        {/* ── Buy fixed-price service Modal ── */}
+        {isAdmin && (
+          <Modal open={!!buyService} onClose={() => setBuyService(null)} title={buyService?.label || 'Buy service'}>
+            {buyService && (
+              <ServiceCheckout service={buyService} onSuccess={() => { setBuyService(null); loadBase(); }} />
+            )}
+          </Modal>
+        )}
+
+        {/* ── Request variable service Modal ── */}
+        {isAdmin && (
+          <Modal open={!!requestService} onClose={() => setRequestService(null)} title={requestService?.label || 'Request a quote'}>
+            {requestService && (
+              <ServiceRequestForm
+                service={requestService}
+                orgId={orgId}
+                orgName={(orgData || organization)?.name || ''}
+                senderName={user?.displayName || ''}
+                senderEmail={user?.email || ''}
+                onDone={() => setRequestService(null)}
+              />
+            )}
+          </Modal>
+        )}
       </div>
     </Layout>
   );
@@ -535,6 +606,94 @@ function StatCard({ label, value, sub, icon: Icon, estimated }) {
         {sub}
       </p>
     </div>
+  );
+}
+
+function ServiceCard({ icon: Icon, title, desc, priceLabel, priceSub, cta, onClick, variant }) {
+  return (
+    <div className="rounded-xl border border-surface-200 p-4 flex flex-col">
+      <div className="flex items-center gap-2.5 mb-2">
+        <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0',
+          variant === 'request' ? 'bg-surface-100 text-surface-600' : 'bg-brand-100 text-brand-600')}>
+          <Icon className="w-4 h-4" />
+        </div>
+        <p className="text-sm font-semibold text-surface-900">{title}</p>
+      </div>
+      <p className="text-xs text-surface-500 flex-1">{desc}</p>
+      <div className="mt-3">
+        <p className="text-lg font-display font-bold text-surface-900">{priceLabel}</p>
+        <p className="text-[11px] text-surface-400">{priceSub}</p>
+      </div>
+      <button onClick={onClick} className={cn('mt-3 w-full text-sm', variant === 'request' ? 'btn-secondary' : 'btn-primary')}>
+        {variant === 'request' ? <MessageSquare className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />} {cta}
+      </button>
+    </div>
+  );
+}
+
+function ServiceRequestForm({ service, orgId, orgName, senderName, senderEmail, onDone }) {
+  const [message, setMessage] = useState('');
+  const [phone, setPhone] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await createSupportTicket({
+        subject: `[${service.label}] ${orgName || 'Org'} — quote request`,
+        message: `Service: ${service.label} (from ${formatCurrency(service.from)})\nOrg: ${orgName || orgId}\nPhone: ${phone || '—'}\n\nWhat they need:\n${message || '(no details provided)'}`,
+        category: service.key,
+        priority: 'high',
+        source: 'app',
+        orgId: orgId || null,
+        orgName: orgName || '',
+        senderName: senderName || '',
+        senderEmail: senderEmail || '',
+        senderRole: 'customer',
+      });
+      setDone(true);
+      toast.success('Request sent — we\'ll be in touch within 24 hours.');
+    } catch (err) {
+      toast.error('Could not send the request. Please try again.');
+    }
+    setSaving(false);
+  };
+
+  if (done) {
+    return (
+      <div className="text-center py-6">
+        <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+          <CheckCircle className="w-7 h-7 text-emerald-600" />
+        </div>
+        <h3 className="text-base font-display font-bold text-surface-900">Request received</h3>
+        <p className="text-sm text-surface-500 mt-1.5">We&apos;ll scope your {service.label.toLowerCase()} and reply within 24 hours.</p>
+        <button onClick={onDone} className="btn-primary !py-2 !px-6 mt-4">Close</button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <div className="p-3 bg-surface-50 border border-surface-200 rounded-xl text-sm">
+        <p className="font-semibold text-surface-800">{service.label}</p>
+        <p className="text-xs text-surface-500 mt-0.5">Priced from {formatCurrency(service.from)} — we&apos;ll confirm an exact quote for your business first. No charge to ask.</p>
+      </div>
+      <div>
+        <label className="label">Tell us what you need</label>
+        <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4} className="input-field resize-none"
+          placeholder="e.g. Café with ~120 products across 2 shops, need barcodes and recipe costs set up." />
+      </div>
+      <div>
+        <label className="label">Phone (optional)</label>
+        <input value={phone} onChange={e => setPhone(e.target.value)} className="input-field" placeholder="+31 6 12345678" />
+      </div>
+      <div className="flex justify-end gap-3 pt-1">
+        <button type="button" onClick={onDone} className="btn-secondary">Cancel</button>
+        <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Sending…' : 'Send request'} <ArrowRight className="w-4 h-4" /></button>
+      </div>
+    </form>
   );
 }
 
