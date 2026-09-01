@@ -6,13 +6,26 @@ import PageIntro from '@/components/help/PageIntro';
 import ScheduleTabs from '@/components/ScheduleTabs';
 import HelpTip from '@/components/help/HelpTip';
 import { useAuth } from '@/contexts/AuthContext';
-import { getShifts, getWorkers, getShops, getShiftTemplates, getPermits, bulkCreateShifts, deleteShift, createShift, getPublicHolidays, savePublicHolidays, getOpenShifts, createOpenShift, claimOpenShift, deleteOpenShift, getShiftSwaps, createShiftSwap, reviewShiftSwap, notifyManagers, notifyWorker } from '@/lib/firestore';
+import { getShifts, getWorkers, getShops, getShiftTemplates, getPermits, bulkCreateShifts, deleteShift, createShift, getPublicHolidays, savePublicHolidays, getOpenShifts, createOpenShift, claimOpenShift, deleteOpenShift, getShiftSwaps, createShiftSwap, reviewShiftSwap, notifyManagers, notifyWorker, getStaffAvailability } from '@/lib/firestore';
 import { generateWeeklySchedule, DAY_LABELS } from '@/lib/scheduling';
 import { cn } from '@/utils/helpers';
-import { ChevronLeft, ChevronRight, Plus, Wand2, Trash2, Calendar as CalIcon, Users, Clock, Grid3X3, List, LayoutGrid, AlertTriangle, CheckCircle, X, Download, FileText, FileSpreadsheet, ArrowLeftRight, Hand, XCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Wand2, Trash2, Calendar as CalIcon, Users, Clock, Grid3X3, List, LayoutGrid, AlertTriangle, CheckCircle, X, Download, FileText, FileSpreadsheet, ArrowLeftRight, Hand, XCircle, Store } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const VIEWS = { MONTH: 'month', WEEK: 'week', LIST: 'list' };
+
+// Colour palette assigned per staff role for the schedule views.
+const ROLE_COLORS = [
+  { chip: 'bg-brand-100 text-brand-700', dot: 'bg-brand-500', bar: 'border-l-brand-400', soft: 'bg-brand-50' },
+  { chip: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500', bar: 'border-l-emerald-400', soft: 'bg-emerald-50' },
+  { chip: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500', bar: 'border-l-purple-400', soft: 'bg-purple-50' },
+  { chip: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500', bar: 'border-l-amber-400', soft: 'bg-amber-50' },
+  { chip: 'bg-rose-100 text-rose-700', dot: 'bg-rose-500', bar: 'border-l-rose-400', soft: 'bg-rose-50' },
+  { chip: 'bg-cyan-100 text-cyan-700', dot: 'bg-cyan-500', bar: 'border-l-cyan-400', soft: 'bg-cyan-50' },
+  { chip: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-500', bar: 'border-l-indigo-400', soft: 'bg-indigo-50' },
+  { chip: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500', bar: 'border-l-orange-400', soft: 'bg-orange-50' },
+];
+const roleOfWorker = (w) => (w?.customRole || w?.position || 'Staff');
 
 export default function CalendarPage() {
   const { orgId, isManager, userProfile } = useAuth();
@@ -38,6 +51,8 @@ export default function CalendarPage() {
   const [openShiftForm, setOpenShiftForm] = useState({ shopId: '', date: '', startTime: '09:00', endTime: '17:00', templateName: '', notes: '' });
   const [showSwapModal, setShowSwapModal] = useState(null); // shift to swap
   const [swapTargetWorker, setSwapTargetWorker] = useState('');
+  const [availability, setAvailability] = useState([]);
+  const [selectedShop, setSelectedShop] = useState('all'); // fixed shop toggle
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -64,7 +79,15 @@ export default function CalendarPage() {
     getPublicHolidays(orgId).then(setPublicHolidays);
     getOpenShifts({ orgId, status: 'open' }).then(setOpenShifts);
     getShiftSwaps({ orgId }).then(setSwapRequests);
+    getStaffAvailability({ orgId, startDate: loadRange.start, endDate: loadRange.end }).then(setAvailability).catch(() => setAvailability([]));
   }, [orgId, loadRange.start, loadRange.end]);
+
+  // Remember the selected shop across visits.
+  useEffect(() => {
+    if (!orgId) return;
+    try { const s = localStorage.getItem(`calShop:${orgId}`); if (s) setSelectedShop(s); } catch {}
+  }, [orgId]);
+  const chooseShop = (id) => { setSelectedShop(id); try { localStorage.setItem(`calShop:${orgId}`, id); } catch {} };
 
   const reload = async () => {
     const s = await getShifts({ orgId, startDate: loadRange.start, endDate: loadRange.end });
@@ -132,8 +155,23 @@ export default function CalendarPage() {
   const shopName = (id) => shops.find(s => s.id === id)?.name || '';
   const todayStr = new Date().toISOString().split('T')[0];
   const getDateStr = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  const shiftsForDate = (ds) => shifts.filter(s => s.date === ds);
+
+  // Shop filter (fixed toggle) applied to everything shown.
+  const visibleShifts = useMemo(() => selectedShop === 'all' ? shifts : shifts.filter(s => s.shopId === selectedShop), [shifts, selectedShop]);
+  const visibleOpenShifts = useMemo(() => selectedShop === 'all' ? openShifts : openShifts.filter(o => o.shopId === selectedShop), [openShifts, selectedShop]);
+  const byTime = (a, b) => (a.startTime || '').localeCompare(b.startTime || '');
+  const shiftsForDate = (ds) => visibleShifts.filter(s => s.date === ds).sort(byTime);
   const permitsForDate = (ds) => permits.filter(p => ds >= p.startDate && ds <= (p.endDate || p.startDate));
+  const availForDate = (ds) => availability.filter(a => a.date === ds);
+
+  // Role → colour map (stable, from active staff) for the schedule views.
+  const roleColorMap = useMemo(() => {
+    const roles = [...new Set(activeWorkers.map(roleOfWorker))].sort();
+    const m = {}; roles.forEach((r, i) => { m[r] = ROLE_COLORS[i % ROLE_COLORS.length]; });
+    return m;
+  }, [activeWorkers]);
+  const shiftRoleOf = (s) => roleOfWorker(workers.find(w => w.id === s.workerId));
+  const shiftColorOf = (s) => roleColorMap[shiftRoleOf(s)] || ROLE_COLORS[0];
 
   // Get Monday of current week
   const getWeekMonday = (dateStr) => {
@@ -183,7 +221,12 @@ export default function CalendarPage() {
     });
   }, [currentDate]);
 
-  const listDates = useMemo(() => [...new Set(shifts.map(s => s.date))].sort(), [shifts]);
+  const listDates = useMemo(() => [...new Set(visibleShifts.map(s => s.date))].sort(), [visibleShifts]);
+  // Availability for the date being scheduled in the Add Shift modal.
+  const dateAvail = useMemo(() => {
+    const m = {}; availability.filter(a => a.date === shiftForm.date).forEach(a => { m[a.workerId] = a.shiftType; });
+    return m;
+  }, [availability, shiftForm.date]);
 
   // ─── Auto-Schedule ──────────────────
   const openAutoSchedule = () => {
@@ -248,7 +291,7 @@ export default function CalendarPage() {
 
   // ─── Manual Shift ───────────────────
   const openAddShift = (date) => {
-    setShiftForm(f => ({ ...f, date: date || todayStr, workerId: '', shopId: shops[0]?.id || '' }));
+    setShiftForm(f => ({ ...f, date: date || todayStr, workerId: '', shopId: (selectedShop !== 'all' ? selectedShop : shops[0]?.id) || '' }));
     setShowAddShift(true);
   };
 
@@ -318,15 +361,25 @@ export default function CalendarPage() {
   };
 
   // ─── Shift Card ─────────────────────
-  const ShiftCard = ({ s, compact }) => (
-    <div className={cn('flex items-center justify-between rounded-xl', compact ? 'p-1.5 sm:p-2 bg-brand-50' : 'p-3 bg-surface-50')}>
+  const ShiftCard = ({ s, compact }) => {
+    const c = shiftColorOf(s);
+    const role = shiftRoleOf(s);
+    return (
+    <div className={cn('flex items-center justify-between rounded-lg border-l-4', c.bar, c.soft, compact ? 'p-1.5 sm:p-2' : 'p-3')}>
       <div className="min-w-0">
         <p className={cn('font-medium text-surface-800 truncate', compact ? 'text-[10px] sm:text-xs' : 'text-sm')}>{s.workerName || 'Unassigned'}</p>
-        <p className={cn('text-surface-500 truncate', compact ? 'text-[9px] sm:text-[10px]' : 'text-xs')}>
+        <p className={cn('text-surface-500 truncate tabular-nums', compact ? 'text-[9px] sm:text-[10px]' : 'text-xs')}>
           {s.startTime}–{s.endTime}
-          {!compact && ` (${s.hours || '—'}h)`}
-          {!compact && shopName(s.shopId) && ` · ${shopName(s.shopId)}`}
+          {!compact && ` · ${s.hours || '—'}h`}
         </p>
+        {compact ? (
+          <span className={cn('inline-block mt-0.5 text-[8px] px-1 py-0 rounded font-medium truncate max-w-full', c.chip)}>{role}</span>
+        ) : (
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className={cn('badge !text-[9px] !px-1.5 !py-0', c.chip)}>{role}</span>
+            {shopName(s.shopId) && <span className="text-[10px] text-surface-400 truncate">{shopName(s.shopId)}</span>}
+          </div>
+        )}
       </div>
       {!compact && (
         <div className="flex gap-1 flex-shrink-0">
@@ -339,7 +392,8 @@ export default function CalendarPage() {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   // ─── Day Cell ───────────────────────
   const DayCell = ({ d }) => {
@@ -431,8 +485,8 @@ export default function CalendarPage() {
       <div className="space-y-6">
         <div className="page-header">
           <div>
-            <h1 className="page-title">Calendar</h1>
-            <p className="text-surface-500 mt-1">{shifts.length} shifts in view</p>
+            <h1 className="page-title">Schedule</h1>
+            <p className="text-surface-500 mt-1">{visibleShifts.length} shifts{selectedShop !== 'all' ? ` · ${shopName(selectedShop)}` : ' in view'}</p>
           </div>
           {isManager && (
             <div className="flex gap-2">
@@ -462,6 +516,36 @@ export default function CalendarPage() {
         <ScheduleTabs />
 
         <PageIntro page="calendar" />
+
+        {/* Fixed shop toggle — switch between locations */}
+        {shops.length > 1 && (
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none -mx-1 px-1">
+            <span className="text-xs font-medium text-surface-400 flex-shrink-0 flex items-center gap-1"><Store className="w-3.5 h-3.5" /> Shop</span>
+            <button onClick={() => chooseShop('all')}
+              className={cn('inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap border transition-all flex-shrink-0',
+                selectedShop === 'all' ? 'bg-surface-900 text-white border-surface-900' : 'bg-white border-surface-200 text-surface-600 hover:border-surface-300')}>
+              All shops
+            </button>
+            {shops.map(s => (
+              <button key={s.id} onClick={() => chooseShop(s.id)}
+                className={cn('inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap border transition-all flex-shrink-0',
+                  selectedShop === s.id ? 'bg-surface-900 text-white border-surface-900' : 'bg-white border-surface-200 text-surface-600 hover:border-surface-300')}>
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color || '#4c6ef5' }} />
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Role legend */}
+        {Object.keys(roleColorMap).length > 1 && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-xs font-medium text-surface-400">Roles</span>
+            {Object.entries(roleColorMap).map(([role, c]) => (
+              <span key={role} className="flex items-center gap-1.5 text-xs text-surface-600"><span className={cn('w-2.5 h-2.5 rounded-full', c.dot)} /> {role}</span>
+            ))}
+          </div>
+        )}
 
         {/* View toggle + nav */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -538,6 +622,9 @@ export default function CalendarPage() {
                   <div key={ds} className={cn('border-r border-surface-100 min-h-[200px]', isToday ? 'bg-brand-50/30' : '')}>
                     <div className={cn('px-2 py-2 text-center border-b border-surface-100', isToday ? 'bg-brand-100/50' : 'bg-surface-50')}>
                       <p className={cn('text-xs font-semibold', isToday ? 'text-brand-700' : 'text-surface-600')}>{dayLabel}</p>
+                      {availForDate(ds).length > 0 && (
+                        <p className="text-[9px] text-emerald-600 font-medium mt-0.5">{availForDate(ds).length} avail</p>
+                      )}
                     </div>
                     <div className="p-1.5 space-y-1">
                       {dayShifts.map(s => <ShiftCard key={s.id} s={s} compact />)}
@@ -738,10 +825,20 @@ export default function CalendarPage() {
             <div><label className="label">Worker *</label>
               <select value={shiftForm.workerId} onChange={e => setShiftForm(f => ({ ...f, workerId: e.target.value }))} className="select-field" required>
                 <option value="">Select worker...</option>
-                {activeWorkers.filter(w => !shifts.some(s => s.workerId === w.id && s.date === shiftForm.date)).map(w => <option key={w.id} value={w.id}>{w.firstName} {w.lastName} {w.shiftPreference && w.shiftPreference !== 'any' ? `(${w.shiftPreference})` : ''}</option>)}
+                {activeWorkers
+                  .filter(w => !shifts.some(s => s.workerId === w.id && s.date === shiftForm.date))
+                  .sort((a, b) => (dateAvail[b.id] ? 1 : 0) - (dateAvail[a.id] ? 1 : 0) || `${a.firstName}`.localeCompare(b.firstName))
+                  .map(w => {
+                    const av = dateAvail[w.id];
+                    const label = av
+                      ? `✓ ${w.firstName} ${w.lastName} — available${av !== 'full' ? ` (${av})` : ''}`
+                      : `${w.firstName} ${w.lastName}${w.shiftPreference && w.shiftPreference !== 'any' ? ` (prefers ${w.shiftPreference})` : ''}`;
+                    return <option key={w.id} value={w.id}>{label}</option>;
+                  })}
               </select>
+              <p className="text-xs text-surface-400 mt-1">✓ = submitted availability for this date{availForDate(shiftForm.date).length > 0 ? ` · ${availForDate(shiftForm.date).length} available` : ''}</p>
               {shiftForm.date && activeWorkers.some(w => shifts.some(s => s.workerId === w.id && s.date === shiftForm.date)) && (
-                <p className="text-xs text-amber-600 mt-1">Some workers already have shifts on this date and are hidden</p>
+                <p className="text-xs text-amber-600 mt-0.5">Workers already scheduled this date are hidden</p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -766,15 +863,15 @@ export default function CalendarPage() {
         </Modal>
 
         {/* ─── Open Shifts & Swap Requests Board ─── */}
-        {(openShifts.length > 0 || swapRequests.filter(s => s.status === 'pending').length > 0) && (
+        {(visibleOpenShifts.length > 0 || swapRequests.filter(s => s.status === 'pending').length > 0) && (
           <div className="space-y-4 mt-6">
-            {openShifts.length > 0 && (
+            {visibleOpenShifts.length > 0 && (
               <div className="card">
                 <div className="px-5 py-3 border-b border-surface-100 flex items-center justify-between">
-                  <h3 className="section-title text-sm flex items-center gap-2"><Hand className="w-4 h-4 text-brand-500" /> Open Shifts ({openShifts.length})</h3>
+                  <h3 className="section-title text-sm flex items-center gap-2"><Hand className="w-4 h-4 text-brand-500" /> Open Shifts ({visibleOpenShifts.length})</h3>
                 </div>
                 <div className="divide-y divide-surface-100">
-                  {openShifts.map(os => (
+                  {visibleOpenShifts.map(os => (
                     <div key={os.id} className="px-5 py-3 flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-medium text-surface-800">{os.date} · {os.startTime}–{os.endTime}</p>

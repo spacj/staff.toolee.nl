@@ -40,6 +40,14 @@ export default function OnboardingChecklist({ variant = 'manager', data = {} }) 
   const allDone = doneCount === total;
   const pct = total ? Math.round((doneCount / total) * 100) : 0;
 
+  // Once fully completed, remember it so it never reappears (even if the
+  // derived data later changes, e.g. a shop is removed).
+  useEffect(() => {
+    if (mounted && total > 0 && allDone && !dismissed) {
+      try { localStorage.setItem(storageKey, '1'); } catch {}
+    }
+  }, [mounted, total, allDone, dismissed, storageKey]);
+
   if (!mounted || dismissed || allDone || total === 0) return null;
 
   const dismiss = () => {
