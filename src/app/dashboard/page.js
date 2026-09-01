@@ -9,7 +9,7 @@ import PageIntro from '@/components/help/PageIntro';
 import OnboardingChecklist from '@/components/OnboardingChecklist';
 import { calculateCost, formatCurrency } from '@/lib/pricing';
 import { cn } from '@/utils/helpers';
-import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3, MessageCircle, AlertTriangle, XCircle, Package, TrendingDown } from 'lucide-react';
+import { Users, Store, Calendar, Clock, TrendingUp, AlertCircle, CheckCircle, ArrowRight, Sparkles, BarChart3, MessageCircle, AlertTriangle, XCircle, Package, TrendingDown, CalendarCheck } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
@@ -178,6 +178,11 @@ export default function DashboardPage() {
               <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center"><Calendar className="w-6 h-6 text-emerald-600" /></div>
               <p className="text-sm font-semibold text-surface-800">My Schedule</p>
               <p className="text-xs text-surface-400">View your shifts</p>
+            </Link>
+            <Link href="/availability" className="card-hover p-5 flex flex-col items-center text-center gap-2 relative">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center"><CalendarCheck className="w-6 h-6 text-amber-600" /></div>
+              <p className="text-sm font-semibold text-surface-800">My Availability</p>
+              <p className="text-xs text-surface-400">Set when you can work</p>
             </Link>
             <Link href="/time#corrections" className="card-hover p-5 flex flex-col items-center text-center gap-2 relative">
               {pendingCorrections.length > 0 && <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full" />}

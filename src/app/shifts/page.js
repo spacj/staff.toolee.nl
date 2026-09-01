@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
-import { getShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate, getShops, getWorkers, getOvertimeRules } from '@/lib/firestore';
+import { getShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate, getShops, getWorkers, getOvertimeRules, getJobRoles, addJobRole } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
 import { DAY_LABELS } from '@/lib/scheduling';
-import { ClipboardList, Plus, Pencil, Trash2, Clock, Users, Store, Calendar, X, DollarSign, Moon, Sun, AlertTriangle } from 'lucide-react';
+import { ClipboardList, Plus, Pencil, Trash2, Clock, Users, Store, Calendar, X, DollarSign, Moon, Sun, AlertTriangle, UserCheck, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const SHIFT_TYPES = ['morning', 'afternoon', 'evening', 'night', 'split', 'custom'];
@@ -33,10 +33,13 @@ export default function ShiftTemplatesPage() {
     usePerDayRequirements: false,
     requiredByDay: {}, // { "1": 2, "6": 3 } — day-specific overrides
     rules: [], // extra rules: [{ type: 'incompatible_workers', workers: ['id1', 'id2'] }]
+    requiredRole: '', // company job role required (empty = any)
+    fixedWorkerId: '', // pinned employee (empty = auto-assign)
   });
   const [workers, setWorkers] = useState([]);
   const [saving, setSaving] = useState(false);
   const [orgOvertimeDefaults, setOrgOvertimeDefaults] = useState(DEFAULT_OT);
+  const [jobRoles, setJobRoles] = useState([]);
 
   const load = () => {
     if (!orgId) return;
@@ -44,6 +47,18 @@ export default function ShiftTemplatesPage() {
     getShops(orgId).then(setShops);
     getWorkers({ orgId }).then(setWorkers);
     getOvertimeRules(orgId).then(r => setOrgOvertimeDefaults(r || DEFAULT_OT));
+    getJobRoles(orgId).then(setJobRoles).catch(() => setJobRoles([]));
+  };
+
+  const activeWorkers = workers.filter(w => w.status === 'active');
+  const handleAddRole = async () => {
+    const name = prompt('New company role (e.g. Cook, Waiter, Bartender):');
+    if (!name || !name.trim()) return;
+    try {
+      const next = await addJobRole(orgId, name.trim());
+      setJobRoles(next);
+      setForm(f => ({ ...f, requiredRole: name.trim() }));
+    } catch { toast.error('Failed to add role'); }
   };
   useEffect(() => { load(); }, [orgId]);
 
@@ -53,6 +68,7 @@ export default function ShiftTemplatesPage() {
       name: '', shopId: shops[0]?.id || '', type: 'morning', startTime: '06:00', endTime: '14:00',
       requiredWorkers: 1, breakMinutes: 30, notes: '', daysOfWeek: [],
       usePerDayRequirements: false, requiredByDay: {}, rules: [],
+      requiredRole: '', fixedWorkerId: '',
       useOvertimeOverride: false,
       overtime: { ...orgOvertimeDefaults, enabled: orgOvertimeDefaults.enabled },
     });
@@ -72,6 +88,7 @@ export default function ShiftTemplatesPage() {
       usePerDayRequirements: hasPerDay,
       requiredByDay: t.requiredByDay || {},
       rules: (t.rules || []).map(migrateRule),
+      requiredRole: t.requiredRole || '', fixedWorkerId: t.fixedWorkerId || '',
       useOvertimeOverride: hasOtOverride,
       overtime: hasOtOverride ? t.overtimeOverride : { ...orgOvertimeDefaults },
     });
@@ -205,6 +222,8 @@ export default function ShiftTemplatesPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-semibold text-surface-800 text-sm sm:text-base">{t.name}</h4>
                         <span className={cn('badge text-[10px] capitalize', TYPE_COLORS[t.type] || TYPE_COLORS.custom)}>{t.type}</span>
+                        {t.requiredRole && <span className="badge text-[10px] bg-brand-100 text-brand-700 inline-flex items-center gap-1"><Tag className="w-2.5 h-2.5" />{t.requiredRole}</span>}
+                        {t.fixedWorkerId && (() => { const fw = workers.find(w => w.id === t.fixedWorkerId); return fw ? <span className="badge text-[10px] bg-purple-100 text-purple-700 inline-flex items-center gap-1"><UserCheck className="w-2.5 h-2.5" />Always {fw.firstName}</span> : null; })()}
                       </div>
                       <div className="flex items-center gap-2 sm:gap-4 mt-1 text-xs text-surface-500 flex-wrap">
                         <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {t.startTime}–{t.endTime} ({calcHours(t.startTime, t.endTime)}h)</span>
@@ -270,6 +289,29 @@ export default function ShiftTemplatesPage() {
                 <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className="select-field">
                   {SHIFT_TYPES.map(t => <option key={t} value={t} className="capitalize">{t}</option>)}
                 </select>
+              </div>
+            </div>
+
+            {/* Company role + fixed employee */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label flex items-center gap-1.5"><Tag className="w-3.5 h-3.5" /> Required Role</label>
+                <div className="flex gap-2">
+                  <select value={form.requiredRole} onChange={e => setForm(f => ({ ...f, requiredRole: e.target.value }))} className="select-field flex-1">
+                    <option value="">Any role</option>
+                    {jobRoles.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  <button type="button" onClick={handleAddRole} className="btn-secondary px-3 flex-shrink-0" title="Add a company role"><Plus className="w-4 h-4" /></button>
+                </div>
+                <p className="text-[10px] text-surface-400 mt-1">Auto-schedule only fills this with staff who have this role.</p>
+              </div>
+              <div>
+                <label className="label flex items-center gap-1.5"><UserCheck className="w-3.5 h-3.5" /> Fixed Employee</label>
+                <select value={form.fixedWorkerId} onChange={e => setForm(f => ({ ...f, fixedWorkerId: e.target.value }))} className="select-field">
+                  <option value="">Auto-assign anyone</option>
+                  {activeWorkers.map(w => <option key={w.id} value={w.id}>{w.firstName} {w.lastName}{w.jobRole ? ` · ${w.jobRole}` : ''}</option>)}
+                </select>
+                <p className="text-[10px] text-surface-400 mt-1">Always assign this person to this shift.</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">

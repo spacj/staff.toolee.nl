@@ -25,7 +25,7 @@ const ROLE_COLORS = [
   { chip: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-500', bar: 'border-l-indigo-400', soft: 'bg-indigo-50' },
   { chip: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500', bar: 'border-l-orange-400', soft: 'bg-orange-50' },
 ];
-const roleOfWorker = (w) => (w?.customRole || w?.position || 'Staff');
+const roleOfWorker = (w) => (w?.jobRole || w?.customRole || w?.position || 'Staff');
 
 export default function CalendarPage() {
   const { orgId, isManager, userProfile } = useAuth();

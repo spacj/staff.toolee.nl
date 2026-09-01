@@ -1035,6 +1035,29 @@ export async function addStockCategory(orgId, category) {
   }
 }
 
+// ─── Company job roles (Cook, Waiter, …) — org-managed list ───
+export async function getJobRoles(orgId) {
+  const org = await get1(C.ORGANIZATIONS, orgId);
+  return org?.jobRoles || [];
+}
+
+export async function addJobRole(orgId, role) {
+  const r = (role || '').trim();
+  if (!r) return [];
+  const org = await get1(C.ORGANIZATIONS, orgId);
+  const current = org?.jobRoles || [];
+  if (current.includes(r)) return current;
+  const next = [...current, r];
+  await upd(C.ORGANIZATIONS, orgId, { jobRoles: next });
+  return next;
+}
+
+export async function saveJobRoles(orgId, roles) {
+  const clean = [...new Set((roles || []).map(r => (r || '').trim()).filter(Boolean))];
+  await upd(C.ORGANIZATIONS, orgId, { jobRoles: clean });
+  return clean;
+}
+
 export async function getStockItems(filters = {}) {
   const c = [];
   if (filters.orgId) c.push(where('orgId', '==', filters.orgId));

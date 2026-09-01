@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
-import { updateUserProfile, getReferrals, getOrganization, getPublicHolidays, savePublicHolidays, getInvites, getAvailabilitySettings, saveAvailabilitySettings } from '@/lib/firestore';
+import { updateUserProfile, getReferrals, getOrganization, getPublicHolidays, savePublicHolidays, getInvites, getAvailabilitySettings, saveAvailabilitySettings, getJobRoles, saveJobRoles } from '@/lib/firestore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { ROLE_LABELS, cn, getInitials, generateAvatarColor } from '@/utils/helpers';
 import toast from 'react-hot-toast';
@@ -12,7 +12,7 @@ import {
   Mail, Phone, Building, MapPin, Globe, Clock,
   ChevronRight, ToggleLeft, ToggleRight, AlertCircle,
   Key, LogOut, Trash2, CheckCircle, Link2, Users, X, QrCode, Download,
-  BellRing, BellOff
+  BellRing, BellOff, Plus
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -49,6 +49,8 @@ export default function SettingsPage() {
   });
 
   const [holidays, setHolidays] = useState([]);
+  const [jobRoles, setJobRoles] = useState([]);
+  const [newRole, setNewRole] = useState('');
   const [orgData, setOrgData] = useState(null);
   const [availabilitySettings, setAvailabilitySettings] = useState({ deadlineDays: 7, enabled: true });
 
@@ -67,6 +69,7 @@ export default function SettingsPage() {
     }
     if (isAdmin && orgId) {
       getPublicHolidays(orgId).then(setHolidays);
+      getJobRoles(orgId).then(setJobRoles).catch(() => setJobRoles([]));
       getOrganization(orgId).then(setOrgData);
       getAvailabilitySettings(orgId).then(setAvailabilitySettings);
     }
@@ -699,6 +702,52 @@ export default function SettingsPage() {
                       className="btn-primary flex items-center gap-2"
                     >
                       <Save className="w-4 h-4" /> {loading ? 'Saving...' : 'Save Holidays'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Company Job Roles */}
+              <div className="card">
+                <div className="px-6 py-5 border-b border-surface-100">
+                  <h2 className="text-lg font-display font-semibold text-surface-900">Company Roles</h2>
+                  <p className="text-sm text-surface-500 mt-0.5">Job roles used to match staff to role-specific shifts (e.g. Cook, Waiter, Bartender). Set a required role on shift templates to keep the right people on the right shifts.</p>
+                </div>
+                <div className="p-4 sm:p-6 space-y-4">
+                  <div className="flex gap-2">
+                    <input
+                      value={newRole}
+                      onChange={e => setNewRole(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const r = newRole.trim(); if (r && !jobRoles.includes(r)) setJobRoles([...jobRoles, r]); setNewRole(''); } }}
+                      placeholder="Add a role, e.g. Cook"
+                      className="input-field flex-1"
+                    />
+                    <button type="button" onClick={() => { const r = newRole.trim(); if (r && !jobRoles.includes(r)) setJobRoles([...jobRoles, r]); setNewRole(''); }} className="btn-secondary flex-shrink-0"><Plus className="w-4 h-4" /> Add</button>
+                  </div>
+                  {jobRoles.length === 0 ? (
+                    <p className="text-sm text-surface-400 text-center py-6">No roles yet. Add your first company role.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {jobRoles.map(r => (
+                        <span key={r} className="inline-flex items-center gap-1.5 bg-surface-100 text-surface-700 rounded-lg pl-3 pr-1.5 py-1.5 text-sm font-medium">
+                          {r}
+                          <button onClick={() => setJobRoles(jobRoles.filter(x => x !== r))} className="w-5 h-5 rounded flex items-center justify-center text-surface-400 hover:bg-surface-200 hover:text-red-600"><X className="w-3 h-3" /></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={async () => {
+                        setLoading(true);
+                        try { const saved = await saveJobRoles(orgId, jobRoles); setJobRoles(saved); toast.success('Company roles updated'); }
+                        catch { toast.error('Failed to save roles'); }
+                        setLoading(false);
+                      }}
+                      disabled={loading}
+                      className="btn-primary flex items-center gap-2"
+                    >
+                      <Save className="w-4 h-4" /> {loading ? 'Saving...' : 'Save Roles'}
                     </button>
                   </div>
                 </div>

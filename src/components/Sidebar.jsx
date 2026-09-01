@@ -57,6 +57,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/chat', icon: MessageCircle, label: 'Chat' },
     { href: '/time', icon: Clock, label: 'My Time' },
     { href: '/calendar', icon: Calendar, label: 'My Schedule' },
+    { href: '/availability', icon: CalendarCheck, label: 'My Availability' },
     { href: '/my-checklists', icon: ClipboardCheck, label: 'My Checklists' },
     { href: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
     { href: '/stock', icon: Package, label: 'Stock' },

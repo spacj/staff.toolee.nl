@@ -255,6 +255,40 @@ export function generateWeeklySchedule({ workers, templates, weekStart, leaves =
     // Also mark workers who have existing shifts on this day (from ANY template)
     existingShifts.filter(s => s.date === dateStr).forEach(s => workersAssignedToday.add(s.workerId));
 
+    // ── Fixed-employee pre-assignment ──
+    // Templates can pin a specific worker who is always assigned (bypasses role
+    // gate and scoring). If that worker is unavailable, warn and leave the slot.
+    const tplFixedFilled = {};
+    for (const tpl of dayTemplates) {
+      if (!tpl.fixedWorkerId || tplSlots[tpl.id] <= 0) continue;
+      const w = activeWorkers.find(x => x.id === tpl.fixedWorkerId);
+      if (!w) continue;
+      if (workersAssignedToday.has(w.id)) continue; // already busy today
+      if (!isWorkerAvailable(w, dateStr, dayOfWeek, leaves)) {
+        warnings.push({ date: dateStr, day: DAY_LABELS[dayOfWeek], template: tpl.name, type: 'fixed_unavailable', worker: `${w.firstName} ${w.lastName}` });
+        continue;
+      }
+      const paid = calcPaidHours(tpl);
+      const total = calcHours(tpl.startTime, tpl.endTime);
+      const brk = (tpl.rules || []).find(r => r.type === 'unpaid_break');
+      assignments.push({
+        workerId: w.id, workerName: `${w.firstName} ${w.lastName}`,
+        shopId: tpl.shopId, templateId: tpl.id, templateName: tpl.name,
+        date: dateStr, dayOfWeek, dayName: DAY_NAMES[dayOfWeek],
+        startTime: tpl.startTime, endTime: tpl.endTime,
+        hours: paid, totalHours: total, unpaidBreakMinutes: brk?.minutes || 0,
+        type: tpl.type || 'regular', autoScheduled: true, fixed: true,
+      });
+      workerHours[w.id] = (workerHours[w.id] || 0) + paid;
+      if (!workerDayShifts[w.id]) workerDayShifts[w.id] = {};
+      if (!workerDayShifts[w.id][dateStr]) workerDayShifts[w.id][dateStr] = [];
+      workerDayShifts[w.id][dateStr].push({ startTime: tpl.startTime, endTime: tpl.endTime });
+      workerLastShift[w.id] = { date: dateStr, startTime: tpl.startTime, endTime: tpl.endTime };
+      workersAssignedToday.add(w.id);
+      tplSlots[tpl.id] -= 1;
+      tplFixedFilled[tpl.id] = (tplFixedFilled[tpl.id] || 0) + 1;
+    }
+
     // Build all eligible (worker, template) pairs with scores
     const candidates = [];
     const availableWorkers = activeWorkers.filter(w =>
@@ -268,6 +302,9 @@ export function generateWeeklySchedule({ workers, templates, weekStart, leaves =
       for (const worker of availableWorkers) {
         // Skip if already assigned to this template from existing shifts
         if (tplExistingWorkers[tpl.id]?.has(worker.id)) continue;
+
+        // Role gate — only staff with the template's required company role
+        if (tpl.requiredRole && (worker.jobRole || '') !== tpl.requiredRole) continue;
 
         // Score check (returns -1 if would exceed max hours)
         const score = scoreWorker(worker, tpl, workerHours, dayOfWeek);
@@ -382,7 +419,7 @@ export function generateWeeklySchedule({ workers, templates, weekStart, leaves =
     for (const tpl of dayTemplates) {
       const needed = getRequiredWorkers(tpl, dayOfWeek);
       const existingCount = existingShifts.filter(s => s.date === dateStr && s.templateId === tpl.id).length;
-      const totalFilled = existingCount + (tplFilled[tpl.id] || 0);
+      const totalFilled = existingCount + (tplFilled[tpl.id] || 0) + (tplFixedFilled[tpl.id] || 0);
       if (totalFilled < needed) {
         warnings.push({
           date: dateStr,

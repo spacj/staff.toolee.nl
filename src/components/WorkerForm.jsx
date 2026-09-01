@@ -1,10 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { createWorker, updateWorker, createInvite, getShops, getWorkers, syncOrgPlan, updateUserProfile } from '@/lib/firestore';
+import { createWorker, updateWorker, createInvite, getShops, getWorkers, syncOrgPlan, updateUserProfile, getJobRoles, addJobRole } from '@/lib/firestore';
 import { canAddWorker, formatCurrency } from '@/lib/pricing';
 import { useAuth } from '@/contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { Copy, Check, Ticket, AlertTriangle, ArrowUpCircle, MessageCircle } from 'lucide-react';
+import { Copy, Check, Ticket, AlertTriangle, ArrowUpCircle, MessageCircle, Plus } from 'lucide-react';
 
 const POSITIONS = ['Barista', 'Cashier', 'Shop Manager', 'Sales Associate', 'Stock Clerk', 'Cleaner', 'Security', 'Chef', 'Waiter', 'Driver', 'Other'];
 
@@ -18,7 +18,7 @@ export default function WorkerForm({ worker, onSuccess, onCancel }) {
   const [upgradeAccepted, setUpgradeAccepted] = useState(false);
   const [form, setForm] = useState({
     firstName: worker?.firstName || '', lastName: worker?.lastName || '', email: worker?.email || '', phone: worker?.phone || '',
-    position: worker?.position || '', role: worker?.role || 'worker', customRole: worker?.customRole || '', status: worker?.status || 'active',
+    position: worker?.position || '', role: worker?.role || 'worker', customRole: worker?.customRole || '', jobRole: worker?.jobRole || '', status: worker?.status || 'active',
     shopId: worker?.shopId || '', startDate: worker?.startDate || new Date().toISOString().split('T')[0],
     shiftPreference: worker?.shiftPreference || 'any',
     availableDays: worker?.availableDays || [1, 2, 3, 4, 5], // Mon-Fri default
@@ -32,9 +32,21 @@ export default function WorkerForm({ worker, onSuccess, onCancel }) {
   const [loading, setLoading] = useState(false);
   const [inviteResult, setInviteResult] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [jobRoles, setJobRoles] = useState([]);
+
+  const handleAddRole = async () => {
+    const name = prompt('New company role (e.g. Cook, Waiter, Bartender):');
+    if (!name || !name.trim()) return;
+    try {
+      const next = await addJobRole(orgId, name.trim());
+      setJobRoles(next);
+      setForm(f => ({ ...f, jobRole: name.trim() }));
+    } catch { toast.error('Failed to add role'); }
+  };
 
   useEffect(() => {
     if (!orgId) return;
+    getJobRoles(orgId).then(setJobRoles).catch(() => setJobRoles([]));
     getShops(orgId).then(s => { setShops(s); setShopCount(s.length); });
     getWorkers({ orgId, status: 'active' }).then(w => {
       setActiveWorkerCount(w.length);
@@ -168,6 +180,14 @@ export default function WorkerForm({ worker, onSuccess, onCancel }) {
         <div><label className="label">Phone</label><input name="phone" value={form.phone} onChange={handleChange} placeholder="+31 6 12345678" className="input-field" /></div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label">Company Role</label>
+          <div className="flex gap-2">
+            <select name="jobRole" value={form.jobRole} onChange={handleChange} className="select-field flex-1"><option value="">Select role...</option>{jobRoles.map(r => <option key={r} value={r}>{r}</option>)}</select>
+            <button type="button" onClick={handleAddRole} className="btn-secondary px-3 flex-shrink-0" title="Add a company role"><Plus className="w-4 h-4" /></button>
+          </div>
+          <p className="text-[10px] text-surface-400 mt-1">Used to match staff to role-specific shifts (e.g. Cook, Waiter)</p>
+        </div>
         <div><label className="label">Position</label><select name="position" value={form.position} onChange={handleChange} className="select-field"><option value="">Select...</option>{POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
         <div><label className="label">Shop</label><select name="shopId" value={form.shopId} onChange={handleChange} className="select-field"><option value="">All shops</option>{shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
         <div><label className="label">System Role</label><select name="role" value={form.role} onChange={handleChange} className="select-field" disabled={!isAdmin}><option value="worker">Worker</option><option value="manager">Manager</option>{isAdmin && <option value="admin">Admin</option>}</select><p className="text-[10px] text-surface-400 mt-1">Controls permissions: managers can approve hours & manage staff</p></div>
