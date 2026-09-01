@@ -6,14 +6,15 @@ import PageIntro from '@/components/help/PageIntro';
 import HelpTip from '@/components/help/HelpTip';
 import EmptyState from '@/components/help/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
-import { getAttendance, getActiveClockIn, clockIn, clockOut, getPermits, createPermit, getShops, getWorkers, getWorker, notifyManagers, getCorrectionRequests, createCorrectionRequest, getMessages, createMessage, markMessageRead } from '@/lib/firestore';
+import { getAttendance, getActiveClockIn, clockIn, clockOut, getPermits, createPermit, getShops, getWorkers, getWorker, notifyManagers, getCorrectionRequests, createCorrectionRequest, getMessages, createMessage, markMessageRead, postRequestToChat } from '@/lib/firestore';
 import { formatCurrency } from '@/lib/pricing';
 import { cn } from '@/utils/helpers';
-import { Clock, Play, Square, Calendar, FileCheck, Plus, BarChart3, AlertCircle, DollarSign, CheckCircle, Pause, AlertTriangle, MessageCircle, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import Link from 'next/link';
+import { Clock, Play, Square, Calendar, FileCheck, Plus, BarChart3, AlertCircle, DollarSign, CheckCircle, Pause, AlertTriangle, MessageCircle, Send, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function TimePage() {
-  const { user, userProfile, orgId } = useAuth();
+  const { user, userProfile, orgId, organization } = useAuth();
   const [active, setActive] = useState(null);
   const [records, setRecords] = useState([]);
   const [permits, setPermits] = useState([]);
@@ -92,7 +93,7 @@ export default function TimePage() {
     if (!permitForm.startDate) { toast.error('Start date required'); return; }
     setSaving(true);
     try {
-      await createPermit({
+      const permitId = await createPermit({
         ...permitForm, endDate: permitForm.endDate || permitForm.startDate,
         workerId: resolvedWorkerId, workerName: userProfile?.displayName || '', orgId,
       });
@@ -101,6 +102,13 @@ export default function TimePage() {
         type: 'permit_request', title: 'Leave Request',
         message: `${userProfile?.displayName} requested ${permitForm.type} (${permitForm.startDate})`,
         link: '/attendance',
+      }).catch(() => {});
+      await postRequestToChat({
+        orgId, ownerId: organization?.ownerId, senderId: resolvedWorkerId,
+        senderName: userProfile?.displayName || '', requestType: 'leave', requestId: permitId,
+        title: `${permitForm.type} leave request`,
+        summary: `${permitForm.startDate}${permitForm.endDate && permitForm.endDate !== permitForm.startDate ? ` → ${permitForm.endDate}` : ''}${permitForm.reason ? ` · ${permitForm.reason}` : ''}`,
+        link: '/time',
       }).catch(() => {});
       toast.success('Request submitted!');
       setShowPermitForm(false);
@@ -129,7 +137,7 @@ export default function TimePage() {
     if (!correctionForm.message) { toast.error('Please describe the issue'); return; }
     setSaving(true);
     try {
-      await createCorrectionRequest({
+      const correctionId = await createCorrectionRequest({
         ...correctionForm, workerId: resolvedWorkerId,
         workerName: userProfile?.displayName || `${workerData?.firstName || ''} ${workerData?.lastName || ''}`.trim(),
         orgId,
@@ -138,6 +146,13 @@ export default function TimePage() {
         type: 'correction_request', title: 'Time Correction Request',
         message: `${userProfile?.displayName || 'A worker'} submitted a ${correctionForm.type.replace(/_/g, ' ')} correction for ${correctionForm.date}`,
         link: '/attendance',
+      }).catch(() => {});
+      await postRequestToChat({
+        orgId, ownerId: organization?.ownerId, senderId: resolvedWorkerId,
+        senderName: userProfile?.displayName || '', requestType: 'correction', requestId: correctionId,
+        title: 'Time correction request',
+        summary: `${correctionForm.type.replace(/_/g, ' ')} · ${correctionForm.date}${correctionForm.message ? ` · ${correctionForm.message}` : ''}`,
+        link: '/time',
       }).catch(() => {});
       toast.success('Correction request submitted!');
       setShowCorrectionForm(false);
@@ -351,51 +366,15 @@ export default function TimePage() {
           </div>
         </div>
 
-        {/* Messages to Management */}
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="section-title flex items-center gap-1.5">Messages <HelpTip tip="worker-messages" /></h3>
-            <button onClick={() => setShowMessageForm(true)} className="btn-secondary !py-2 !text-sm"><MessageCircle className="w-4 h-4" /> New Message</button>
+        {/* Messages now live in Chat */}
+        <Link href="/chat" className="card p-4 flex items-center gap-3 hover:border-brand-300 transition-colors">
+          <div className="w-10 h-10 rounded-xl bg-brand-100 flex items-center justify-center flex-shrink-0"><MessageCircle className="w-5 h-5 text-brand-600" /></div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-surface-800">Message management</p>
+            <p className="text-xs text-surface-400">Questions, schedule changes or anything else — chat with your manager.</p>
           </div>
-          <p className="text-xs text-surface-400 mb-3">Send a message to management about schedule changes, shift swaps, or any work-related questions.</p>
-          <div className="divide-y divide-surface-100">
-            {messages.length === 0 && <p className="py-4 text-sm text-surface-400 text-center">No messages yet.</p>}
-            {messages.filter(m => !m.parentId).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).map(m => (
-              <div key={m.id} className="py-3">
-                <div className="flex items-center justify-between cursor-pointer" onClick={() => { setExpandedMsg(expandedMsg === m.id ? null : m.id); if (!m.read && m.recipientId === resolvedWorkerId) markMessageRead(m.id); }}>
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {!m.read && m.recipientId === resolvedWorkerId && <div className="w-2 h-2 rounded-full bg-brand-500 flex-shrink-0" />}
-                    <span className={cn('text-sm truncate', !m.read && m.recipientId === resolvedWorkerId ? 'font-semibold text-surface-900' : 'text-surface-700')}>{m.subject}</span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                    <span className="text-[10px] text-surface-400">{m.senderRole === 'worker' ? 'You' : m.senderName}</span>
-                    {expandedMsg === m.id ? <ChevronUp className="w-3.5 h-3.5 text-surface-400" /> : <ChevronDown className="w-3.5 h-3.5 text-surface-400" />}
-                  </div>
-                </div>
-                {expandedMsg === m.id && (
-                  <div className="mt-2 space-y-2">
-                    <div className={cn('p-3 rounded-xl text-sm', m.senderRole === 'worker' ? 'bg-brand-50 text-surface-700' : 'bg-surface-50 text-surface-700')}>
-                      <p className="text-[10px] text-surface-400 mb-1">{m.senderRole === 'worker' ? 'You' : m.senderName} · {m.createdAt?.slice(0, 16).replace('T', ' ')}</p>
-                      <p className="whitespace-pre-wrap">{m.body}</p>
-                    </div>
-                    {/* Show replies */}
-                    {messages.filter(r => r.parentId === m.id).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).map(r => (
-                      <div key={r.id} className={cn('p-3 rounded-xl text-sm', r.senderRole === 'worker' ? 'bg-brand-50 text-surface-700 ml-4' : 'bg-emerald-50 text-surface-700 ml-4')}>
-                        <p className="text-[10px] text-surface-400 mb-1">{r.senderRole === 'worker' ? 'You' : r.senderName} · {r.createdAt?.slice(0, 16).replace('T', ' ')}</p>
-                        <p className="whitespace-pre-wrap">{r.body}</p>
-                      </div>
-                    ))}
-                    {/* Reply input */}
-                    <div className="flex gap-2 ml-4">
-                      <input value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Type a reply..." className="input-field flex-1 !py-2 text-sm" onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply(m.id); } }} />
-                      <button onClick={() => handleReply(m.id)} disabled={saving || !replyText.trim()} className="btn-primary !py-2 !px-3"><Send className="w-4 h-4" /></button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+          <ArrowRight className="w-4 h-4 text-surface-400 flex-shrink-0" />
+        </Link>
 
         {/* Attendance Records */}
         <div className="card">
@@ -489,21 +468,6 @@ export default function TimePage() {
           </form>
         </Modal>
 
-        {/* Message Modal */}
-        <Modal open={showMessageForm} onClose={() => setShowMessageForm(false)} title="Message Management">
-          <form onSubmit={handleMessageSubmit} className="space-y-4">
-            <div><label className="label">Subject *</label>
-              <input value={messageForm.subject} onChange={e => setMessageForm(f => ({ ...f, subject: e.target.value }))} className="input-field" placeholder="E.g. Shift swap request, Schedule question..." required />
-            </div>
-            <div><label className="label">Message *</label>
-              <textarea value={messageForm.body} onChange={e => setMessageForm(f => ({ ...f, body: e.target.value }))} rows={4} className="input-field resize-none" placeholder="Write your message to management..." required />
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={() => setShowMessageForm(false)} className="btn-secondary">Cancel</button>
-              <button type="submit" disabled={saving} className="btn-primary"><Send className="w-4 h-4" /> {saving ? 'Sending...' : 'Send Message'}</button>
-            </div>
-          </form>
-        </Modal>
       </div>
     </Layout>
   );

@@ -7,7 +7,14 @@ import Modal from '@/components/Modal';
 import { useAuth } from '@/contexts/AuthContext';
 import { getMessages, createMessage, markMessageRead, getWorkers, getConversations, getOrganization, getUsersByOrg, createSupportTicket, getSupportTicketsByOrg, updateSupportTicket, addSupportTicketReply } from '@/lib/firestore';
 import { cn, formatDate } from '@/utils/helpers';
-import { MessageCircle, Send, Plus, Search, ArrowLeft, User, Users, HelpCircle, Loader2, AlertCircle, Check, Shield } from 'lucide-react';
+import { MessageCircle, Send, Plus, Search, ArrowLeft, User, Users, HelpCircle, Loader2, AlertCircle, Check, Shield, FileCheck, AlertTriangle, Package, ArrowLeftRight, ArrowRight } from 'lucide-react';
+
+const REQUEST_META = {
+  leave: { icon: FileCheck, label: 'Leave request', color: 'bg-blue-100 text-blue-700', accent: 'border-blue-200 bg-blue-50/50' },
+  correction: { icon: AlertTriangle, label: 'Time correction', color: 'bg-amber-100 text-amber-700', accent: 'border-amber-200 bg-amber-50/50' },
+  stock: { icon: Package, label: 'Stock request', color: 'bg-orange-100 text-orange-700', accent: 'border-orange-200 bg-orange-50/50' },
+  swap: { icon: ArrowLeftRight, label: 'Shift swap', color: 'bg-purple-100 text-purple-700', accent: 'border-purple-200 bg-purple-50/50' },
+};
 import toast from 'react-hot-toast';
 
 export default function ChatPage() {
@@ -394,6 +401,27 @@ export default function ChatPage() {
               ) : (
                 messages.map(m => {
                   const isMe = m.senderId === currentWorkerId || m.senderId === userProfile?.workerId;
+                  // Request card (leave / time-fix / stock / swap)
+                  if (m.kind === 'request') {
+                    const meta = REQUEST_META[m.requestType] || { icon: AlertCircle, label: 'Request', color: 'bg-surface-100 text-surface-600', accent: 'border-surface-200 bg-surface-50' };
+                    return (
+                      <div key={m.id} className="flex justify-start">
+                        <div className={cn('max-w-[85%] w-full rounded-2xl border p-3', meta.accent)}>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className={cn('w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0', meta.color)}><meta.icon className="w-4 h-4" /></span>
+                            <span className="text-xs font-semibold text-surface-700">{meta.label}</span>
+                            <span className="badge bg-amber-100 text-amber-700 !text-[10px] ml-auto">Pending</span>
+                          </div>
+                          <p className="text-sm font-medium text-surface-800">{m.title}</p>
+                          {m.summary && <p className="text-xs text-surface-500 mt-0.5">{m.summary}</p>}
+                          <p className="text-[10px] text-surface-400 mt-1.5">{m.senderName} · {formatTime(m.createdAt)}</p>
+                          <Link href={m.link || '/chat'} className="mt-2 inline-flex items-center gap-1.5 bg-white border border-surface-200 rounded-lg px-3 py-1.5 text-xs font-medium text-surface-700 hover:border-brand-300 hover:text-brand-700 transition-colors">
+                            {isManager ? 'Review' : 'View'} <ArrowRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={m.id} className={cn("flex", isMe ? 'justify-end' : 'justify-start')}>
                       <div className={cn("max-w-[75%] p-3 rounded-2xl",

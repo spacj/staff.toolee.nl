@@ -213,7 +213,7 @@ function CostsContent() {
         <div>
           <h1 className="page-title">Costs & Billing</h1>
           <p className="text-sm text-surface-500 hidden sm:block">
-            Navigate months to view reports or future previsions
+            See past months, or a forecast for months ahead
           </p>
         </div>
 
@@ -288,7 +288,7 @@ function CostsContent() {
             <div className="flex items-start gap-2.5">
               <CalendarDays className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-amber-800">Future Prevision</p>
+                <p className="text-sm font-semibold text-amber-800">Forecast</p>
                 <p className="text-xs text-amber-700 mt-0.5">
                   Labor costs are estimated based on each worker's contract hours. Actual costs may differ.
                 </p>

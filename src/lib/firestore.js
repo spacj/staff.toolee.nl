@@ -501,6 +501,31 @@ export async function getConversations(userId, orgId, userRole, workers = []) {
 }
 
 export const createMessage = (data) => add(C.MESSAGES, { ...data, read: false });
+
+// Post a worker request (leave/time-fix/stock/swap) into Chat as a request card.
+// recipientId=ownerId + recipientType='management' → visible in the worker↔owner
+// thread and to other managers (see getConversations).
+export async function postRequestToChat({ orgId, ownerId, senderId, senderName, requestType, requestId, title, summary, link }) {
+  if (!orgId || !senderId) return null;
+  try {
+    return await createMessage({
+      orgId,
+      senderId,
+      senderName: senderName || 'Worker',
+      senderRole: 'worker',
+      recipientId: ownerId || null,
+      recipientType: 'management',
+      kind: 'request',
+      requestType: requestType || 'request',
+      requestId: requestId || null,
+      requestStatus: 'pending',
+      title: title || 'New request',
+      summary: summary || '',
+      link: link || '/chat',
+      body: title || 'New request',
+    });
+  } catch { return null; }
+}
 export const markMessageRead = (id) => upd(C.MESSAGES, id, { read: true });
 export async function getMessageThread(parentId) {
   const replies = await getAll(C.MESSAGES, where('parentId', '==', parentId));

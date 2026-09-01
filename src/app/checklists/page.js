@@ -21,12 +21,12 @@ import toast from 'react-hot-toast';
 
 const FREQUENCIES = [
   { value: 'daily', label: 'Daily', desc: 'Every day', icon: Clock },
-  { value: 'weekly', label: 'Weekly', desc: 'Specific day each week', icon: Calendar },
-  { value: 'monthly', label: 'Monthly', desc: 'Specific day each month', icon: Calendar },
-  { value: 'specific-days', label: 'Days', desc: 'Selected days each week', icon: Calendar },
-  { value: 'specific-dates', label: 'Dates', desc: 'Specific dates', icon: Calendar },
-  { value: 'one-time', label: 'One-time', desc: 'Assign once manually', icon: Send },
-  { value: 'qr', label: 'QR Code', desc: 'Triggered by scanning', icon: QrCode },
+  { value: 'weekly', label: 'Weekly', desc: 'One day each week', icon: Calendar },
+  { value: 'monthly', label: 'Monthly', desc: 'One day each month', icon: Calendar },
+  { value: 'specific-days', label: 'Certain days', desc: 'Pick the weekdays', icon: Calendar },
+  { value: 'specific-dates', label: 'Certain dates', desc: 'Pick exact dates', icon: Calendar },
+  { value: 'one-time', label: 'One-time', desc: 'Assign it just once', icon: Send },
+  { value: 'qr', label: 'QR Code', desc: 'Starts when scanned', icon: QrCode },
 ];
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -113,22 +113,16 @@ const [templates, setTemplates] = useState([]);
 
         if (applicable && data.frequency !== 'qr') {
           const templateWithId = { ...data, id: newTemplate };
-          console.log('[DEBUG] Generating with date:', todayStr, 'scope:', data.scope, 'frequency:', data.frequency);
-          console.log('[DEBUG] Template withId:', JSON.stringify({ scope: templateWithId.scope, frequency: templateWithId.frequency, items: templateWithId.items?.length }));
           try {
             const ids = await generateChecklistAssignments(templateWithId, workers, todayStr);
-            console.log('[DEBUG] Generated ids:', ids);
             if (ids.length > 0) {
               toast.success('Assignment generated for today');
             } else {
               toast('Assignment for today already exists');
             }
           } catch (err) {
-            console.error('[DEBUG] Error generating:', err);
             toast.error('Failed to generate assignment: ' + err.message);
           }
-        } else {
-          console.log('[DEBUG] NOT applicable. frequency:', data.frequency, 'scope:', data.scope);
         }
       }
       setShowTemplateModal(false);
@@ -1022,7 +1016,6 @@ function ShopQRModal({ open, onClose, shop }) {
 function CalendarView({ assignments, templates, viewDate, setViewDate }) {
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState(null);
-  console.log('[CAL] Mounted. Assignments:', assignments.length, 'dates:', assignments.map(a => a.date));
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -1034,7 +1027,7 @@ function CalendarView({ assignments, templates, viewDate, setViewDate }) {
   const prevMonth = () => setViewDate(new Date(year, month - 1, 1));
   const nextMonth = () => setViewDate(new Date(year, month + 1, 1));
 
-  const dayLabels = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
+  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   function getAssignmentsForDate(dateStr) {
     return assignments.filter(a => a.date === dateStr);
@@ -1077,7 +1070,7 @@ function CalendarView({ assignments, templates, viewDate, setViewDate }) {
           <ChevronRight className="w-4 h-4 rotate-180" />
         </button>
         <h2 className="text-base font-display font-semibold text-surface-800 capitalize">
-          {viewDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })}
+          {viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
         </h2>
         <button onClick={nextMonth} className="btn-icon">
           <ChevronRight className="w-4 h-4" />
@@ -1099,7 +1092,6 @@ function CalendarView({ assignments, templates, viewDate, setViewDate }) {
           const dayAssignments = getAssignmentsForDate(dateStr);
           const completed = dayAssignments.filter(a => a.status === 'completed').length;
           const total = dayAssignments.length;
-          if (total > 0) console.log('[CAL] dateStr:', dateStr, 'assignments:', dayAssignments.map(a => ({ id: a.id, date: a.date, title: a.templateTitle })));
 
           return (
             <button

@@ -10,7 +10,7 @@ import {
   openStockUnit, finishStockUnit, updateOpenedUnitLevel,
   getStockRequests, createStockRequest, reviewStockRequest,
   notifyManagers, notifyWorker, getWorkers, getStockLogsRealtime,
-  getStockCategories, addStockCategory, reverseStockLog,
+  getStockCategories, addStockCategory, reverseStockLog, postRequestToChat,
 } from '@/lib/firestore';
 import { cn } from '@/utils/helpers';
 import BarcodeScanner from '@/components/BarcodeScanner';
@@ -600,13 +600,26 @@ function StockPageInner() {
         requestedByRole: userProfile?.role || 'worker',
         workerId: userProfile?.workerId || null,
       };
-      await createStockRequest(data);
+      const requestId = await createStockRequest(data);
       await notifyManagers(orgId, {
         type: 'stock_request',
         title: `Stock Request: ${data.itemName}`,
         message: `${data.requestedByName} requested ${data.quantity} ${data.itemName}${data.urgent ? ' (URGENT)' : ''}: ${data.reason}`,
         link: '/stock',
       });
+      if (!canManage) {
+        await postRequestToChat({
+          orgId,
+          ownerId: organization?.ownerId,
+          senderId: user?.uid,
+          senderName: data.requestedByName || 'Worker',
+          requestType: 'stock',
+          requestId,
+          title: `Stock request: ${data.itemName}`,
+          summary: `${data.quantity} × ${data.itemName}${data.urgent ? ' · Urgent' : ''} — ${data.reason}`,
+          link: '/stock?tab=requests',
+        });
+      }
       toast.success('Request submitted');
       setRequestModal(false);
       load();

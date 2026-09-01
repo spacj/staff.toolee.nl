@@ -419,7 +419,6 @@ export default function AttendancePage() {
             { key: 'hours', label: 'Hours', count: pendingApproval.length },
             { key: 'permits', label: 'Leave', count: pendingPermits.length },
             { key: 'corrections', label: 'Fixes', count: pendingCorrections.length },
-            { key: 'messages', label: 'Messages', count: unreadMessages.length },
           ].map(t => (
             <button key={t.key} onClick={() => setTab(t.key)} className={cn('flex-1 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all whitespace-nowrap px-2 sm:px-3 min-w-0', tab === t.key ? 'bg-white shadow-sm text-surface-900' : 'text-surface-500 hover:text-surface-700')}>
               {t.label}{t.count > 0 ? ` (${t.count})` : ''}
@@ -690,45 +689,6 @@ export default function AttendancePage() {
                     <div className="flex gap-2 flex-shrink-0">
                       <button onClick={() => { setCorrectionReviewModal(c); setCorrectionNotes(''); }} className="btn-secondary !py-2 !px-3 !text-sm"><MessageSquare className="w-4 h-4" /> Review</button>
                       <button onClick={async () => { await reviewCorrectionRequest(c.id, true, user?.uid, ''); if (c.workerId) { await notifyWorker(c.workerId, orgId, { type: 'correction_response', title: 'Correction approved', message: `Your time correction for ${c.date} has been approved.`, link: '/time' }).catch(() => {}); } toast.success('Approved'); reload(); }} className="btn-primary !py-2 !px-3 !text-sm"><CheckCircle className="w-4 h-4" /> Approve</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ═══ MESSAGES TAB ═══ */}
-        {tab === 'messages' && (
-          <div className="space-y-3">
-            {messages.filter(m => !m.parentId).length === 0 && <div className="card p-8 text-center"><MessageSquare className="w-8 h-8 text-surface-300 mx-auto mb-2" /><p className="text-surface-400 text-sm">No messages from workers.</p></div>}
-            {messages.filter(m => !m.parentId).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).map(m => (
-              <div key={m.id} className={cn('card overflow-hidden', !m.read ? 'border-brand-200' : '')}>
-                {!m.read && <div className="h-0.5 bg-brand-500" />}
-                <div className="p-5">
-                  <div className="flex items-start justify-between cursor-pointer" onClick={() => { setExpandedMsg(expandedMsg === m.id ? null : m.id); if (!m.read) markMessageRead(m.id).then(load); }}>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        {!m.read && <div className="w-2 h-2 rounded-full bg-brand-500 flex-shrink-0" />}
-                        <p className={cn('text-sm', !m.read ? 'font-semibold text-surface-900' : 'font-medium text-surface-700')}>{m.subject}</p>
-                      </div>
-                      <p className="text-xs text-surface-400 mt-0.5">From: {m.senderName || workerName(m.senderId)} · {m.createdAt?.slice(0, 16).replace('T', ' ')}</p>
-                    </div>
-                    {expandedMsg === m.id ? <ChevronUp className="w-4 h-4 text-surface-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-surface-400 flex-shrink-0" />}
-                  </div>
-                  {expandedMsg === m.id && (
-                    <div className="mt-3 space-y-2">
-                      <div className="p-3 bg-surface-50 rounded-xl text-sm"><p className="whitespace-pre-wrap text-surface-700">{m.body}</p></div>
-                      {messages.filter(r => r.parentId === m.id).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).map(r => (
-                        <div key={r.id} className={cn('p-3 rounded-xl text-sm ml-4', r.senderRole === 'worker' ? 'bg-surface-50' : 'bg-brand-50')}>
-                          <p className="text-[10px] text-surface-400 mb-1">{r.senderRole === 'worker' ? r.senderName : 'You (Management)'} · {r.createdAt?.slice(0, 16).replace('T', ' ')}</p>
-                          <p className="whitespace-pre-wrap text-surface-700">{r.body}</p>
-                        </div>
-                      ))}
-                      <div className="flex gap-2 ml-4">
-                        <input value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Reply to this worker..." className="input-field flex-1 !py-2 text-sm" onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleManagerReply(m); } }} />
-                        <button onClick={() => handleManagerReply(m)} disabled={saving || !replyText.trim()} className="btn-primary !py-2 !px-3"><Send className="w-4 h-4" /></button>
-                      </div>
                     </div>
                   )}
                 </div>

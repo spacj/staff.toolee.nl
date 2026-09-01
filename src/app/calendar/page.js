@@ -6,7 +6,7 @@ import PageIntro from '@/components/help/PageIntro';
 import ScheduleTabs from '@/components/ScheduleTabs';
 import HelpTip from '@/components/help/HelpTip';
 import { useAuth } from '@/contexts/AuthContext';
-import { getShifts, getWorkers, getShops, getShiftTemplates, getPermits, bulkCreateShifts, deleteShift, createShift, getPublicHolidays, savePublicHolidays, getOpenShifts, createOpenShift, claimOpenShift, deleteOpenShift, getShiftSwaps, createShiftSwap, reviewShiftSwap, notifyManagers, notifyWorker, getStaffAvailability } from '@/lib/firestore';
+import { getShifts, getWorkers, getShops, getShiftTemplates, getPermits, bulkCreateShifts, deleteShift, createShift, getPublicHolidays, savePublicHolidays, getOpenShifts, createOpenShift, claimOpenShift, deleteOpenShift, getShiftSwaps, createShiftSwap, reviewShiftSwap, notifyManagers, notifyWorker, getStaffAvailability, postRequestToChat } from '@/lib/firestore';
 import { generateWeeklySchedule, DAY_LABELS } from '@/lib/scheduling';
 import { cn } from '@/utils/helpers';
 import { ChevronLeft, ChevronRight, Plus, Wand2, Trash2, Calendar as CalIcon, Users, Clock, Grid3X3, List, LayoutGrid, AlertTriangle, CheckCircle, X, Download, FileText, FileSpreadsheet, ArrowLeftRight, Hand, XCircle, Store } from 'lucide-react';
@@ -28,7 +28,7 @@ const ROLE_COLORS = [
 const roleOfWorker = (w) => (w?.jobRole || w?.customRole || w?.position || 'Staff');
 
 export default function CalendarPage() {
-  const { orgId, isManager, userProfile } = useAuth();
+  const { orgId, isManager, userProfile, organization } = useAuth();
   const [view, setView] = useState(VIEWS.MONTH);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [shifts, setShifts] = useState([]);
@@ -120,7 +120,7 @@ export default function CalendarPage() {
   const handleSwapRequest = async () => {
     if (!showSwapModal || !swapTargetWorker) return;
     try {
-      await createShiftSwap({
+      const swapId = await createShiftSwap({
         orgId,
         shiftId: showSwapModal.id,
         date: showSwapModal.date,
@@ -133,6 +133,17 @@ export default function CalendarPage() {
         type: 'shift_swap',
         title: 'Shift Swap Request',
         message: `${workerName(showSwapModal.workerId)} wants to swap their ${showSwapModal.date} shift with ${workerName(swapTargetWorker)}.`,
+        link: '/calendar',
+      });
+      await postRequestToChat({
+        orgId,
+        ownerId: organization?.ownerId,
+        senderId: userProfile?.uid,
+        senderName: workerName(showSwapModal.workerId),
+        requestType: 'swap',
+        requestId: swapId,
+        title: 'Shift swap request',
+        summary: `${workerName(showSwapModal.workerId)} → ${workerName(swapTargetWorker)} · ${showSwapModal.date} shift`,
         link: '/calendar',
       });
       toast.success('Swap request sent');
