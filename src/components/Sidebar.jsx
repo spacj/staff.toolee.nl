@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
-import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, Shield, ClipboardList, Sparkles, MessageCircle, CalendarCheck, Globe, Building2, DollarSign, Tag, Inbox, BookOpen, ClipboardCheck, Package, CookingPot } from 'lucide-react';
+import Logo from '@/components/Logo';
+import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, ClipboardList, Sparkles, MessageCircle, CalendarCheck, Globe, Building2, DollarSign, Tag, Inbox, BookOpen, ClipboardCheck, Package, CookingPot } from 'lucide-react';
 
 export default function Sidebar({ mobile, onClose }) {
   const pathname = usePathname();
@@ -73,14 +74,8 @@ export default function Sidebar({ mobile, onClose }) {
     )}>
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 h-16 border-b border-white/10 flex-shrink-0">
-        <Link href="/dashboard" className="flex items-center gap-2.5" onClick={onClose}>
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
-            <Shield className="w-4.5 h-4.5 text-white" />
-          </div>
-          <div className="flex flex-col leading-none">
-            <span className="text-lg font-display font-bold tracking-tight">Staff<span className="text-brand-400">Hub</span></span>
-            <span className="text-[9px] font-medium text-orange-400 tracking-wide">staff2.app</span>
-          </div>
+        <Link href="/dashboard" onClick={onClose}>
+          <Logo theme="dark" size="md" />
         </Link>
       </div>
 

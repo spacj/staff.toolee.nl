@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PRICE_PER_WORKER, PRICE_PER_SHOP, PRO_PRICE_MONTHLY, PRO_INCLUDED_WORKERS, PRO_EXTRA_WORKER, BASIC_MAX_WORKERS, ENTERPRISE_THRESHOLD, FREE_WORKER_LIMIT, STOCK_ADDON_MONTHLY, INVENTORY_SETUP_FROM } from '@/lib/pricing';
 import { createSupportTicket } from '@/lib/firestore';
 import Modal from '@/components/Modal';
+import Logo from '@/components/Logo';
 import LandingDemo from '@/components/landing/LandingDemo';
 import toast from 'react-hot-toast';
 import { Shield, Clock, Calendar, Users, Store, ArrowRight, Check, Star, BarChart3, FileCheck, Sparkles, Zap, ChevronRight, ChevronDown, ExternalLink, HelpCircle, Send, Loader2, Building2, Users as UsersIcon, Mail, Phone, Menu, X, Download, Smartphone, Coffee, UtensilsCrossed, ShoppingBag, Scissors, TrendingUp, Package, Wrench, ScanLine } from 'lucide-react';
@@ -466,14 +467,8 @@ export default function HomePage() {
       {/* Navigation */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-white/90 backdrop-blur-xl border-b border-slate-200/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5" onClick={() => setMobileMenuOpen(false)}>
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-lg shadow-brand-500/30">
-              <Shield className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-base sm:text-lg font-display font-bold text-slate-900 tracking-tight leading-none">Staff2</span>
-              <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium tracking-wide hidden sm:block">staff2.app</span>
-            </div>
+          <Link href="/" onClick={() => setMobileMenuOpen(false)}>
+            <Logo theme="light" size="md" />
           </Link>
 
           {/* Desktop Nav */}
@@ -931,15 +926,7 @@ export default function HomePage() {
       <footer className="py-12 px-4 sm:px-6 border-t border-slate-200/60 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
-                <Shield className="w-4 h-4 text-white" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-base font-display font-bold text-slate-900 leading-none">Staff2</span>
-                <span className="text-[10px] text-slate-400 font-medium">staff2.app</span>
-              </div>
-            </div>
+            <Logo theme="light" size="md" />
             <p className="text-sm text-slate-500">&copy; {new Date().getFullYear()} Staff2. All rights reserved.</p>
           </div>
         </div>

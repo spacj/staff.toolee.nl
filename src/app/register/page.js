@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { Shield, Mail, Lock, User, Building, Eye, EyeOff, ArrowRight, Check, Sparkles } from 'lucide-react';
+import Logo from '@/components/Logo';
+import { Mail, Lock, User, Building, Eye, EyeOff, ArrowRight, Check, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function RegisterPage() {
@@ -72,14 +73,8 @@ export default function RegisterPage() {
           <div className="absolute bottom-20 left-20 w-[500px] h-[500px] bg-purple-300 rounded-full blur-3xl" />
         </div>
         <div className="relative z-10 flex flex-col justify-between px-16 py-12">
-          <Link href="/" className="flex items-center gap-3 w-fit">
-            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <Shield className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-2xl font-display font-bold text-white tracking-tight leading-none">Staff2</span>
-              <span className="text-xs text-purple-200">staff2.app</span>
-            </div>
+          <Link href="/" className="w-fit">
+            <Logo theme="dark" size="lg" />
           </Link>
           
           <div>
@@ -120,15 +115,9 @@ export default function RegisterPage() {
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12 bg-gradient-to-br from-slate-50 via-white to-brand-50/30">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
-          <div className="lg:hidden flex flex-col items-center gap-2 mb-8">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
-                <Shield className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-2xl font-display font-bold text-slate-900 leading-none">Staff2</span>
-                <span className="text-[10px] text-slate-400">staff2.app</span>
-              </div>
+          <div className="lg:hidden flex justify-center mb-8">
+            <Link href="/">
+              <Logo theme="light" size="lg" />
             </Link>
           </div>
 
