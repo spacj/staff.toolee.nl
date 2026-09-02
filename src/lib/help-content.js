@@ -1,5 +1,5 @@
 /**
- * StaffHub — In-app guidance copy
+ * Staff2 — In-app guidance copy
  *
  * Single source of truth for explainer text so tone stays consistent and copy
  * lives outside components. Used by <PageIntro>, <HelpTip>, <EmptyState> and
@@ -78,7 +78,7 @@ const PAGE_INTROS = {
   costs: {
     manager: {
       title: 'Costs & billing, explained',
-      body: 'See labor costs by month and understand exactly what you pay for StaffHub.',
+      body: 'See labor costs by month and understand exactly what you pay for Staff2.',
       bullets: [
         'Browse past months for actuals or future months for estimates.',
         'Your plan is set automatically by how many workers you have.',

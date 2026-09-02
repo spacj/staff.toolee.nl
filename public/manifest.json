@@ -1,7 +1,8 @@
 {
-  "name": "StaffHub - Staff Management Platform",
-  "short_name": "StaffHub",
-  "description": "Manage your team, shifts, costs, checklists, and stock all in one place.",
+  "name": "Staff2 — All-in-One Team Operations Platform",
+  "short_name": "Staff2",
+  "description": "Run your whole team in one app: shift scheduling, time tracking, labor costs, stock & recipes, checklists and a knowledge base.",
+  "id": "/",
   "start_url": "/login",
   "display": "standalone",
   "background_color": "#ffffff",

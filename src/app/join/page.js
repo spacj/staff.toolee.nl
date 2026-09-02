@@ -91,8 +91,8 @@ export default function JoinPage() {
               <Shield className="w-6 h-6 text-white" />
             </div>
             <div className="flex flex-col">
-              <span className="text-2xl font-display font-bold text-white tracking-tight leading-none">StaffHub</span>
-              <span className="text-xs text-emerald-200">by toolee.nl</span>
+              <span className="text-2xl font-display font-bold text-white tracking-tight leading-none">Staff2</span>
+              <span className="text-xs text-emerald-200">staff2.app</span>
             </div>
           </Link>
           
@@ -104,7 +104,7 @@ export default function JoinPage() {
               Welcome to<br />the team!
             </h1>
             <p className="text-lg text-emerald-200 max-w-md leading-relaxed">
-              You've been invited to join your company's StaffHub. Enter your invite code to get started.
+              You've been invited to join your company's Staff2. Enter your invite code to get started.
             </p>
           </div>
           
@@ -125,7 +125,7 @@ export default function JoinPage() {
           </div>
           
           <div className="text-emerald-200 text-sm">
-            &copy; {new Date().getFullYear()} toolee.nl. All rights reserved.
+            &copy; {new Date().getFullYear()} Staff2. All rights reserved.
           </div>
         </div>
       </div>
@@ -140,8 +140,8 @@ export default function JoinPage() {
                 <Shield className="w-5 h-5 text-white" />
               </div>
               <div className="flex flex-col">
-                <span className="text-2xl font-display font-bold text-slate-900 leading-none">StaffHub</span>
-                <span className="text-[10px] text-slate-400">by toolee.nl</span>
+                <span className="text-2xl font-display font-bold text-slate-900 leading-none">Staff2</span>
+                <span className="text-[10px] text-slate-400">staff2.app</span>
               </div>
             </Link>
           </div>
@@ -261,7 +261,7 @@ export default function JoinPage() {
           
           <div className="lg:hidden mt-6 pt-6 border-t border-slate-200 flex flex-col items-center gap-3 text-sm text-slate-500">
             <Link href="/" className="text-brand-600 hover:text-brand-700 font-medium">← Back to Home</Link>
-            <div>&copy; {new Date().getFullYear()} toolee.nl</div>
+            <div>&copy; {new Date().getFullYear()} Staff2</div>
           </div>
           
           <div className="hidden lg:block mt-8 text-center">

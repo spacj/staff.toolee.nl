@@ -53,7 +53,7 @@ export default function SubscriptionAlert() {
           )}
           {isSuspended && (
             <p>
-              <strong>Subscription suspended.</strong> Your payment failed or was suspended. Please update your payment method to continue using StaffHub for {workerCount} workers.
+              <strong>Subscription suspended.</strong> Your payment failed or was suspended. Please update your payment method to continue using Staff2 for {workerCount} workers.
             </p>
           )}
           {isCancelled && (

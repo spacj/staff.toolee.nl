@@ -493,7 +493,7 @@ function CostsContent() {
             <h3 className="section-title">Cost Breakdown</h3>
           </div>
           <div className="divide-y divide-surface-100">
-            <BreakdownRow label="StaffHub Subscription" value={formatCurrency(cost.total)} />
+            <BreakdownRow label="Staff2 Subscription" value={formatCurrency(cost.total)} />
             {cost.workerCost > 0 && (
               <BreakdownRow
                 label={`Workers (${activeWorkers.length - (freeLimit || FREE_WORKER_LIMIT)} billable)`}
@@ -592,7 +592,7 @@ function CostsContent() {
 
         {/* ── Subscribe Modal ── */}
         {isAdmin && (
-          <Modal open={showSubscribe} onClose={() => setShowSubscribe(false)} title="Subscribe to StaffHub" size="lg">
+          <Modal open={showSubscribe} onClose={() => setShowSubscribe(false)} title="Subscribe to Staff2" size="lg">
             <PayPalCheckout
               tier={cost.tier}
               workerCount={activeWorkers.length}

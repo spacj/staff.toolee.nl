@@ -1,5 +1,5 @@
 /**
- * StaffHub Pricing & Tier Enforcement
+ * Staff2 Pricing & Tier Enforcement
  *
  * Free:   0–4 employees, 1 shop     → €0
  * Basic:  5–30 employees            → €2/employee + €15/extra shop (1st shop free)

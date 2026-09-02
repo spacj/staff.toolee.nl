@@ -28,7 +28,7 @@ export default function InventoryUpgrade({ feature = 'Inventory' }) {
           </div>
           <h1 className="text-xl sm:text-2xl font-display font-bold text-surface-900">Unlock the Inventory module</h1>
           <p className="text-sm text-surface-500 mt-1.5 max-w-md mx-auto">
-            {feature} is part of StaffHub’s Inventory add-on — everything you need to control stock and know your margins.
+            {feature} is part of Staff2’s Inventory add-on — everything you need to control stock and know your margins.
           </p>
 
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left">

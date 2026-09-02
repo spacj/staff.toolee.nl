@@ -28,7 +28,7 @@ async function ensurePlans() {
   // (The UI computes the actual cost using unit-price = €0.01 and quantity derived from total cost)
   const payload = {
     product_id: process.env.NEXT_PUBLIC_PAYPAL_PLAN_PRODUCT_ID || 'PROD_STANDARD_AUTO',
-    name: 'StaffHub Standard Monthly (Automated)',
+    name: 'Staff2 Standard Monthly (Automated)',
     status: 'ACTIVE',
     billing_cycles: [
       {

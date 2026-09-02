@@ -1,4 +1,4 @@
-const CACHE_NAME = 'staffhub-v1';
+const CACHE_NAME = 'staff2-v1';
 const OFFLINE_URL = '/offline.html';
 
 const STATIC_ASSETS = [
@@ -106,7 +106,7 @@ async function networkFirst(request) {
 
 self.addEventListener('push', (event) => {
   let data = {
-    title: 'StaffHub',
+    title: 'Staff2',
     body: 'You have a new notification',
     icon: '/icons/icon.svg',
     badge: '/favicon.svg',
@@ -123,7 +123,7 @@ self.addEventListener('push', (event) => {
         badge: payload.badge || data.badge,
         url: payload.data?.url || payload.url || data.url,
         actions: payload.actions || [],
-        tag: payload.tag || 'staffhub-notification',
+        tag: payload.tag || 'staff2-notification',
         requireInteraction: payload.requireInteraction || false,
         ...payload.data,
       };

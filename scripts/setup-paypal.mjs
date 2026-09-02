@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * ╔═══════════════════════════════════════════════════════════╗
- * ║   StaffHub — One-Time PayPal Plan Setup Script           ║
+ * ║   Staff2 — One-Time PayPal Plan Setup Script           ║
  * ║   Run: node scripts/setup-paypal.mjs                     ║
  * ║   Only needs to run ONCE. Creates product + 4 plans.     ║
  * ╚═══════════════════════════════════════════════════════════╝
@@ -57,7 +57,7 @@ async function main() {
 
   // 1. Create Product
   const product = await api(token, '/v1/catalogs/products', {
-    name: 'StaffHub',
+    name: 'Staff2',
     description: 'Staff management — scheduling, attendance, payroll.',
     type: 'SERVICE',
     category: 'SOFTWARE',
@@ -68,7 +68,7 @@ async function main() {
   const makePlan = (name, interval, unitPrice) => api(token, '/v1/billing/plans', {
     product_id: product.id,
     name,
-    description: `StaffHub ${name}`,
+    description: `Staff2 ${name}`,
     billing_cycles: [{
       frequency: { interval_unit: interval, interval_count: 1 },
       tenure_type: 'REGULAR', sequence: 1, total_cycles: 0,

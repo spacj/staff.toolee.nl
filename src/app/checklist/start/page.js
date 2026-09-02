@@ -186,7 +186,7 @@ function PublicScanContent() {
       <div className="px-4 pb-6 pt-4 text-center">
         <div className="flex items-center justify-center gap-2 text-white/30 text-xs">
           <Shield className="w-3.5 h-3.5" />
-          Powered by StaffHub
+          Powered by Staff2
         </div>
       </div>
     </div>

@@ -616,7 +616,7 @@ export default function SettingsPage() {
                     <LogOut className="w-5 h-5 text-red-500" />
                     <div>
                       <p className="text-sm font-medium text-red-700">Sign Out</p>
-                      <p className="text-xs text-surface-400">Sign out of your StaffHub account</p>
+                      <p className="text-xs text-surface-400">Sign out of your Staff2 account</p>
                     </div>
                   </button>
                   <button className="flex items-center gap-3 w-full p-3 rounded-xl border border-red-200 hover:bg-red-50 transition-colors text-left">
@@ -997,7 +997,7 @@ function QRCodesTab({ orgId, organization }) {
     }
   }, [orgId]);
 
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://staff.toolee.nl';
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://staff2.app';
   const homepageUrl = baseUrl;
   const loginUrl = `${baseUrl}/login`;
 
@@ -1006,22 +1006,22 @@ function QRCodesTab({ orgId, organization }) {
       <div className="card">
         <div className="px-6 py-5 border-b border-surface-100">
           <h2 className="text-lg font-display font-semibold text-surface-900">QR Codes</h2>
-          <p className="text-sm text-surface-500 mt-0.5">Download QR codes for quick access to your StaffHub. Print them and put them on display for your workers.</p>
+          <p className="text-sm text-surface-500 mt-0.5">Download QR codes for quick access to your Staff2. Print them and put them on display for your workers.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         <QRCodeCard
           title="Homepage"
-          description="Links to your StaffHub homepage"
+          description="Links to your Staff2 homepage"
           url={homepageUrl}
-          filename="staffhub-homepage-qr"
+          filename="staff2-homepage-qr"
         />
         <QRCodeCard
           title="Login Page"
           description="Quick access to the login page for workers and managers"
           url={loginUrl}
-          filename="staffhub-login-qr"
+          filename="staff2-login-qr"
         />
       </div>
 
@@ -1044,7 +1044,7 @@ function QRCodesTab({ orgId, organization }) {
                   title={`Invite: ${inv.code}`}
                   description={inv.role ? `Role: ${inv.role}` : 'Worker invite'}
                   url={`${baseUrl}/join?code=${inv.code}`}
-                  filename={`staffhub-invite-${inv.code}`}
+                  filename={`staff2-invite-${inv.code}`}
                 />
               ))}
             </div>

@@ -70,7 +70,7 @@ export default function OnboardingChecklist({ variant = 'manager', data = {} }) 
             <div>
               <h2 className="text-base font-display font-bold text-surface-900">Getting started</h2>
               <p className="text-xs text-surface-500 mt-0.5">
-                {doneCount} of {total} done · finish setup to get the most out of StaffHub
+                {doneCount} of {total} done · finish setup to get the most out of Staff2
               </p>
             </div>
           </div>

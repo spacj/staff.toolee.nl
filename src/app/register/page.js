@@ -50,7 +50,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await registerAdmin(form.email, form.password, form.displayName, form.companyName, form.referralCode);
-      toast.success('Company registered! Welcome to StaffHub.');
+      toast.success('Company registered! Welcome to Staff2.');
       router.push('/dashboard');
     } catch (err) {
       const messages = {
@@ -77,8 +77,8 @@ export default function RegisterPage() {
               <Shield className="w-6 h-6 text-white" />
             </div>
             <div className="flex flex-col">
-              <span className="text-2xl font-display font-bold text-white tracking-tight leading-none">StaffHub</span>
-              <span className="text-xs text-purple-200">by toolee.nl</span>
+              <span className="text-2xl font-display font-bold text-white tracking-tight leading-none">Staff2</span>
+              <span className="text-xs text-purple-200">staff2.app</span>
             </div>
           </Link>
           
@@ -111,7 +111,7 @@ export default function RegisterPage() {
           </div>
           
           <div className="text-purple-200 text-sm">
-            &copy; {new Date().getFullYear()} toolee.nl. All rights reserved.
+            &copy; {new Date().getFullYear()} Staff2. All rights reserved.
           </div>
         </div>
       </div>
@@ -126,8 +126,8 @@ export default function RegisterPage() {
                 <Shield className="w-5 h-5 text-white" />
               </div>
               <div className="flex flex-col">
-                <span className="text-2xl font-display font-bold text-slate-900 leading-none">StaffHub</span>
-                <span className="text-[10px] text-slate-400">by toolee.nl</span>
+                <span className="text-2xl font-display font-bold text-slate-900 leading-none">Staff2</span>
+                <span className="text-[10px] text-slate-400">staff2.app</span>
               </div>
             </Link>
           </div>
@@ -265,7 +265,7 @@ export default function RegisterPage() {
           
           <div className="lg:hidden mt-6 pt-6 border-t border-slate-200 flex flex-col items-center gap-3 text-sm text-slate-500">
             <Link href="/" className="text-brand-600 hover:text-brand-700 font-medium">← Back to Home</Link>
-            <div>&copy; {new Date().getFullYear()} toolee.nl</div>
+            <div>&copy; {new Date().getFullYear()} Staff2</div>
           </div>
           
           <div className="hidden lg:block mt-8 text-center">

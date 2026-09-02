@@ -96,7 +96,7 @@ export default function AIAssistant({ contextData }) {
           <div className="px-4 py-3 border-b border-surface-100 bg-gradient-to-r from-surface-50 to-white">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-4 h-4 text-brand-600" />
-              <h3 className="text-sm font-display font-bold text-surface-900">StaffHub AI</h3>
+              <h3 className="text-sm font-display font-bold text-surface-900">Staff2 AI</h3>
             </div>
             <div className="flex gap-1.5 flex-wrap">
               {FEATURES.map(f => (

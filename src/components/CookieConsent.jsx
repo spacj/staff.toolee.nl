@@ -7,7 +7,7 @@ export default function CookieConsent() {
   const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
-    const consent = localStorage.getItem('staffhub_cookie_consent');
+    const consent = localStorage.getItem('staff2_cookie_consent');
     if (!consent) {
       const timer = setTimeout(() => setVisible(true), 1200);
       return () => clearTimeout(timer);
@@ -15,7 +15,7 @@ export default function CookieConsent() {
   }, []);
 
   const accept = (level) => {
-    localStorage.setItem('staffhub_cookie_consent', JSON.stringify({ level, date: new Date().toISOString() }));
+    localStorage.setItem('staff2_cookie_consent', JSON.stringify({ level, date: new Date().toISOString() }));
     setVisible(false);
   };
 
@@ -33,7 +33,7 @@ export default function CookieConsent() {
               <div className="flex-1 min-w-0">
                 <h3 className="text-base font-display font-bold text-surface-900">We use cookies</h3>
                 <p className="text-sm text-surface-500 mt-1">
-                  StaffHub uses essential cookies for authentication and app functionality. 
+                  Staff2 uses essential cookies for authentication and app functionality. 
                   We also use analytics cookies to improve your experience.
                 </p>
 
@@ -53,7 +53,7 @@ export default function CookieConsent() {
                         <span className="font-semibold text-surface-700">Analytics Cookies</span>
                         <span className="text-[10px] bg-blue-100 text-blue-700 rounded px-1.5 py-0.5 font-medium">Optional</span>
                       </div>
-                      <p className="text-xs text-surface-500">Help us understand how you use StaffHub so we can improve the product. Anonymous usage data only.</p>
+                      <p className="text-xs text-surface-500">Help us understand how you use Staff2 so we can improve the product. Anonymous usage data only.</p>
                     </div>
                   </div>
                 )}

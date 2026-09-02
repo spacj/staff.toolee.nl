@@ -89,7 +89,7 @@ export default function ServiceCheckout({ service, onSuccess }) {
             intent: 'CAPTURE',
             purchase_units: [{
               amount: { value: amountStr, currency_code: 'EUR' },
-              description: `StaffHub — ${service.label}`,
+              description: `Staff2 — ${service.label}`,
               custom_id: `${orgId || 'org'}:${service.key}`,
             }],
           })}

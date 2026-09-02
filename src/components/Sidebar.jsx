@@ -79,7 +79,7 @@ export default function Sidebar({ mobile, onClose }) {
           </div>
           <div className="flex flex-col leading-none">
             <span className="text-lg font-display font-bold tracking-tight">Staff<span className="text-brand-400">Hub</span></span>
-            <span className="text-[9px] font-medium text-orange-400 tracking-wide">by toolee.nl</span>
+            <span className="text-[9px] font-medium text-orange-400 tracking-wide">staff2.app</span>
           </div>
         </Link>
       </div>

@@ -54,7 +54,7 @@ const testimonials = [
 const faqs = [
   { q: 'Do I need a credit card to start?', a: `No. Create an account and manage up to ${FREE_WORKER_LIMIT} workers completely free, forever. You only upgrade when your team grows.` },
   { q: 'How long does setup take?', a: 'Most owners are scheduling within minutes — add a shop, invite your team with a code or QR, and let Auto-Schedule draft the week for you.' },
-  { q: 'Does it work on phones?', a: 'Yes. StaffHub installs as an app on any iPhone, Android or desktop — no app store needed. Your team clocks in, checks shifts and gets notifications on their own phone.' },
+  { q: 'Does it work on phones?', a: 'Yes. Staff2 installs as an app on any iPhone, Android or desktop — no app store needed. Your team clocks in, checks shifts and gets notifications on their own phone.' },
   { q: 'Can I manage multiple shops or locations?', a: 'Absolutely. Run every location from one dashboard with its own staff, schedule, stock and costs — and see the whole business at a glance.' },
   { q: 'What if I need to cancel?', a: 'Plans are month-to-month with no lock-in. Cancel anytime and keep access until the end of your billing period.' },
   { q: 'Is my data secure?', a: 'Your data is stored securely with per-organization isolation and role-based access, so people only ever see what they need.' },
@@ -471,8 +471,8 @@ export default function HomePage() {
               <Shield className="w-5 h-5 text-white" />
             </div>
             <div className="flex flex-col">
-              <span className="text-base sm:text-lg font-display font-bold text-slate-900 tracking-tight leading-none">StaffHub</span>
-              <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium tracking-wide hidden sm:block">by toolee.nl</span>
+              <span className="text-base sm:text-lg font-display font-bold text-slate-900 tracking-tight leading-none">Staff2</span>
+              <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium tracking-wide hidden sm:block">staff2.app</span>
             </div>
           </Link>
 
@@ -514,7 +514,7 @@ export default function HomePage() {
               <div className="space-y-1.5">
                 {[
                   { href: '#demo', icon: Smartphone, label: 'Live Demo', desc: 'Try the app on every screen' },
-                  { href: '#features', icon: Sparkles, label: 'Features', desc: 'What StaffHub can do' },
+                  { href: '#features', icon: Sparkles, label: 'Features', desc: 'What Staff2 can do' },
                   { href: '#pricing', icon: BarChart3, label: 'Pricing', desc: 'Simple per-worker plans' },
                   { href: '#faq', icon: HelpCircle, label: 'FAQ', desc: 'Answers to common questions' },
                   { href: '#contact', icon: Mail, label: 'Contact', desc: 'Get in touch with our team' },
@@ -590,11 +590,11 @@ export default function HomePage() {
             <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> AI-Powered Scheduling Now Available
           </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-display font-bold text-slate-900 leading-[1.1] mb-4 sm:mb-6 tracking-tight">
-            The smarter way to<br />
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-600 via-brand-500 to-purple-500">manage your staff</span>
+            Run your whole team<br />
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-600 via-brand-500 to-purple-500">from one simple app</span>
           </h1>
           <p className="text-base sm:text-lg md:text-xl text-slate-600 max-w-3xl mx-auto mb-8 sm:mb-12 leading-relaxed px-2">
-            Schedule shifts effortlessly, track attendance in real-time, manage leave requests, and control labor costs — all from one beautifully designed platform.
+            Staff2 is the all-in-one team operations platform: shift scheduling, time tracking, labor costs, stock &amp; recipes, checklists and a knowledge base — together in one place, on any phone.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-6 sm:mb-8">
             <Link href="/register" className="btn-primary !py-3.5 sm:!py-4 !px-8 sm:!px-10 !text-sm sm:!text-base !shadow-xl !shadow-brand-500/30 hover:!shadow-2xl hover:!shadow-brand-500/40 hover:!-translate-y-1 transition-all w-full sm:w-auto">
@@ -897,7 +897,7 @@ export default function HomePage() {
             <div className="relative z-10 text-center">
               <Zap className="w-10 h-10 sm:w-12 sm:h-12 text-brand-400 mx-auto mb-4 sm:mb-6" />
               <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-display font-bold text-white mb-4 sm:mb-5">Ready to simplify your operations?</h2>
-              <p className="text-white/70 mb-8 sm:mb-10 max-w-xl mx-auto text-sm sm:text-lg">Join businesses using StaffHub to save time, reduce errors, and keep their team happy.</p>
+              <p className="text-white/70 mb-8 sm:mb-10 max-w-xl mx-auto text-sm sm:text-lg">Join businesses using Staff2 to save time, reduce errors, and keep their team happy.</p>
               <Link href="/register" className="inline-flex items-center gap-2 bg-white text-slate-900 font-semibold px-8 sm:px-10 py-3 sm:py-4 rounded-xl hover:bg-brand-50 transition-all shadow-xl hover:-translate-y-1 text-sm sm:text-base">
                 Get Started for Free <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
               </Link>
@@ -936,11 +936,11 @@ export default function HomePage() {
                 <Shield className="w-4 h-4 text-white" />
               </div>
               <div className="flex flex-col">
-                <span className="text-base font-display font-bold text-slate-900 leading-none">StaffHub</span>
-                <span className="text-[10px] text-slate-400 font-medium">by toolee.nl</span>
+                <span className="text-base font-display font-bold text-slate-900 leading-none">Staff2</span>
+                <span className="text-[10px] text-slate-400 font-medium">staff2.app</span>
               </div>
             </div>
-            <p className="text-sm text-slate-500">&copy; {new Date().getFullYear()} toolee.nl. All rights reserved.</p>
+            <p className="text-sm text-slate-500">&copy; {new Date().getFullYear()} Staff2. All rights reserved.</p>
           </div>
         </div>
       </footer>

@@ -100,11 +100,11 @@ export default function WorkerForm({ worker, onSuccess, onCancel }) {
     setLoading(false);
   };
 
-  const joinUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://staff.toolee.nl'}/join`;
+  const joinUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://staff2.app'}/join`;
 
   const sendWhatsApp = () => {
-    const orgName = organization?.name || 'StaffHub';
-    const message = `Hi ${form.firstName}! You've been added to *${orgName}* on StaffHub.\n\nYour invite code: *${inviteResult.code}*\n\nJoin here: ${joinUrl}\n\nEnter the code above to create your account.`;
+    const orgName = organization?.name || 'Staff2';
+    const message = `Hi ${form.firstName}! You've been added to *${orgName}* on Staff2.\n\nYour invite code: *${inviteResult.code}*\n\nJoin here: ${joinUrl}\n\nEnter the code above to create your account.`;
     // Clean phone: remove spaces, dashes, dots, parens
     let phone = (form.phone || '').replace(/[\s\-().]/g, '');
     if (phone) {

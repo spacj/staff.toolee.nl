@@ -1,4 +1,4 @@
-# StaffHub — Staff Management Platform
+# Staff2 — Staff Management Platform
 
 Next.js 14 + Firebase + PayPal automatic subscriptions.
 
