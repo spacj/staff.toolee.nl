@@ -72,10 +72,14 @@ export function getTierInfo(tier) {
 
 /**
  * Calculate cost for a given billing cycle.
- * @param {object} opts - { inventoryAddon } paid Stock+Recipes module (€19.99/mo, free on Pro)
+ * @param {object} opts - {
+ *   inventoryAddon: paid Stock+Recipes module (€19.99/mo, free on Pro),
+ *   proPlan: force the Pro plan even below the 31-employee threshold (opt-in upgrade),
+ * }
  */
 export function calculateCost(workerCount, shopCount, cycle = 'monthly', freeLimit = FREE_WORKER_LIMIT, opts = {}) {
-  const tier = getTier(workerCount, freeLimit);
+  // Pro is auto-selected at 31+ employees, or chosen as an upgrade at any size.
+  const tier = opts.proPlan ? TIERS.ENTERPRISE : getTier(workerCount, freeLimit);
   const isYearly = cycle === 'yearly';
   const wantsAddon = !!opts.inventoryAddon;
   // Enterprise includes Inventory; other tiers pay the monthly add-on.
@@ -156,14 +160,25 @@ export function getSubscriptionQuantity(workerCount, shopCount, freeLimit = FREE
 }
 
 /**
+ * Whether an organization is on the Pro plan — either chosen as an upgrade
+ * (org.proPlan) or reached automatically by employee count with an active sub.
+ */
+export function hasProPlan(org) {
+  if (!org) return false;
+  if (org.proPlan === true) return true;
+  if (org.subscriptionTier === 'enterprise' && org.subscriptionStatus === 'active') return true;
+  return false;
+}
+
+/**
  * Whether an organization can access the Inventory module (Stock + Recipes).
- * True if they bought the add-on, are on Enterprise, or were grandfathered
+ * True if they bought the add-on, are on Pro, or were grandfathered
  * (created before the add-on launched).
  */
 export function hasInventoryAccess(org) {
   if (!org) return false;
   if (org.inventoryAddon) return true;
-  if (org.subscriptionTier === 'enterprise' && org.subscriptionStatus === 'active') return true;
+  if (hasProPlan(org)) return true;
   const raw = org.createdAt;
   const created = raw?.toDate ? raw.toDate() : raw ? new Date(raw) : null;
   if (created && !Number.isNaN(created.getTime()) && created < new Date(INVENTORY_LAUNCH)) return true;

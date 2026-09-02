@@ -77,8 +77,8 @@ export default function CalendarPage() {
     getShiftTemplates(orgId).then(setTemplates);
     getPermits({ orgId, status: 'approved' }).then(setPermits);
     getPublicHolidays(orgId).then(setPublicHolidays);
-    getOpenShifts({ orgId, status: 'open' }).then(setOpenShifts);
-    getShiftSwaps({ orgId }).then(setSwapRequests);
+    getOpenShifts({ orgId, status: 'open' }).then(setOpenShifts).catch(() => setOpenShifts([]));
+    getShiftSwaps({ orgId }).then(setSwapRequests).catch(() => setSwapRequests([]));
     getStaffAvailability({ orgId, startDate: loadRange.start, endDate: loadRange.end }).then(setAvailability).catch(() => setAvailability([]));
   }, [orgId, loadRange.start, loadRange.end]);
 
@@ -92,8 +92,8 @@ export default function CalendarPage() {
   const reload = async () => {
     const s = await getShifts({ orgId, startDate: loadRange.start, endDate: loadRange.end });
     setShifts(s);
-    getOpenShifts({ orgId, status: 'open' }).then(setOpenShifts);
-    getShiftSwaps({ orgId }).then(setSwapRequests);
+    getOpenShifts({ orgId, status: 'open' }).then(setOpenShifts).catch(() => {});
+    getShiftSwaps({ orgId }).then(setSwapRequests).catch(() => {});
   };
 
   const handlePostOpenShift = async (e) => {
@@ -104,8 +104,12 @@ export default function CalendarPage() {
       await createOpenShift({ orgId, ...openShiftForm });
       toast.success('Open shift posted');
       setShowOpenShiftModal(false);
+      setOpenShiftForm({ shopId: '', date: '', startTime: '09:00', endTime: '17:00', templateName: '', notes: '' });
       await reload();
-    } catch { toast.error('Failed to post'); }
+    } catch (e) {
+      console.error('Open shift post failed:', e);
+      toast.error(e?.code === 'permission-denied' ? 'Only managers can post open shifts.' : (e?.message || 'Failed to post open shift'));
+    }
     setSaving(false);
   };
 
@@ -174,6 +178,18 @@ export default function CalendarPage() {
   const shiftsForDate = (ds) => visibleShifts.filter(s => s.date === ds).sort(byTime);
   const permitsForDate = (ds) => permits.filter(p => ds >= p.startDate && ds <= (p.endDate || p.startDate));
   const availForDate = (ds) => availability.filter(a => a.date === ds);
+  // Count distinct staff who marked themselves available on a date.
+  const availCount = (ds) => new Set(availForDate(ds).map(a => a.workerId)).size;
+  // Heatmap cell colour by share of the team that is available.
+  const availHeatClass = (count) => {
+    const total = activeWorkers.length || 1;
+    const r = count / total;
+    if (count === 0) return 'bg-surface-100 text-surface-300';
+    if (r <= 0.25) return 'bg-emerald-100 text-emerald-700';
+    if (r <= 0.5) return 'bg-emerald-200 text-emerald-800';
+    if (r <= 0.75) return 'bg-emerald-300 text-emerald-900';
+    return 'bg-emerald-500 text-white';
+  };
 
   // Role → colour map (stable, from active staff) for the schedule views.
   const roleColorMap = useMemo(() => {
@@ -233,6 +249,11 @@ export default function CalendarPage() {
   }, [currentDate]);
 
   const listDates = useMemo(() => [...new Set(visibleShifts.map(s => s.date))].sort(), [visibleShifts]);
+
+  // Days for the availability heatmap: aligned to the active calendar view.
+  const heatmapDays = view === VIEWS.MONTH
+    ? monthDays.map(d => (d ? getDateStr(year, month, d) : null))
+    : weekDays;
   // Availability for the date being scheduled in the Add Shift modal.
   const dateAvail = useMemo(() => {
     const m = {}; availability.filter(a => a.date === shiftForm.date).forEach(a => { m[a.workerId] = a.shiftType; });
@@ -691,6 +712,57 @@ export default function CalendarPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* ─── Availability Heatmap (below the main calendar) ─── */}
+        {view !== VIEWS.LIST && (
+          <div className="card p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="section-title text-sm flex items-center gap-2"><Users className="w-4 h-4 text-emerald-500" /> Staff availability</h3>
+              <div className="flex items-center gap-1.5 text-[11px] text-surface-400">
+                <span>fewer</span>
+                <span className="w-3 h-3 rounded-sm bg-surface-100 border border-surface-200" />
+                <span className="w-3 h-3 rounded-sm bg-emerald-100" />
+                <span className="w-3 h-3 rounded-sm bg-emerald-300" />
+                <span className="w-3 h-3 rounded-sm bg-emerald-500" />
+                <span>more free</span>
+              </div>
+            </div>
+            <p className="text-xs text-surface-500 mb-3">How many of your {activeWorkers.length} staff said they&apos;re free each day. Darker = more available.</p>
+            {availability.length === 0 ? (
+              <p className="text-sm text-surface-400 py-4 text-center">No availability submitted yet. Ask your team to set theirs in the Availability tab.</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-7 text-center text-[10px] font-medium text-surface-400 mb-1">
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => <div key={d}>{d[0]}</div>)}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {heatmapDays.map((ds, i) => {
+                    if (!ds) return <div key={`e${i}`} />;
+                    const count = availCount(ds);
+                    const isToday = ds === todayStr;
+                    const dayNum = Number(ds.slice(8, 10));
+                    return (
+                      <button
+                        key={ds}
+                        type="button"
+                        onClick={() => { setView(VIEWS.MONTH); setSelectedDate(ds); }}
+                        title={`${ds} · ${count} available`}
+                        className={cn(
+                          'aspect-square rounded-lg flex flex-col items-center justify-center transition-transform hover:scale-105',
+                          availHeatClass(count),
+                          isToday && 'ring-2 ring-brand-400'
+                        )}
+                      >
+                        <span className="text-[10px] leading-none opacity-70">{dayNum}</span>
+                        <span className="text-sm font-bold leading-tight">{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         )}
 

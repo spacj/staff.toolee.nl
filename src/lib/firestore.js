@@ -1470,8 +1470,9 @@ export async function getShiftSwaps(filters = {}) {
   const c = [];
   if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
   if (filters.status) c.push(where('status', '==', filters.status));
-  c.push(orderBy('createdAt', 'desc'));
-  return getAll(C.SHIFT_SWAPS, ...c);
+  // Sort client-side to avoid needing a composite index (orgId + createdAt).
+  const results = await getAll(C.SHIFT_SWAPS, ...c);
+  return results.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
 }
 
 export async function createShiftSwap(data) {
@@ -1492,8 +1493,9 @@ export async function getOpenShifts(filters = {}) {
   const c = [];
   if (filters.orgId) c.push(where('orgId', '==', filters.orgId));
   if (filters.status) c.push(where('status', '==', filters.status));
-  c.push(orderBy('date', 'asc'));
-  return getAll(C.OPEN_SHIFTS, ...c);
+  // Sort client-side to avoid needing a composite index (orgId + status + date).
+  const results = await getAll(C.OPEN_SHIFTS, ...c);
+  return results.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 }
 
 export async function createOpenShift(data) {

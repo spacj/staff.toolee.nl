@@ -10,7 +10,7 @@ import PageIntro from '@/components/help/PageIntro';
 import HelpTip from '@/components/help/HelpTip';
 import { useAuth } from '@/contexts/AuthContext';
 import { getWorkers, getShops, getShifts, getPayments, getOrganization, getPublicHolidays, getOvertimeRules, createSupportTicket } from '@/lib/firestore';
-import { calculateCost, formatCurrency, getTierInfo, FREE_WORKER_LIMIT, STOCK_ADDON_MONTHLY, STAFF_SETUP_FEE, INVENTORY_SETUP_FROM, KB_SETUP_FROM, hasInventoryAccess } from '@/lib/pricing';
+import { calculateCost, formatCurrency, getTier, getTierInfo, FREE_WORKER_LIMIT, PRO_PRICE_MONTHLY, PRO_INCLUDED_WORKERS, STOCK_ADDON_MONTHLY, STAFF_SETUP_FEE, INVENTORY_SETUP_FROM, KB_SETUP_FROM, hasInventoryAccess } from '@/lib/pricing';
 import { calculateWorkerCostWithOvertime } from '@/lib/scheduling';
 import { cn } from '@/utils/helpers';
 import {
@@ -162,9 +162,14 @@ function CostsContent() {
   const freeLimit = orgData?.freeWorkerLimit || organization?.freeWorkerLimit;
   const [addonWanted, setAddonWanted] = useState(!!(orgData?.inventoryAddon || organization?.inventoryAddon));
   useEffect(() => { if (orgData?.inventoryAddon) setAddonWanted(true); }, [orgData?.inventoryAddon]);
+  // Pro plan: auto at 31+ employees, or chosen as an upgrade at any size.
+  const autoPro = getTier(activeWorkers.length, freeLimit || FREE_WORKER_LIMIT) === 'enterprise';
+  const [proChosen, setProChosen] = useState(!!(orgData?.proPlan || organization?.proPlan));
+  useEffect(() => { if (orgData?.proPlan) setProChosen(true); }, [orgData?.proPlan]);
+  const onPro = autoPro || proChosen;
   const cost = useMemo(
-    () => calculateCost(activeWorkers.length, shops.length, 'monthly', freeLimit, { inventoryAddon: addonWanted }),
-    [activeWorkers.length, shops.length, freeLimit, addonWanted]
+    () => calculateCost(activeWorkers.length, shops.length, 'monthly', freeLimit, { inventoryAddon: addonWanted, proPlan: onPro }),
+    [activeWorkers.length, shops.length, freeLimit, addonWanted, onPro]
   );
 
   const sub = orgData || organization || {};
@@ -175,8 +180,8 @@ function CostsContent() {
   const subscriptionCycle = sub.subscriptionCycle || 'monthly';
   const subscriptionCost = useMemo(() => {
     if (!hasActiveSubscription && !hasSuspendedSubscription) return null;
-    return calculateCost(activeWorkers.length, shops.length, subscriptionCycle, freeLimit);
-  }, [activeWorkers.length, shops.length, subscriptionCycle, hasActiveSubscription, hasSuspendedSubscription, freeLimit]);
+    return calculateCost(activeWorkers.length, shops.length, subscriptionCycle, freeLimit, { inventoryAddon: !!sub.inventoryAddon, proPlan: sub.proPlan || sub.subscriptionTier === 'enterprise' });
+  }, [activeWorkers.length, shops.length, subscriptionCycle, hasActiveSubscription, hasSuspendedSubscription, freeLimit, sub.inventoryAddon, sub.proPlan, sub.subscriptionTier]);
 
   // Labor costs — actual (past/current) or prevision (future)
   const laborCosts = useMemo(() => {
@@ -245,8 +250,44 @@ function CostsContent() {
           </div>
         </div>
 
-        {/* ── Inventory add-on ── */}
+        {/* ── Pro plan upgrade ── */}
         {isAdmin && (
+          <div className={cn('card p-4 sm:p-5', onPro && 'border-purple-300 bg-purple-50/30')}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                  <TrendingUp className="w-5 h-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-display font-semibold text-surface-900">Pro plan <span className="text-surface-400 font-normal">· everything included</span></p>
+                  <p className="text-xs text-surface-500 mt-0.5">Up to {PRO_INCLUDED_WORKERS} employees, with <strong>Stock &amp; Recipes, Checklists and Knowledge Base</strong> all included.</p>
+                  <p className="text-xs mt-1.5">
+                    <span className="font-semibold text-surface-800">{formatCurrency(PRO_PRICE_MONTHLY)}/mo</span>
+                    <span className="text-surface-400 font-normal"> · +€4/employee beyond {PRO_INCLUDED_WORKERS}</span>
+                  </p>
+                  {autoPro && <p className="text-[11px] text-purple-700 mt-1.5">You have {activeWorkers.length} employees — Pro is required above 30.</p>}
+                </div>
+              </div>
+              {!autoPro && (
+                <button
+                  type="button"
+                  onClick={() => setProChosen(v => !v)}
+                  role="switch"
+                  aria-checked={proChosen}
+                  className={cn('relative w-11 h-6 rounded-full transition-colors flex-shrink-0 mt-0.5', proChosen ? 'bg-purple-600' : 'bg-surface-300')}
+                >
+                  <span className={cn('absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform', proChosen ? 'translate-x-[22px]' : 'translate-x-0.5')} />
+                </button>
+              )}
+            </div>
+            {onPro && !hasInventoryAccess(sub) && (
+              <p className="text-[11px] text-purple-700 mt-3 pt-3 border-t border-purple-100">Pro is in your plan below — subscribe to activate Stock, Checklists &amp; Knowledge Base.</p>
+            )}
+          </div>
+        )}
+
+        {/* ── Inventory add-on (hidden on Pro — it's included) ── */}
+        {isAdmin && !onPro && (
           <div className={cn('card p-4 sm:p-5', addonWanted && !inventoryIncluded && 'border-brand-300 bg-brand-50/30')}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3 min-w-0">
@@ -557,6 +598,7 @@ function CostsContent() {
               workerCount={activeWorkers.length}
               shopCount={shops.length}
               inventoryAddon={addonWanted}
+              proPlan={onPro}
               onSuccess={() => { setShowSubscribe(false); loadBase(); }}
             />
           </Modal>

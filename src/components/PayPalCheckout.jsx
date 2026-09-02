@@ -24,7 +24,7 @@ const PLAN_IDS = {
   },
 };
 
-export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess, inventoryAddon = false }) {
+export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess, inventoryAddon = false, proPlan = false }) {
   const { orgId, user, organization } = useAuth();
   const [cycle, setCycle] = useState(CYCLES.MONTHLY);
   const [status, setStatus] = useState('idle'); // idle | success | error
@@ -34,7 +34,7 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   const freeLimit = organization?.freeWorkerLimit || FREE_WORKER_LIMIT;
-  const opts = { inventoryAddon };
+  const opts = { inventoryAddon, proPlan };
   const cost = calculateCost(workerCount, shopCount, cycle, freeLimit, opts);
   const quantity = getSubscriptionQuantity(workerCount, shopCount, freeLimit, opts, cycle);
   // Every paid tier (Basic and Pro) bills on the €0.01/unit metered plan, so the
@@ -246,6 +246,7 @@ export default function PayPalCheckout({ tier, workerCount, shopCount, onSuccess
                 subscriptionStartTime: new Date().toISOString(),
                 monthlyCost: cost.monthlyTotal || cost.total,
                 pendingSubscriptionId: null,
+                proPlan: !!proPlan,
                 ...(inventoryAddon ? { inventoryAddon: true } : {}),
               });
               // Record the subscription event
