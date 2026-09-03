@@ -1,0 +1,27 @@
+{
+  "projectId": "7a425259-0dba-4908-9169-92396e8ab69c",
+  "pkg": "staff-manager",
+  "globalName": "Staff2",
+  "shape": "package",
+  "srcDir": "src",
+  "tsconfig": "./jsconfig.json",
+  "buildCmd": "npx tailwindcss -i ./src/styles/globals.css -o ./.design-sync/compiled.css",
+  "cssEntry": ".design-sync/compiled.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "runtimeFontPrefixes": ["DM Sans", "Inter", "JetBrains Mono"],
+  "componentSrcMap": {
+    "Logo": "src/components/Logo.jsx",
+    "Modal": "src/components/Modal.jsx",
+    "HelpTip": "src/components/help/HelpTip.jsx",
+    "MonthCarousel": "src/components/MonthCarousel.jsx"
+  },
+  "overrides": {
+    "Modal": { "cardMode": "single", "viewport": "680x520" }
+  },
+  "dtsPropsFor": {
+    "Logo": "theme?: 'light' | 'dark'; size?: 'sm' | 'md' | 'lg'; subtitle?: string | null; markOnly?: boolean; className?: string;",
+    "Modal": "open: boolean; onClose: () => void; title?: string; children?: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'; className?: string;",
+    "HelpTip": "tip?: string; text?: string; label?: string; align?: 'left' | 'right'; className?: string;",
+    "MonthCarousel": "onChange?: (info: { year: number; month: number; monthName: string; monthNameShort: string; startDate: string; endDate: string; type: 'report' | 'current' | 'prevision'; isCurrentMonth: boolean; isPast: boolean; isFuture: boolean }) => void; maxFutureMonths?: number; className?: string;"
+  }
+}
