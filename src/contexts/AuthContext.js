@@ -15,6 +15,7 @@ import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firest
 import { auth, db } from '@/lib/firebase';
 import { getUserProfile, createReferral, getUserByReferralCode, getWebmasterReferralCodeByCode, updateWebmasterReferralCode } from '@/lib/firestore';
 import { PROMO_WORKER_LIMIT } from '@/lib/pricing';
+import { isSuperAdminEmail, SUPERADMIN_ORG_OVERRIDES } from '@/lib/access';
 
 const PROMO_CODES = {
   'TOOLEE10': PROMO_WORKER_LIMIT,
@@ -272,10 +273,19 @@ export function AuthProvider({ children }) {
     setOrganization(null);
   };
 
+  // Comp / super-admin accounts always get full access and are never gated by
+  // billing — merge the override flags onto their organization so every
+  // subscription/inventory gate passes.
+  const isSuperAdmin = isSuperAdminEmail(user?.email);
+  const effectiveOrganization = isSuperAdmin && organization
+    ? { ...organization, ...SUPERADMIN_ORG_OVERRIDES, freeWorkerLimit: Math.max(Number(organization.freeWorkerLimit) || 0, SUPERADMIN_ORG_OVERRIDES.freeWorkerLimit) }
+    : organization;
+
   const value = {
     user,
     userProfile,
-    organization,
+    organization: effectiveOrganization,
+    isSuperAdmin,
     loading,
     signIn,
     registerAdmin,

@@ -6,11 +6,12 @@ import Modal from '@/components/Modal';
 import MonthCarousel from '@/components/MonthCarousel';
 import PayPalCheckout from '@/components/PayPalCheckout';
 import ServiceCheckout from '@/components/ServiceCheckout';
+import ProrationCheckout from '@/components/ProrationCheckout';
 import PageIntro from '@/components/help/PageIntro';
 import HelpTip from '@/components/help/HelpTip';
 import { useAuth } from '@/contexts/AuthContext';
-import { getWorkers, getShops, getShifts, getPayments, getOrganization, getPublicHolidays, getOvertimeRules, createSupportTicket } from '@/lib/firestore';
-import { calculateCost, formatCurrency, getTier, getTierInfo, FREE_WORKER_LIMIT, PRO_PRICE_MONTHLY, PRO_INCLUDED_WORKERS, STOCK_ADDON_MONTHLY, STAFF_SETUP_FEE, INVENTORY_SETUP_FROM, KB_SETUP_FROM, hasInventoryAccess } from '@/lib/pricing';
+import { getWorkers, getShops, getShifts, getPayments, getOrganization, getPublicHolidays, getOvertimeRules, createSupportTicket, updateOrganization, createPayment } from '@/lib/firestore';
+import { calculateCost, formatCurrency, getTier, getTierInfo, calcImmediateProration, getPeriodBounds, FREE_WORKER_LIMIT, PRO_PRICE_MONTHLY, PRO_INCLUDED_WORKERS, STOCK_ADDON_MONTHLY, STAFF_SETUP_FEE, INVENTORY_SETUP_FROM, KB_SETUP_FROM, hasInventoryAccess } from '@/lib/pricing';
 import { calculateWorkerCostWithOvertime } from '@/lib/scheduling';
 import { cn } from '@/utils/helpers';
 import {
@@ -71,7 +72,7 @@ function buildPrevision(activeWorkers, shops, overtimeRules, holidays, freeLimit
 /* ── main content ────────────────────────────────────────── */
 
 function CostsContent() {
-  const { orgId, organization, user, isAdmin } = useAuth();
+  const { orgId, organization, user, isAdmin, isSuperAdmin } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -87,6 +88,8 @@ function CostsContent() {
 
   // UI state
   const [showSubscribe, setShowSubscribe] = useState(false);
+  const [showPlanChange, setShowPlanChange] = useState(false);
+  const [savingChange, setSavingChange] = useState(false);
   const [expandedWorker, setExpandedWorker] = useState(null);
   const [buyService, setBuyService] = useState(null);     // fixed-price → instant checkout
   const [requestService, setRequestService] = useState(null); // variable → open a ticket
@@ -172,7 +175,9 @@ function CostsContent() {
     [activeWorkers.length, shops.length, freeLimit, addonWanted, onPro]
   );
 
-  const sub = orgData || organization || {};
+  // Comp/super-admin accounts read the (augmented) organization so every gate
+  // reports full access and no billing prompts appear.
+  const sub = isSuperAdmin ? { ...(orgData || {}), ...(organization || {}) } : (orgData || organization || {});
   const inventoryIncluded = cost.tier === 'enterprise'; // Pro bundles Inventory free
   const hasActiveSubscription = sub.subscriptionStatus === 'active';
   const hasSuspendedSubscription = sub.subscriptionStatus === 'suspended';
@@ -182,6 +187,54 @@ function CostsContent() {
     if (!hasActiveSubscription && !hasSuspendedSubscription) return null;
     return calculateCost(activeWorkers.length, shops.length, subscriptionCycle, freeLimit, { inventoryAddon: !!sub.inventoryAddon, proPlan: sub.proPlan || sub.subscriptionTier === 'enterprise' });
   }, [activeWorkers.length, shops.length, subscriptionCycle, hasActiveSubscription, hasSuspendedSubscription, freeLimit, sub.inventoryAddon, sub.proPlan, sub.subscriptionTier]);
+
+  // ── Pending plan change (active subscription only) ──
+  // What they're billed today vs what the current roster + toggles require.
+  const cycleMult = subscriptionCycle === 'yearly' ? 10 : 1;
+  const paidMonthly = Number(sub.monthlyCost || 0);
+  const desiredMonthly = cost.monthlyTotal; // cost already reflects onPro + addonWanted
+  const planDelta = Math.round((desiredMonthly - paidMonthly) * 100) / 100;
+  const isUpgrade = hasActiveSubscription && !isSuperAdmin && planDelta > 0.005;
+  const isDowngrade = hasActiveSubscription && !isSuperAdmin && planDelta < -0.005;
+  const proration = useMemo(() => (
+    isUpgrade
+      ? calcImmediateProration({ oldMonthly: paidMonthly, newMonthly: desiredMonthly, cycle: subscriptionCycle, subscriptionStartISO: sub.subscriptionStartTime || sub.subscriptionActivatedAt })
+      : null
+  ), [isUpgrade, paidMonthly, desiredMonthly, subscriptionCycle, sub.subscriptionStartTime, sub.subscriptionActivatedAt]);
+
+  // Persist a plan change (new recurring price + future PayPal quantity).
+  const persistPlanChange = useCallback(async (immediateAmount, orderDetails) => {
+    const requiredQty = Math.round(desiredMonthly * cycleMult * 100);
+    if (sub.subscriptionId) {
+      await fetch('/api/paypal/sync', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriptionId: sub.subscriptionId, action: 'update_quantity', quantity: requiredQty }),
+      }).catch(() => {});
+    }
+    await updateOrganization(orgId, {
+      monthlyCost: desiredMonthly,
+      subscriptionQuantity: requiredQty,
+      proPlan: onPro,
+      inventoryAddon: addonWanted,
+    });
+    if (immediateAmount > 0) {
+      await createPayment({
+        orgId, amount: immediateAmount, currency: 'EUR', type: 'proration',
+        period: new Date().toISOString().slice(0, 7), method: 'paypal_order', status: 'COMPLETED',
+        paypalOrderId: orderDetails?.id || null, createdAt: new Date().toISOString(),
+      }).catch(() => {});
+    }
+    loadBase();
+  }, [desiredMonthly, cycleMult, sub.subscriptionId, orgId, onPro, addonWanted, loadBase]);
+
+  const applyDowngrade = useCallback(async () => {
+    setSavingChange(true);
+    try {
+      await persistPlanChange(0, null);
+      toast.success('Saved — the lower price applies from your next renewal.');
+    } catch { toast.error('Could not save the change.'); }
+    setSavingChange(false);
+  }, [persistPlanChange]);
 
   // Labor costs — actual (past/current) or prevision (future)
   const laborCosts = useMemo(() => {
@@ -281,7 +334,9 @@ function CostsContent() {
               )}
             </div>
             {onPro && !hasInventoryAccess(sub) && (
-              <p className="text-[11px] text-purple-700 mt-3 pt-3 border-t border-purple-100">Pro is in your plan below — subscribe to activate Stock, Checklists &amp; Knowledge Base.</p>
+              <p className="text-[11px] text-purple-700 mt-3 pt-3 border-t border-purple-100">
+                {hasActiveSubscription ? 'Confirm the plan change above to activate' : 'Subscribe below to activate'} Stock, Checklists &amp; Knowledge Base.
+              </p>
             )}
           </div>
         )}
@@ -317,7 +372,9 @@ function CostsContent() {
               )}
             </div>
             {!inventoryIncluded && addonWanted && !hasInventoryAccess(sub) && (
-              <p className="text-[11px] text-brand-700 mt-3 pt-3 border-t border-brand-100">Added to your plan below — subscribe to activate. Want it set up for you? Ask about our one-time setup service.</p>
+              <p className="text-[11px] text-brand-700 mt-3 pt-3 border-t border-brand-100">
+                {hasActiveSubscription ? 'Confirm the plan change above to activate.' : 'Added to your plan below — subscribe to activate.'} Want it set up for you? Ask about our one-time setup service.
+              </p>
             )}
           </div>
         )}
@@ -432,6 +489,48 @@ function CostsContent() {
                   </p>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Plan change: pay the difference now ── */}
+        {isAdmin && isUpgrade && (
+          <div className="card p-4 sm:p-5 border-l-4 border-l-brand-500 bg-brand-50/30">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-brand-900">Plan change ready to apply</p>
+                <p className="text-xs text-brand-700 mt-1">
+                  New price <strong>{formatCurrency(desiredMonthly * cycleMult)}/{subscriptionCycle === 'yearly' ? 'yr' : 'mo'}</strong>
+                  {' '}(was {formatCurrency(paidMonthly * cycleMult)}).
+                  {proration?.amountNow > 0
+                    ? <> <strong>{formatCurrency(proration.amountNow)} due now</strong> for the {proration.daysRemaining} day{proration.daysRemaining !== 1 ? 's' : ''} left in this period.</>
+                    : <> Applies from your next renewal.</>}
+                </p>
+              </div>
+              <button
+                onClick={() => (proration?.amountNow > 0 ? setShowPlanChange(true) : applyDowngrade())}
+                disabled={savingChange}
+                className="btn-primary !text-sm flex-shrink-0 w-full sm:w-auto"
+              >
+                <CreditCard className="w-4 h-4" /> {proration?.amountNow > 0 ? 'Pay & apply' : 'Apply change'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Plan change: downgrade (applies next renewal, no charge) ── */}
+        {isAdmin && isDowngrade && (
+          <div className="card p-4 sm:p-5 border-l-4 border-l-surface-300 bg-surface-50">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-surface-800">Lower your plan</p>
+                <p className="text-xs text-surface-500 mt-1">
+                  New price <strong>{formatCurrency(desiredMonthly * cycleMult)}/{subscriptionCycle === 'yearly' ? 'yr' : 'mo'}</strong> takes effect at your next renewal — no refund for the current period.
+                </p>
+              </div>
+              <button onClick={applyDowngrade} disabled={savingChange} className="btn-secondary !text-sm flex-shrink-0 w-full sm:w-auto">
+                {savingChange ? 'Saving…' : 'Save change'}
+              </button>
             </div>
           </div>
         )}
@@ -601,6 +700,27 @@ function CostsContent() {
               proPlan={onPro}
               onSuccess={() => { setShowSubscribe(false); loadBase(); }}
             />
+          </Modal>
+        )}
+
+        {/* ── Plan change (pay difference now) Modal ── */}
+        {isAdmin && (
+          <Modal open={showPlanChange} onClose={() => setShowPlanChange(false)} title="Apply plan change">
+            {proration && (
+              <div className="space-y-4">
+                <div className="p-4 bg-surface-50 border border-surface-200 rounded-xl space-y-1.5 text-sm">
+                  <div className="flex justify-between"><span className="text-surface-500">New recurring price</span><span className="font-semibold text-surface-800">{formatCurrency(desiredMonthly * cycleMult)}/{subscriptionCycle === 'yearly' ? 'yr' : 'mo'}</span></div>
+                  <div className="flex justify-between"><span className="text-surface-500">Days left this period</span><span className="text-surface-700">{proration.daysRemaining} / {proration.totalDays}</span></div>
+                  <div className="flex justify-between pt-1.5 border-t border-surface-200"><span className="font-semibold text-surface-800">Due now</span><span className="text-lg font-display font-bold text-surface-900">{formatCurrency(proration.amountNow)}</span></div>
+                </div>
+                <ProrationCheckout
+                  amount={proration.amountNow}
+                  orgId={orgId}
+                  description={`Staff2 plan change → ${formatCurrency(desiredMonthly * cycleMult)}/${subscriptionCycle === 'yearly' ? 'yr' : 'mo'}`}
+                  onPaid={async (details) => { await persistPlanChange(proration.amountNow, details); setShowPlanChange(false); }}
+                />
+              </div>
+            )}
           </Modal>
         )}
 

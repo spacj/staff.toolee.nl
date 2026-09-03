@@ -290,6 +290,51 @@ export function calculateProration(oldCost, newCost) {
   return { proratedDifference, daysRemaining, totalDaysInMonth, dailyRate: Math.round(dailyRate * 100) / 100, monthlyDifference, isUpgrade: true };
 }
 
+/**
+ * Work out the current billing period from the subscription's start date and
+ * cycle, walking forward one period at a time until we land on the period that
+ * contains "now". Cycle-aware so yearly plans prorate over the year, not a month.
+ */
+export function getPeriodBounds(startISO, cycle = 'monthly') {
+  const now = new Date();
+  const start = startISO ? new Date(startISO) : now;
+  const advance = (d) => {
+    const n = new Date(d);
+    if (cycle === 'yearly') n.setFullYear(n.getFullYear() + 1);
+    else n.setMonth(n.getMonth() + 1);
+    return n;
+  };
+  let periodStart = Number.isNaN(start.getTime()) ? new Date(now) : new Date(start);
+  let periodEnd = advance(periodStart);
+  let guard = 0;
+  while (periodEnd <= now && guard < 3000) { periodStart = periodEnd; periodEnd = advance(periodStart); guard++; }
+  const DAY = 86400000;
+  const totalDays = Math.max(1, Math.round((periodEnd - periodStart) / DAY));
+  const daysRemaining = Math.max(0, Math.min(totalDays, Math.round((periodEnd - now) / DAY)));
+  return { periodStart, periodEnd, totalDays, daysRemaining };
+}
+
+/**
+ * The amount to charge IMMEDIATELY when the recurring price goes up mid-period.
+ * The subscription still renews at the new price; this one-time charge covers the
+ * remainder of the current period so an upgrade is never "free until renewal"
+ * (which, on a yearly plan, would mean free for up to a year).
+ *
+ * @returns {{ amountNow, isUpgrade, periodDelta, daysRemaining, totalDays, newPeriodTotal, periodEnd }}
+ */
+export function calcImmediateProration({ oldMonthly = 0, newMonthly = 0, cycle = 'monthly', subscriptionStartISO }) {
+  const mult = cycle === 'yearly' ? YEARLY_MULTIPLIER : 1;
+  const oldPeriod = (oldMonthly || 0) * mult;
+  const newPeriod = (newMonthly || 0) * mult;
+  const periodDelta = Math.round((newPeriod - oldPeriod) * 100) / 100;
+  const { totalDays, daysRemaining, periodEnd } = getPeriodBounds(subscriptionStartISO, cycle);
+  if (periodDelta <= 0) {
+    return { amountNow: 0, isUpgrade: false, periodDelta, daysRemaining, totalDays, newPeriodTotal: newPeriod, periodEnd };
+  }
+  const amountNow = Math.round(periodDelta * (daysRemaining / totalDays) * 100) / 100;
+  return { amountNow, isUpgrade: true, periodDelta, daysRemaining, totalDays, newPeriodTotal: newPeriod, periodEnd };
+}
+
 export {
   PRICE_PER_WORKER, PRICE_PER_SHOP, FREE_WORKER_LIMIT, FREE_SHOP_LIMIT,
   BASIC_MAX_WORKERS, ENTERPRISE_THRESHOLD, ENTERPRISE_PRICE_MONTHLY, ENTERPRISE_DISCOUNTED_PRICE,

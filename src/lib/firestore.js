@@ -61,28 +61,44 @@ export async function syncOrgPlan(orgId) {
   const shops = await getAll(C.SHOPS, where('orgId', '==', orgId));
   const org = await get1(C.ORGANIZATIONS, orgId);
   const freeLimit = org?.freeWorkerLimit || FREE_WORKER_LIMIT;
-  const newTier = getTier(workers.length, freeLimit);
-  const cost = calculateCost(workers.length, shops.length, 'monthly', freeLimit);
-  await upd(C.ORGANIZATIONS, orgId, { plan: newTier, activeWorkerCount: workers.length, shopCount: shops.length, monthlyCost: cost.total });
+  const onPro = !!org?.proPlan || org?.subscriptionTier === 'enterprise';
+  const opts = { inventoryAddon: !!org?.inventoryAddon, proPlan: onPro };
+  const cost = calculateCost(workers.length, shops.length, 'monthly', freeLimit, opts);
+  // "requiredMonthly" is what they SHOULD pay for the current roster/plan.
+  const requiredMonthly = cost.monthlyTotal;
+  // Bill tier: Pro/add-on keep it paid even when the head-count would be free.
+  const billTier = onPro || (opts.inventoryAddon) ? 'standard' : getTier(workers.length, freeLimit);
+  const cycle = org?.subscriptionCycle || 'monthly';
+  const mult = cycle === 'yearly' ? 10 : 1;
+  await upd(C.ORGANIZATIONS, orgId, {
+    plan: onPro ? 'enterprise' : getTier(workers.length, freeLimit),
+    activeWorkerCount: workers.length, shopCount: shops.length,
+    requiredMonthly,
+  });
 
-  // Sync PayPal subscription quantity (fire-and-forget)
+  // Sync the PayPal subscription — but NEVER silently defer an increase to the
+  // next invoice (on a yearly plan that means free for up to a year). Increases
+  // must be paid immediately from Costs & Billing (prorated). We only auto-apply
+  // decreases here, and suspend/reactivate for the free boundary.
   try {
     const subId = org?.subscriptionId;
+    const paidQty = org?.subscriptionQuantity || 0;
+    const requiredQty = Math.round(requiredMonthly * mult * 100); // cents for the cycle
     if (subId && org.subscriptionStatus === 'active') {
-      if (newTier === 'free') {
+      if (billTier === 'free') {
         fetch('/api/paypal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriptionId: subId, action: 'suspend' }) });
-      } else if (newTier === 'standard') {
-        const qty = Math.round(cost.total * 100); // cents for PayPal quantity
-        if (qty !== (org.subscriptionQuantity || 0)) {
-          fetch('/api/paypal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriptionId: subId, action: 'update_quantity', quantity: qty }) });
-          await upd(C.ORGANIZATIONS, orgId, { subscriptionQuantity: qty, previousMonthlyCost: org.monthlyCost || 0 });
-        }
+      } else if (requiredQty < paidQty) {
+        // Decrease only: apply now so they don't overpay next cycle.
+        fetch('/api/paypal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriptionId: subId, action: 'update_quantity', quantity: requiredQty }) });
+        await upd(C.ORGANIZATIONS, orgId, { subscriptionQuantity: requiredQty, monthlyCost: requiredMonthly, previousMonthlyCost: org.monthlyCost || 0 });
       }
-    } else if (subId && org.subscriptionStatus === 'suspended' && newTier !== 'free') {
+      // Increase (requiredQty > paidQty): left for the Costs page to charge the
+      // prorated difference immediately, then revise the quantity up.
+    } else if (subId && org.subscriptionStatus === 'suspended' && billTier !== 'free') {
       fetch('/api/paypal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriptionId: subId, action: 'activate' }) });
     }
   } catch {}
-  return { plan: newTier, activeWorkerCount: workers.length, shopCount: shops.length };
+  return { plan: onPro ? 'enterprise' : getTier(workers.length, freeLimit), activeWorkerCount: workers.length, shopCount: shops.length, requiredMonthly };
 }
 
 // ─── Overtime Rules (org-level defaults) ──────────────
