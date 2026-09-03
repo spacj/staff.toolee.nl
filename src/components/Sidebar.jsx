@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/utils/helpers';
 import Logo from '@/components/Logo';
-import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, ClipboardList, Sparkles, MessageCircle, CalendarCheck, Globe, Building2, DollarSign, Tag, Inbox, BookOpen, ClipboardCheck, Package, CookingPot } from 'lucide-react';
+import { LayoutDashboard, Users, Store, Calendar, Clock, FileCheck, CreditCard, Settings, LogOut, ClipboardList, Sparkles, MessageCircle, CalendarCheck, Globe, Building2, DollarSign, Tag, Inbox, BookOpen, ClipboardCheck, Package, CookingPot, BarChart3 } from 'lucide-react';
 
 export default function Sidebar({ mobile, onClose }) {
   const pathname = usePathname();
@@ -34,6 +34,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
     { href: '/stock', icon: Package, label: 'Stock' },
     { href: '/recipes', icon: CookingPot, label: 'Recipes' },
+    { href: '/reports', icon: BarChart3, label: 'Reports', pro: true },
     { href: '/costs', icon: CreditCard, label: 'Costs & Billing' },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
@@ -50,6 +51,7 @@ export default function Sidebar({ mobile, onClose }) {
     { href: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
     { href: '/stock', icon: Package, label: 'Stock' },
     { href: '/recipes', icon: CookingPot, label: 'Recipes' },
+    { href: '/reports', icon: BarChart3, label: 'Reports', pro: true },
     { href: '/settings', icon: Settings, label: 'Settings' },
   ];
 
@@ -101,6 +103,7 @@ export default function Sidebar({ mobile, onClose }) {
               )}>
               <link.icon className={cn('w-[18px] h-[18px]', active ? 'text-brand-400' : 'text-white/40')} />
               {link.label}
+              {link.pro && !active && <span className="ml-auto text-[9px] font-bold uppercase tracking-wide text-purple-300/80 bg-purple-500/15 px-1.5 py-0.5 rounded-md">Pro</span>}
               {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-400" />}
             </Link>
           );
