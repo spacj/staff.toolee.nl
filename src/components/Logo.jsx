@@ -30,15 +30,12 @@ export default function Logo({ theme = 'light', size = 'md', subtitle = 'staff2.
     >
       {/* soft top highlight for depth */}
       <span className="absolute inset-0 bg-gradient-to-b from-white/25 to-transparent" />
-      {/* custom geometric "2" mark */}
-      <svg viewBox="0 0 64 64" fill="none" className={cn('relative', S.svg)}>
-        <path
-          d="M20 25 C20 13 46 13 46 27 C46 38 26 41 19 51 L47 51"
-          stroke="white"
-          strokeWidth="9"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+      {/* team mark — two staff figures */}
+      <svg viewBox="0 0 64 64" fill="#fff" className={cn('relative', S.svg)}>
+        <circle cx="22" cy="24" r="6.5" />
+        <path d="M10 48a12 12 0 0 1 24 0z" />
+        <circle cx="42" cy="24" r="6.5" />
+        <path d="M30 48a12 12 0 0 1 24 0z" />
       </svg>
     </span>
   );

@@ -30,11 +30,14 @@ export default function Image() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '48px',
-              fontWeight: 800,
             }}
           >
-            S2
+            <svg width="52" height="52" viewBox="0 0 64 64">
+              <circle cx="22" cy="24" r="6.5" fill="#fff" />
+              <path d="M10 48a12 12 0 0 1 24 0z" fill="#fff" />
+              <circle cx="42" cy="24" r="6.5" fill="#fff" />
+              <path d="M30 48a12 12 0 0 1 24 0z" fill="#fff" />
+            </svg>
           </div>
           <div style={{ fontSize: '64px', fontWeight: 800, letterSpacing: '-1px' }}>Staff2</div>
         </div>
