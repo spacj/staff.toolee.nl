@@ -14,23 +14,32 @@ import { cn } from '@/utils/helpers';
 export default function Logo({ theme = 'light', size = 'md', subtitle = 'staff2.app', markOnly = false, className }) {
   const isDark = theme === 'dark';
   const S = {
-    sm: { box: 'w-8 h-8 rounded-lg', mark: 'text-[15px]', sup: 'text-[9px] -mt-1', word: 'text-base', sub: 'text-[9px]' },
-    md: { box: 'w-9 h-9 rounded-xl', mark: 'text-[17px]', sup: 'text-[10px] -mt-1', word: 'text-lg', sub: 'text-[10px]' },
-    lg: { box: 'w-12 h-12 rounded-2xl', mark: 'text-2xl', sup: 'text-sm -mt-1.5', word: 'text-2xl', sub: 'text-xs' },
+    sm: { box: 'w-8 h-8 rounded-lg', svg: 'w-4 h-4', word: 'text-base', sub: 'text-[9px]' },
+    md: { box: 'w-9 h-9 rounded-xl', svg: 'w-[18px] h-[18px]', word: 'text-lg', sub: 'text-[10px]' },
+    lg: { box: 'w-12 h-12 rounded-2xl', svg: 'w-6 h-6', word: 'text-2xl', sub: 'text-xs' },
   }[size] || {};
 
   const Mark = (
     <span
       className={cn(
-        'relative flex items-center justify-center flex-shrink-0 shadow-lg',
+        'relative flex items-center justify-center flex-shrink-0 overflow-hidden shadow-lg',
         'bg-gradient-to-br from-brand-400 via-brand-500 to-purple-500 shadow-brand-500/30',
         S.box
       )}
       aria-hidden="true"
     >
-      <span className={cn('font-display font-extrabold text-white leading-none flex items-start tracking-tight', S.mark)}>
-        S<span className={cn('font-extrabold leading-none', S.sup)}>2</span>
-      </span>
+      {/* soft top highlight for depth */}
+      <span className="absolute inset-0 bg-gradient-to-b from-white/25 to-transparent" />
+      {/* custom geometric "2" mark */}
+      <svg viewBox="0 0 64 64" fill="none" className={cn('relative', S.svg)}>
+        <path
+          d="M20 25 C20 13 46 13 46 27 C46 38 26 41 19 51 L47 51"
+          stroke="white"
+          strokeWidth="9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
     </span>
   );
 

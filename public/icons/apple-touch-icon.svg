@@ -6,6 +6,9 @@
       <stop offset="1" stop-color="#6d28d9"/>
     </linearGradient>
   </defs>
-  <rect width="180" height="180" rx="40" fill="url(#g)"/>
-  <text x="87" y="118" font-family="Segoe UI, Arial, sans-serif" font-size="86" font-weight="800" letter-spacing="-4" fill="#fff" text-anchor="middle">S<tspan font-size="54" dy="-24">2</tspan></text>
+  <rect width="180" height="180" fill="url(#g)"/>
+  <g transform="translate(26 26) scale(2)">
+    <path d="M20 25 C20 13 46 13 46 27 C46 38 26 41 19 51 L47 51"
+      fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>
