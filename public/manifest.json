@@ -3,8 +3,11 @@
   "short_name": "Staff2",
   "description": "Run your whole team in one app: shift scheduling, time tracking, labor costs, stock & recipes, checklists and a knowledge base.",
   "id": "/",
+  "lang": "en",
+  "dir": "ltr",
   "start_url": "/login",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#ffffff",
   "theme_color": "#4c6ef5",
   "orientation": "portrait-primary",
@@ -20,7 +23,13 @@
       "src": "/icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     },
     {
       "src": "/icons/apple-touch-icon.svg",

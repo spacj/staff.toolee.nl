@@ -1,10 +1,14 @@
-const CACHE_NAME = 'staff2-v1';
+const CACHE_NAME = 'staff2-v2';
 const OFFLINE_URL = '/offline.html';
 
 const STATIC_ASSETS = [
   '/',
   '/offline.html',
   '/manifest.json',
+  '/favicon.svg',
+  '/icons/icon.svg',
+  '/icons/maskable.svg',
+  '/icons/apple-touch-icon.svg',
 ];
 
 const FIREBASE_DOMAINS = [
