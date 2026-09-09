@@ -37,7 +37,8 @@ function isBypassed(url) {
 function isFirebaseStorage(url) {
   return (
     url.hostname === 'firebasestorage.googleapis.com' ||
-    url.hostname === 'storage.googleapis.com'
+    url.hostname === 'storage.googleapis.com' ||
+    url.hostname.endsWith('.firebasestorage.app')
   );
 }
 
@@ -128,7 +129,10 @@ async function handleNavigation(event) {
     putRuntime(request, network.clone());
     return network;
   } catch {
-    const cached = await caches.match(request);
+    // Ignore the query string so e.g. /login?source=pwa still matches /login.
+    const cached =
+      (await caches.match(request, { ignoreSearch: true })) ||
+      (await caches.match('/'));
     if (cached) return cached;
     const offline = await caches.match(OFFLINE_URL);
     if (offline) return offline;

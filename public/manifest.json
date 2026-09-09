@@ -1,18 +1,19 @@
 {
-  "name": "Staff2 — All-in-One Team Operations Platform",
+  "name": "Staff2 - All-in-One Team Operations Platform",
   "short_name": "Staff2",
-  "description": "Run your whole team in one app: shift scheduling, time tracking, labor costs, stock & recipes, checklists and a knowledge base.",
+  "description": "Run your whole team in one app: shift scheduling, time tracking, labor costs, stock and recipes, checklists and a knowledge base.",
   "id": "/",
   "lang": "en",
   "dir": "ltr",
-  "start_url": "/login",
+  "start_url": "/login?source=pwa",
+  "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "background_color": "#ffffff",
   "theme_color": "#4c6ef5",
   "orientation": "portrait-primary",
-  "scope": "/",
   "prefer_related_applications": false,
+  "handle_links": "preferred",
   "launch_handler": {
     "client_mode": "navigate-existing"
   },
@@ -57,32 +58,38 @@
       "sizes": "1080x1920",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Staff2 — run your whole team in one app"
+      "label": "Run your whole team in one app"
     },
     {
       "src": "/screenshots/desktop.png",
       "sizes": "1920x1080",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Staff2 — scheduling, time tracking, costs, stock and checklists"
+      "label": "Scheduling, time tracking, costs, stock and checklists"
     }
   ],
   "categories": ["business", "productivity"],
   "shortcuts": [
     {
       "name": "Dashboard",
-      "url": "/dashboard",
-      "description": "View your dashboard"
+      "short_name": "Dashboard",
+      "url": "/dashboard?source=pwa-shortcut",
+      "description": "View your dashboard",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "My Checklists",
-      "url": "/my-checklists",
-      "description": "View your assigned checklists"
+      "short_name": "Checklists",
+      "url": "/my-checklists?source=pwa-shortcut",
+      "description": "View your assigned checklists",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Time Tracking",
-      "url": "/time",
-      "description": "Track your work hours"
+      "short_name": "Time",
+      "url": "/time?source=pwa-shortcut",
+      "description": "Track your work hours",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }
