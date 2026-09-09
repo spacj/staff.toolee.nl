@@ -1,118 +1,196 @@
-const CACHE_NAME = 'staff2-v2';
+/* Staff2 service worker — offline shell + runtime caching + push. */
+
+const VERSION = 'v3';
+const PRECACHE = `staff2-precache-${VERSION}`;
+const RUNTIME = `staff2-runtime-${VERSION}`;
 const OFFLINE_URL = '/offline.html';
 
-const STATIC_ASSETS = [
+// App shell that should always be available offline.
+const PRECACHE_URLS = [
   '/',
-  '/offline.html',
+  '/login',
+  OFFLINE_URL,
   '/manifest.json',
   '/favicon.svg',
   '/icons/icon.svg',
   '/icons/maskable.svg',
   '/icons/apple-touch-icon.svg',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/maskable-512.png',
 ];
 
-const FIREBASE_DOMAINS = [
-  'firbasestorage.googleapis.com',
-  'firebasestorage.googleapis.com',
-];
+// Requests we never want the SW to touch (real-time data, auth, APIs).
+function isBypassed(url) {
+  if (url.pathname.startsWith('/api/')) return true;
+  const h = url.hostname;
+  if (h === 'firestore.googleapis.com') return true;
+  if (h === 'firebaseinstallations.googleapis.com') return true;
+  if (h === 'identitytoolkit.googleapis.com') return true;
+  if (h === 'securetoken.googleapis.com') return true;
+  if (h === 'fcmregistrations.googleapis.com') return true;
+  if (h.endsWith('.firebaseio.com')) return true;
+  if (h.endsWith('.cloudfunctions.net')) return true;
+  return false;
+}
+
+function isFirebaseStorage(url) {
+  return (
+    url.hostname === 'firebasestorage.googleapis.com' ||
+    url.hostname === 'storage.googleapis.com'
+  );
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
+    caches
+      .open(PRECACHE)
+      // Don't let one bad asset abort the whole install.
+      .then((cache) =>
+        Promise.all(
+          PRECACHE_URLS.map((u) =>
+            cache.add(new Request(u, { cache: 'reload' })).catch(() => null)
+          )
+        )
+      )
+      .then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
+    (async () => {
+      if (self.registration.navigationPreload) {
+        await self.registration.navigationPreload.enable();
+      }
+      const names = await caches.keys();
+      await Promise.all(
+        names
+          .filter((n) => n !== PRECACHE && n !== RUNTIME)
+          .map((n) => caches.delete(n))
       );
-    })
+      await self.clients.claim();
+    })()
   );
-  self.clients.claim();
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING' || event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const url = new URL(request.url);
+  if (request.method !== 'GET') return;
 
-  if (request.method !== 'GET') {
+  const url = new URL(request.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  if (isBypassed(url)) return;
+
+  const sameOrigin = url.origin === self.location.origin;
+
+  // HTML navigations: network-first, fall back to cache, then offline page.
+  if (request.mode === 'navigate') {
+    event.respondWith(handleNavigation(event));
     return;
   }
 
-  if (FIREBASE_DOMAINS.some(domain => url.hostname.includes(domain))) {
+  if (sameOrigin && ['style', 'script', 'font'].includes(request.destination)) {
+    event.respondWith(staleWhileRevalidate(request));
+    return;
+  }
+
+  if (request.destination === 'image' && (sameOrigin || isFirebaseStorage(url))) {
+    event.respondWith(cacheFirst(request));
+    return;
+  }
+
+  if (isFirebaseStorage(url)) {
     event.respondWith(networkFirst(request));
     return;
   }
 
-  if (url.origin === location.origin) {
-    if (request.mode === 'navigate') {
-      event.respondWith(networkFirst(request));
-      return;
-    }
-
-    if (request.destination === 'style' || request.destination === 'script' || request.destination === 'font') {
-      event.respondWith(cacheFirst(request));
-      return;
-    }
-
-    if (request.destination === 'image') {
-      event.respondWith(cacheFirst(request));
-      return;
-    }
+  if (sameOrigin) {
+    event.respondWith(networkFirst(request));
   }
-
-  event.respondWith(fetch(request).catch(() => caches.match(OFFLINE_URL)));
 });
+
+async function handleNavigation(event) {
+  const { request } = event;
+  try {
+    const preload = await event.preloadResponse;
+    if (preload) {
+      putRuntime(request, preload.clone());
+      return preload;
+    }
+    const network = await fetch(request);
+    putRuntime(request, network.clone());
+    return network;
+  } catch {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    const offline = await caches.match(OFFLINE_URL);
+    if (offline) return offline;
+    return new Response('Offline', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+  }
+}
 
 async function cacheFirst(request) {
   const cached = await caches.match(request);
   if (cached) return cached;
-
   try {
     const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(request, response.clone());
-    }
+    if (response.ok) putRuntime(request, response.clone());
     return response;
   } catch {
-    return new Response('Offline', { status: 503 });
+    return new Response('', { status: 504 });
   }
 }
 
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(request, response.clone());
-    }
+    if (response.ok) putRuntime(request, response.clone());
     return response;
   } catch {
     const cached = await caches.match(request);
     if (cached) return cached;
-
-    if (request.mode === 'navigate') {
-      const offlinePage = await caches.match(OFFLINE_URL);
-      if (offlinePage) return offlinePage;
-    }
-
     return new Response('Offline', { status: 503 });
   }
 }
+
+async function staleWhileRevalidate(request) {
+  const cached = await caches.match(request);
+  const network = fetch(request)
+    .then((response) => {
+      if (response.ok) putRuntime(request, response.clone());
+      return response;
+    })
+    .catch(() => null);
+  return cached || (await network) || new Response('', { status: 504 });
+}
+
+async function putRuntime(request, response) {
+  try {
+    if (!response || !response.ok || response.type === 'opaque') return;
+    const cache = await caches.open(RUNTIME);
+    await cache.put(request, response);
+  } catch {
+    /* ignore quota / put errors */
+  }
+}
+
+/* ---------------------------------------------------------------- push ---- */
 
 self.addEventListener('push', (event) => {
   let data = {
     title: 'Staff2',
     body: 'You have a new notification',
-    icon: '/icons/icon.svg',
+    icon: '/icons/icon-192.png',
     badge: '/favicon.svg',
     url: '/',
   };
@@ -143,38 +221,30 @@ self.addEventListener('push', (event) => {
     vibrate: [100, 50, 100, 50, 100],
     tag: data.tag,
     requireInteraction: data.requireInteraction,
-    data: {
-      url: data.url,
-      date: new Date().toISOString(),
-    },
+    data: { url: data.url, date: new Date().toISOString() },
     actions: data.actions,
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-
   const url = event.notification.data?.url || '/';
-  
+
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          client.focus();
-          if (url !== '/') {
-            client.navigate(url);
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            client.focus();
+            if (url !== '/') client.navigate(url);
+            return;
           }
-          return;
         }
-      }
-      if (self.clients.openWindow) {
-        self.clients.openWindow(url);
-      }
-    })
+        if (self.clients.openWindow) self.clients.openWindow(url);
+      })
   );
 });
 

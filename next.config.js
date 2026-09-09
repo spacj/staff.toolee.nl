@@ -38,6 +38,24 @@ const nextConfig = {
         ],
       },
       {
+        source: '/screenshots/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=604800',
+          },
+        ],
+      },
+      {
+        source: '/offline.html',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, must-revalidate',
+          },
+        ],
+      },
+      {
         source: '/favicon.svg',
         headers: [
           {
