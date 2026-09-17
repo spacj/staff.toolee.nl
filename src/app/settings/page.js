@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { updateUserProfile, getReferrals, getOrganization, getPublicHolidays, savePublicHolidays, getInvites, getAvailabilitySettings, saveAvailabilitySettings, getJobRoles, saveJobRoles } from '@/lib/firestore';
@@ -619,13 +620,14 @@ export default function SettingsPage() {
                       <p className="text-xs text-surface-400">Sign out of your Staff2 account</p>
                     </div>
                   </button>
-                  <button className="flex items-center gap-3 w-full p-3 rounded-xl border border-red-200 hover:bg-red-50 transition-colors text-left">
+                  <Link href="/delete-account" className="flex items-center gap-3 w-full p-3 rounded-xl border border-red-200 hover:bg-red-50 transition-colors text-left">
                     <Trash2 className="w-5 h-5 text-red-500" />
                     <div>
                       <p className="text-sm font-medium text-red-700">Delete Account</p>
                       <p className="text-xs text-surface-400">Permanently delete your account and all data</p>
                     </div>
-                  </button>
+                    <ChevronRight className="w-4 h-4 text-surface-300 ml-auto" />
+                  </Link>
                 </div>
               </div>
             </div>

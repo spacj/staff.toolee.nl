@@ -929,6 +929,7 @@ export default function HomePage() {
             <Logo theme="light" size="md" />
             <div className="flex items-center gap-5">
               <Link href="/privacy" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Privacy Policy</Link>
+              <Link href="/delete-account" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Delete Account</Link>
               <p className="text-sm text-slate-500">&copy; {new Date().getFullYear()} Staff2. All rights reserved.</p>
             </div>
           </div>
