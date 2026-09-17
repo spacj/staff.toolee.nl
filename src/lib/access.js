@@ -9,6 +9,9 @@
 export const SUPERADMIN_EMAILS = [
   'malek@gmail.com',
   'malekalqaisi@gmail.com',
+  // Google Play reviewer demo account — full Pro access for app review, no
+  // real billing. See Play Console "App access" > login credentials.
+  'googleplay-review@staff2.app',
 ];
 
 export function isSuperAdminEmail(email) {
