@@ -927,7 +927,10 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <Logo theme="light" size="md" />
-            <p className="text-sm text-slate-500">&copy; {new Date().getFullYear()} Staff2. All rights reserved.</p>
+            <div className="flex items-center gap-5">
+              <Link href="/privacy" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Privacy Policy</Link>
+              <p className="text-sm text-slate-500">&copy; {new Date().getFullYear()} Staff2. All rights reserved.</p>
+            </div>
           </div>
         </div>
       </footer>
